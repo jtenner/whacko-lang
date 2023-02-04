@@ -1,1 +1,5 @@
 build-emscripten/
+node_modules
+package-lock.json
+lib
+src/grammar/compiled.ne
