@@ -15,6 +15,8 @@ emcmake cmake \
 
 ninja -C build-emscripten
 
+npm run build
+
 # em++ \
 #     src/bindings.cpp \
 #     -I  \
