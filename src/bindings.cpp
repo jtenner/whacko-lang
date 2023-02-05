@@ -1,11 +1,10 @@
 
-#include <llvm-15/llvm/IR/LLVMContext.h>
-#include <llvm-15/llvm/IR/Module.h>
-#include <llvm-15/llvm/IR/DataLayout.h>
-#include <llvm-15/llvm/Analysis/TargetFolder.h>
-#include <llvm-15/llvm/IR/IRBuilder.h>
-#include <llvm-15/llvm/IR/Constants.h>
-// all the header files are there wtf
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/DataLayout.h>
+#include <llvm/Analysis/TargetFolder.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Constants.h>
 #include <emscripten/bind.h>
 
 

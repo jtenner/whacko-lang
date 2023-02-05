@@ -1,1 +1,5 @@
 build-emscripten/
+src/bindings.mjs
+src/bindings.wasm
+src/bindings-generator.mjs
+src/bindings-generator.wasm
