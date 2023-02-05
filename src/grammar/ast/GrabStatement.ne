@@ -13,3 +13,4 @@ export class GrabStatementNode extends StatementNode {
 GrabStatement -> "grab" __ Expression __ "as" __ Identifier _ BlockStatement {%
   (d: any) => new GrabStatementNode(d[2], d[6], d[8])
 %}
+

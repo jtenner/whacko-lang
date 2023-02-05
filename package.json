@@ -4,7 +4,7 @@
   "description": "Compiled language that runs in lunatic",
   "main": "lib/index.js",
   "scripts": {
-    "cat": "cat src/grammar/prelude.ne src/grammar/ast/*.ne >> src/grammar/compiled.ne",
+    "cat": "cat src/grammar/prelude.ne src/grammar/ast/*.ne > src/grammar/compiled.ne",
     "tsc": "tsc",
     "grammar": "nearleyc src/grammar/compiled.ne -o src/grammar.ts",
     "build": "run-s cat grammar tsc",
