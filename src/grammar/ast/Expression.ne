@@ -33,8 +33,9 @@ as	left to right
 ||	left to right
 
 .. ..=	Require parentheses
-= += -= *= /= %=
-&= |= ^= <<= >>=	right to left	
+
+right to left	
+
 
 */%}
 
@@ -63,7 +64,7 @@ export class ConditionalExpression extends ExpressionNode {
 
 Expression -> Precidence1 {% identity %}
 
-Precidence1 -> (YieldExpression | ConditionalExpression | AssignmentExpression) {% (d: any) => d[0][0] %}
+Precidence1 -> (YieldExpression | ConditionalExpression) {% (d: any) => d[0][0] %}
              | Precidence2 {% identity %}
 
 YieldExpression -> "yield" _ Precidence1 {%
@@ -73,4 +74,9 @@ YieldExpression -> "yield" _ Precidence1 {%
 ConditionalExpression -> Precidence2 _ "?" _ Precidence1 _ ":" _ Precidence1 {%
   (d: any) => new ConditionalExpressionNode(d[0], d[1], d[2])
 %}
+
+Precidence2 -> AssignmentExpression {% identity %}
+             | Precidence3 {% identity %}
+
+AssignmentExpression -> BinaryExpression[PathExpression, ("=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>="), Precidence2] {% identity %}
 
