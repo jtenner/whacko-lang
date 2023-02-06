@@ -54,6 +54,7 @@ export class WhileStatementNode extends StatementNode {
 }
 
 export class ContinueStatementNode extends StatementNode {}
+export class BreakStatementNode extends StatementNode {}
 
 %}
 
@@ -82,3 +83,6 @@ WhileStatement -> "while" _ "(" _ Expression _ ")" _ Statement {%
 %}
 
 ContinueStatement -> "continue" _ ";" {% () => new ContinueStatementNode() %}
+
+BreakStatement -> "break" _ ";" {% () => new BreakStatementNode() %}
+

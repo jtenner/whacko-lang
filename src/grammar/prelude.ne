@@ -31,6 +31,8 @@ const keywords = new Set([
   "type",
   "while",
   "continue",
+  "break",
+  "gen",
 ]);
 %}
 
