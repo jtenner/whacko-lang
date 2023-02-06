@@ -90,7 +90,7 @@ FunctionDeclaration -> ("async" __):?
 
 GeneratorDeclaration ->
   "gen" _
-  "<" _ TypeExpression _ "," _ TypeExpression _">"_
+  "<" _ TypeExpression _ "," _ TypeExpression _ ">" __
   Identifier _
   ("<" _ List[TypeIdentifier, (_ "," _)] _ ">" _ ):?
   "(" _ (List[ParameterDeclarator, (_ "," _)] _):? ")" _ BlockStatement {%

@@ -17,8 +17,8 @@ export class ExpressionStatementNode extends StatementNode {
 
 export class TypeDeclaratorNode extends Node {
   constructor(
-    public name: TypeIdentifier,
-    public parameters: TypeIdentifier[] | null,
+    public name: TypeIdentifierNode,
+    public parameters: TypeIdentifierNode[] | null,
     public expr: TypeExpressionNode,
   ) {
     super();
@@ -65,7 +65,7 @@ export class IfElseStatementNode extends StatementNode {
   }
 }
 
-export class ReturnStatement extends StatementNode {
+export class ReturnStatementNode extends StatementNode {
   constructor(
     public expr: ExpressionNode,
   ) {
