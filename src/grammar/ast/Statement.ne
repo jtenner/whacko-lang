@@ -19,7 +19,8 @@ export class ExpressionStatementNode extends StatementNode {
 
 export class TypeDeclaratorNode extends Node {
   constructor(
-    public name: IdentifierNode,
+    public name: TypeIdentifier,
+    public parameters: TypeIdentifier[] | null,
     public expr: TypeExpressionNode,
   ) {
     super();
