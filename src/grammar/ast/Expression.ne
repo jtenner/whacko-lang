@@ -4,7 +4,7 @@
 
 export class YieldExpressionNode extends ExpressionNode {
   constructor(
-    public expr: Expression,
+    public expr: ExpressionNode,
   ) {
     super();
   }
