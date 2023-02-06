@@ -1,5 +1,4 @@
 @{%
-
 export class BlockStatementNode extends StatementNode {
   constructor(
     public statements: StatementNode[],
@@ -15,7 +14,6 @@ export class ExpressionStatementNode extends StatementNode {
     super();
   }
 }
-
 
 export class TypeDeclaratorNode extends Node {
   constructor(
@@ -57,6 +55,15 @@ export class WhileStatementNode extends StatementNode {
 export class ContinueStatementNode extends StatementNode {}
 export class BreakStatementNode extends StatementNode {}
 
+export class IfElseStatementNode extends StatementNode {
+  constructor(
+    public expr: ExpressionNode,
+    public ifTrue: StatementNode,
+    public ifFalse: StatementNode | null, 
+  ) {
+    super();
+  }
+}
 %}
 
 BlockStatement -> "{" _ (List[Statement, _] _):? "}" {%
@@ -90,4 +97,8 @@ WhileStatement -> "while" _ "(" _ Expression _ ")" _ Statement {%
 ContinueStatement -> "continue" _ ";" {% () => new ContinueStatementNode() %}
 
 BreakStatement -> "break" _ ";" {% () => new BreakStatementNode() %}
+
+IfElseStatement -> "if" _ "(" _ Expression _ ")" _ Statement (_ "else" _ Statement):? {%
+  (d: any) => new IfElseStatementNode(d[4], d[8], d[9] ? d[9][3] : null)
+%}
 
