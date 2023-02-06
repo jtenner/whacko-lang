@@ -60,7 +60,7 @@ export class ConditionalExpressionNode extends ExpressionNode {
   }
 }
 
-export class AsExpressionNode extends ExportDeclarationNode {
+export class AsExpressionNode extends ExpressionnNode {
   constructor(
     public expr: ExpressionNode,
     public type: TypeExpressionNode,
