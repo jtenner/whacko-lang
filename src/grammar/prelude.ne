@@ -30,6 +30,7 @@ const keywords = new Set([
   "fn",
   "type",
   "while",
+  "continue",
 ]);
 %}
 
