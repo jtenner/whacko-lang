@@ -69,9 +69,13 @@ TypeDeclarationStatement -> "type" __ List[TypeDeclarator, (_ "," _)] _ ";" {%
   (d: any) => new TypeDeclarationStatementNode(d[2])
 %}
 
-#TypeIdentifier = TypeExpression
-TypeDeclarator -> TypeIdentifier _ "=" _ TypeExpression {%
-  (d: any) => new TypeDeclaratorNode(d[0], d[4])
+# TypeIdentifier<TypeParam, ...> = TypeExpression
+TypeDeclarator -> TypeIdentifier _ ("<" _ List[TypeIdentifier, (_ "," _)] _ ">" _):? "=" _ TypeExpression {%
+  (d: any) => new TypeDeclaratorNode(
+    d[0],
+    d[2] ? d[2][2] : null,
+    d[5],
+  )
 %}
 
 GrabStatement -> "grab" __ Expression __ "as" __ Identifier _ BlockStatement {%
