@@ -75,15 +75,15 @@ export class ReturnStatementNode extends StatementNode {
 %}
 
 Statement -> ( BlockStatement
-            | TypeDeclarationStatement
-            | GrabStatement
-            | WhileStatement
-            | ContinueStatement
-            | BreakStatement
-            | IfElseStatement
-            | ReturnStatement
-            | ExpressionStatement
-            ) {% (d: any) => d[0][0] %}
+             | TypeDeclarationStatement
+             | GrabStatement
+             | WhileStatement
+             | ContinueStatement
+             | BreakStatement
+             | IfElseStatement
+             | ReturnStatement
+             | ExpressionStatement
+             ) {% (d: any) => d[0][0] %}
 
 BlockStatement -> "{" _ (List[Statement, _] _):? "}" {%
   (d: any) => new BlockStatementNode(d[2][0][0])
@@ -123,7 +123,7 @@ IfElseStatement -> "if" _ "(" _ Expression _ ")" _ Statement (_ "else" _ Stateme
   (d: any) => new IfElseStatementNode(d[4], d[8], d[9] ? d[9][3] : null)
 %}
 
-ReturnStatement -> "return" _ Expression _ ";" {%
+ReturnStatement -> "return" __ Expression _ ";" {%
   (d: any) => new ReturnStatementNode(d[2])
 %}
 

@@ -1,6 +1,5 @@
-Declaration -> (ImportDeclaration | FunctionDeclaration | GlobalDeclaration) {% (d: any) => d[0][0] %}
-
 @{%
+
 export class ImportDeclarationNode extends DeclarationNode {
   constructor(
     public imports: ImportDeclaratorNode[],
@@ -63,7 +62,22 @@ export class GlobalDeclarationNode extends DeclarationNode {
     super();
   }
 }
+
+export class ExportDeclarationNode extends DeclarationNode {
+  constructor(
+    public declaration: DeclarationNode,
+  ) {
+    super();
+  }
+}
 %}
+
+Declaration -> ( ExportDeclaration
+               | ImportDeclaration
+               | FunctionDeclaration
+               | GeneratorDeclaration
+               | GlobalDeclaration
+               )
 
 ImportDeclaration -> "import" _ "{" _ (List[ImportDeclarator, (_ "," _)] _):? "}" _ "from" _ String _ ";" {%
   (d: any[]) => new ImportDeclarationNode(d[4] ? d[4][0] : null, d[9])
@@ -110,5 +124,9 @@ ParameterDeclarator -> Identifier _ ":" _ TypeExpression _ ("=" _ Expression):? 
 
 GlobalDeclaration -> ("const" | "let") __ List[ParameterDeclarator, (_ "," _)] _ ";" {%
   (d: any) => new GlobalDeclarationNode(d[0][0] === "const", d[2])
+%}
+
+ExportDeclaration -> "export" __ (GlobalDeclaration | GeneratorDeclaration | FunctionDeclaration) {%
+  (d: any) => new ExportDeclarationNode(d[2][0])
 %}
 
