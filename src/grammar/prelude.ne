@@ -73,7 +73,7 @@ BinaryExpression[Left, Op, Right] -> $Left _ $Op _ $Right {%
     d[0][0],
     d[2][0][0],
     d[4][0],
-  );
+  )
 %}
 
 

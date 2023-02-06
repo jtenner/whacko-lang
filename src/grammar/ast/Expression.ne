@@ -50,7 +50,7 @@ export class YieldExpressionNode extends ExpressionNode {
   }
 }
 
-export class ConditionalExpression extends ExpressionNode {
+export class ConditionalExpressionNode extends ExpressionNode {
   constructor(
     public condition: ExpressionNode,
     public ifTrue: ExpressionNode,
@@ -78,5 +78,21 @@ ConditionalExpression -> Precidence2 _ "?" _ Precidence1 _ ":" _ Precidence1 {%
 Precidence2 -> AssignmentExpression {% identity %}
              | Precidence3 {% identity %}
 
-AssignmentExpression -> BinaryExpression[PathExpression, ("=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>="), Precidence2] {% identity %}
+AssignmentExpression -> BinaryExpression[MemberAccessExpression, ("=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>="), Precidence2] {% identity %}
+                      | BinaryExpression[IdentifierExpression, ("=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>="), Precidence2] {% identity %}
+
+Precidence3 -> LogicalOrExpression {% identity %}
+             | Precidence4 {% identity %}
+
+LogicalOrExpression -> BinaryExpression[Precidence3, ("||"), Precidence4] {% identity %}
+
+Precidence4 -> LogicalAndExpression {% identity %}
+             | Precidence5 {% identity %}
+
+LogicalAndExpression -> BinaryExpression[Precidence4, ("&&"), Precidence5] {% identity %}
+
+Precidence5 -> EqualityExpression {% identity %}
+             | Precidence6 {% identity %}
+
+EqualityExpression -> BinaryExpression[Precidence5, ("==" | "!=" | "<" | ">" | "<=" | ">="), Precidence6] {% identity %}
 

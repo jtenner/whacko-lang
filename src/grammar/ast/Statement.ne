@@ -74,11 +74,24 @@ export class ReturnStatementNode extends StatementNode {
 }
 %}
 
+Statement -> ( BlockStatement
+            | TypeDeclarationStatement
+            | GrabStatement
+            | WhileStatement
+            | ContinueStatement
+            | BreakStatement
+            | IfElseStatement
+            | ReturnStatement
+            | ExpressionStatement
+            ) {% (d: any) => d[0][0] %}
+
 BlockStatement -> "{" _ (List[Statement, _] _):? "}" {%
   (d: any) => new BlockStatementNode(d[2][0][0])
 %}
 
-ExpressionStatementNode -> Expression _ ";" {% identity %} 
+ExpressionStatement -> Expression _ ";" {%
+  (d: any) => new ExpressionStatementNode(d[0])
+%} 
 
 # type TypeIdentifier = TypeExpression, TypeIdentifier = TypeExpression ...;
 TypeDeclarationStatement -> "type" __ List[TypeDeclarator, (_ "," _)] _ ";" {%
