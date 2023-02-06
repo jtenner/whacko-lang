@@ -53,6 +53,8 @@ export class WhileStatementNode extends StatementNode {
   }
 }
 
+export class ContinueStatementNode extends StatementNode {}
+
 %}
 
 BlockStatement -> "{" _ (List[Statement, _] _):? "}" {%
@@ -78,3 +80,5 @@ GrabStatement -> "grab" __ Expression __ "as" __ Identifier _ BlockStatement {%
 WhileStatement -> "while" _ "(" _ Expression _ ")" _ Statement {%
   (d: any) => new WhileStatementNode(d[4], d[8])
 %}
+
+ContinueStatement -> "continue" _ ";" {% () => new ContinueStatementNode() %}
