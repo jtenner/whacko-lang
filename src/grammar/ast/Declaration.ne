@@ -34,6 +34,8 @@ export class FunctionDeclarationNode extends Node {
 
 export class GeneratorDeclarationNode extends Node {
   constructor(
+    public tIn: TypeExpressionNode,
+    public tOut: TypeExpressionNode, 
     public name: IdentifierNode,
     public typeParameters: TypeIdentifierNode[] | null,
     public parameters: ParameterDeclaratorNode[] | null,
@@ -87,14 +89,18 @@ FunctionDeclaration -> ("async" __):?
 %}
 
 GeneratorDeclaration ->
-  "gen" __ Identifier _
+  "gen" _
+  "<" _ TypeExpression _ "," _ TypeExpression _">"_
+  Identifier _
   ("<" _ List[TypeIdentifier, (_ "," _)] _ ">" _ ):?
   "(" _ (List[ParameterDeclarator, (_ "," _)] _):? ")" _ BlockStatement {%
   (d: any) => new GeneratorDeclarationNode(
-    d[2], // name
-    d[4] ? d[4][2] : null, // type parameters
-    d[7] ? d[7][0] : null, // function parameters
-    d[10], // body
+    d[4], // TIn
+    d[10], // TOut
+    d[12], // name
+    d[14] ? d[14][2] : null, // TypeParameters
+    d[17] ? d[17][0] : null, // FunctionParameters
+    d[20], // function body 
   )
 %}
 
