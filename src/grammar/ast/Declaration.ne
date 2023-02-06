@@ -63,7 +63,7 @@ export class GlobalDeclarationNode extends DeclarationNode {
 }
 %}
 
-ImportDeclaration -> "import" _ "{" _ (List[ImportDeclarator, (_ "," _)] _):? "}" _ "from" _ StringExpression _ ";" {%
+ImportDeclaration -> "import" _ "{" _ (List[ImportDeclarator, (_ "," _)] _):? "}" _ "from" _ String _ ";" {%
   (d: any[]) => new ImportDeclarationNode(d[4] ? d[4][0] : null, d[9])
 %}
 
