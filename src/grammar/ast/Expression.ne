@@ -60,6 +60,15 @@ export class ConditionalExpressionNode extends ExpressionNode {
   }
 }
 
+export class AsExpressionNode extends ExportDeclarationNode {
+  constructor(
+    public expr: ExpressionNode,
+    public type: TypeExpressionNode,
+  ) {
+    super();
+  }
+}
+
 %}
 
 Expression -> Precidence1 {% identity %}
@@ -95,4 +104,48 @@ Precidence5 -> EqualityExpression {% identity %}
              | Precidence6 {% identity %}
 
 EqualityExpression -> BinaryExpression[Precidence5, ("==" | "!=" | "<" | ">" | "<=" | ">="), Precidence6] {% identity %}
+
+Precidence6 -> BitwiseOrExpression {% identity %}
+             | Precidence7 {% identity %}
+
+BitwiseOrExpression -> BinaryExpression[Precidence6, ("|"), Precidence7] {% identity %}
+
+Precidence7 -> BitwiseXOrExpression {% identity %}
+             | Precidence8 {% identity %}
+
+BitwiseXOrExpression -> BinaryExpression[Precidence7, ("^"), Precidence8] {% identity %}
+
+Precidence8 -> BitwiseAndExpression {% identity %}
+             | Precidence9 {% identity %}
+
+BitwiseAndExpression -> BinaryExpression[Precidence8, ("&"), Precidence9] {% identity %}
+
+Precidence9 -> BitshiftExpression {% identity %}
+             | Precidence10 {% identity %}
+
+BitshiftExpression -> BinaryExpression[Precidence9, ("<<" | ">>"), Precidence10] {% identity %}
+
+Precidence10 -> SumExpression {% identity %}
+              | Precidence11 {% identity %}
+
+SumExpression -> BinaryExpression[Precidence10, ("+" | "-"), Precidence11] {% identity %}
+
+Precidence11 -> ProductExpression {% identity %}
+              | Precidence12 {% identity %}
+
+ProductExpression -> BinaryExpression[Precidence11, ("*" | "/" | "%"), Precidence12] {% identity %}
+
+Precidence12 -> AsExpression {% identity %}
+              | Precidence13
+
+AsExpression -> Precidence12 _ "as" _ TypeExpression {%
+  (d: any) => new AsExpressionNode(d[0], d[4])
+%}
+
+Precidence13 -> LogicalNotExpression {% identity %}
+              | NegativeExpression {% identity %}
+              | Precidence14
+
+LogicalNotExpression -> LeftUnaryExpression[("!"), Precidence13] {% identity %}
+NegativeExpression -> LeftUnaryExpression[("-"), Precidence13] {% identity %}
 

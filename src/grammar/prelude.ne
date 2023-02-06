@@ -76,6 +76,26 @@ BinaryExpression[Left, Op, Right] -> $Left _ $Op _ $Right {%
   )
 %}
 
+@{%
+
+export class LeftUnaryExpressionNode extends ExpressionNode {
+  constructor(
+    public op: string,
+    public expr: ExpressionNode
+  ) {
+    super();
+  }
+}
+
+%}
+
+LeftUnaryExpression[Op, Expr] -> $Op _ $Expr {%
+  (d: any) => new LeftUnaryExpressionNode(
+    d[0][0][0],
+    d[2][0],
+  )
+%}
+
 
 _ -> __:?
 __ -> [\r\t\n ]:+
