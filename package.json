@@ -1,0 +1,33 @@
+{
+  "name": "whacko-lang",
+  "version": "0.0.1",
+  "description": "",
+  "main": "lib/index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jtenner/whacko-lang.git"
+  },
+  "author": "Joshua Tenner <tenner.joshua@gmail.com>",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/jtenner/whacko-lang/issues"
+  },
+  "homepage": "https://github.com/jtenner/whacko-lang#readme",
+  "devDependencies": {
+    "@types/diff": "^5.0.2",
+    "@types/glob": "^8.0.1",
+    "@types/node": "^18.13.0",
+    "diff": "^5.1.0",
+    "typescript": "^4.9.5"
+  },
+  "dependencies": {
+    "@types/moo": "^0.5.5",
+    "colors": "^1.4.0",
+    "glob": "^8.1.0",
+    "moo": "^0.5.2"
+  }
+}

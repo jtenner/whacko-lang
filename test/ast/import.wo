@@ -1,0 +1,1 @@
+import { test, test2 as test3, test4 } from "./file.wo";
