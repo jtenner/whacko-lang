@@ -1,0 +1,4 @@
+export fn magic(): void {
+  let a: string = "test";
+  a + a;
+}

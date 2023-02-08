@@ -1,4 +1,4 @@
-import grammar, { /* AST NODES ARE HERE */ ProgramNode } from "./grammar";
+import grammar, { /* AST NODES ARE HERE */ ProgramNode } from "./grammar.js";
 import ne from "nearley";
 
 import {equal, ok} from "node:assert/strict";
@@ -11,21 +11,31 @@ export class Parser {
   public parse(str: string): ProgramNode | null {
     const parser = new ne.Parser(compiledGrammar);
     
-    parser.feed(str);
-
-    equal(parser.results.length, 1, "Parse returned multiple or no results");
-    ok(parser.results[0] instanceof ProgramNode, "Parse result is a ProgramNode.");
-    
-    return parser.results[0];
+    try {
+      parser.feed(str);
+  
+      equal(parser.results.length, 1, "Parse returned multiple or no results");
+      ok(parser.results[0] instanceof ProgramNode, "Parse result is not a ProgramNode.");
+      
+      return parser.results[0];
+    } catch(ex) {
+      console.log((ex as any).message);
+    }
+    return null;
   }
 
-  public async parseStream(stream: AsyncIterable<string>): Promise<ProgramNode> {
-    const parser = new ne.Parser(compiledGrammar)
-    for await (const chunk of stream) {
-        parser.feed(chunk);
+  public async parseStream(stream: AsyncIterable<string>): Promise<ProgramNode | null> {
+    const parser = new ne.Parser(compiledGrammar);
+    try {
+      for await (const chunk of stream) {
+          parser.feed(chunk);
+      }
+      equal(parser.results.length, 1, "Parse returned multiple or no results");
+      ok(parser.results[0] instanceof ProgramNode, "Parse result is not a ProgramNode");
+      return parser.results[0];
+    } catch(ex) {
+      console.log(ex);
     }
-    equal(parser.results.length, 1, "Parse returned multiple or no results");
-    ok(parser.results[0] instanceof ProgramNode, "Parse result is a ProgramNode");
-    return parser.results[0];
+    return null;
   }
 }

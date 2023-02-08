@@ -33,10 +33,14 @@ const keywords = new Set([
   "continue",
   "break",
   "gen",
+  "await",
+  "new",
+  "const",
+  "let",
 ]);
 %}
 
-Entry -> _ Program _ {% (d: any) => d[1] %}
+Entry -> _ (Program _):? {% (d: any) => d[1] %}
 
 List[Item, Sep] -> $Item ($Sep $Item):* {%
   (d: any) => [d[0][0], ...d[1].map((e: any) => e[1][0])]

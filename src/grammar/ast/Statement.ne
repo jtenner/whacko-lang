@@ -72,6 +72,15 @@ export class ReturnStatementNode extends StatementNode {
     super();
   }
 }
+
+export class VariableDeclarationNode extends DeclarationNode {
+  constructor(
+    public isConst: boolean,
+    public declarators: ParameterDeclaratorNode[],
+  ) {
+    super();
+  }
+}
 %}
 
 Statement -> ( BlockStatement
@@ -83,6 +92,7 @@ Statement -> ( BlockStatement
              | IfElseStatement
              | ReturnStatement
              | ExpressionStatement
+             | VariableDeclarationStatement
              ) {% (d: any) => d[0][0] %}
 
 BlockStatement -> "{" _ (List[Statement, _] _):? "}" {%
@@ -125,5 +135,9 @@ IfElseStatement -> "if" _ "(" _ Expression _ ")" _ Statement (_ "else" _ Stateme
 
 ReturnStatement -> "return" __ Expression _ ";" {%
   (d: any) => new ReturnStatementNode(d[2])
+%}
+
+VariableDeclarationStatement -> ("const" | "let") __ List[ParameterDeclarator, (_ "," _)] _ ";" {%
+  (d: any) => new VariableDeclarationNode(d[0][0] === "const", d[2])
 %}
 
