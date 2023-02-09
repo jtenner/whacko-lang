@@ -10,17 +10,12 @@
     },
     {
       "name": "keyword.control.whacko",
-      "match": "\\b(Hello|person)\\b"
+      "match": ""
     },
     {
       "name": "string.quoted.double.whacko",
       "begin": "\"",
-      "end": "\""
-    },
-    {
-      "name": "string.quoted.single.whacko",
-      "begin": "'",
-      "end": "'"
+      "end": "[^\"\\r\\n]\\\\\\.\""
     }
   ],
   "repository": {

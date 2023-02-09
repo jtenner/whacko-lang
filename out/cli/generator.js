@@ -12,8 +12,9 @@ function generateJavaScript(model, filePath, destination) {
     const data = (0, cli_util_1.extractDestinationAndName)(filePath, destination);
     const generatedFilePath = `${path_1.default.join(data.destination, data.name)}.js`;
     const fileNode = new langium_1.CompositeGeneratorNode();
-    fileNode.append('"use strict";', langium_1.NL, langium_1.NL);
-    model.greetings.forEach(greeting => { var _a; return fileNode.append(`console.log('Hello, ${(_a = greeting.person.ref) === null || _a === void 0 ? void 0 : _a.name}!');`, langium_1.NL); });
+    console.log(model);
+    // fileNode.append('"use strict";', NL, NL);
+    // model.greetings.forEach(greeting => fileNode.append(`console.log('Hello, ${greeting.person.ref?.name}!');`, NL));
     if (!fs_1.default.existsSync(data.destination)) {
         fs_1.default.mkdirSync(data.destination, { recursive: true });
     }

@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { Command } from 'commander';
-import { Model } from '../language-server/generated/ast';
+import * as AST from '../language-server/generated/ast';
 import { WhackoLanguageMetaData } from '../language-server/generated/module';
 import { createWhackoServices } from '../language-server/whacko-module';
 import { extractAstNode } from './cli-util';
@@ -9,7 +9,7 @@ import { NodeFileSystem } from 'langium/node';
 
 export const generateAction = async (fileName: string, opts: GenerateOptions): Promise<void> => {
     const services = createWhackoServices(NodeFileSystem).Whacko;
-    const model = await extractAstNode<Model>(fileName, services);
+    const model = await extractAstNode<AST.Program>(fileName, services);
     const generatedFilePath = generateJavaScript(model, fileName, opts.destination);
     console.log(chalk.green(`JavaScript code generated successfully: ${generatedFilePath}`));
 };

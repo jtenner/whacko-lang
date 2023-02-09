@@ -1,0 +1,5 @@
+import { test } from "test";
+fn myFn(): void {
+  let a = async<i32> {  };
+
+}

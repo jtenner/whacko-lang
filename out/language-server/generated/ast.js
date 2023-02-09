@@ -4,30 +4,300 @@
  * DO NOT EDIT MANUALLY!
  ******************************************************************************/
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.reflection = exports.WhackoAstReflection = exports.isPerson = exports.Person = exports.isModel = exports.Model = exports.isGreeting = exports.Greeting = void 0;
+exports.isFunctionDeclaration = exports.FunctionDeclaration = exports.isFieldClassMember = exports.FieldClassMember = exports.isExpression = exports.Expression = exports.isExportDeclarator = exports.ExportDeclarator = exports.isExportDeclaration = exports.ExportDeclaration = exports.isConstructorClassMember = exports.ConstructorClassMember = exports.isClassMember = exports.ClassMember = exports.isClassDeclaration = exports.ClassDeclaration = exports.isCallPath = exports.CallPath = exports.isArrayAccessPath = exports.ArrayAccessPath = exports.isPrimaryExpression = exports.PrimaryExpression = exports.isPrecedence9 = exports.Precedence9 = exports.isPrecedence8 = exports.Precedence8 = exports.isPrecedence7 = exports.Precedence7 = exports.isPrecedence6 = exports.Precedence6 = exports.isPrecedence5 = exports.Precedence5 = exports.isPrecedence4 = exports.Precedence4 = exports.isPrecedence3 = exports.Precedence3 = exports.isPrecedence2 = exports.Precedence2 = exports.isPrecedence14 = exports.Precedence14 = exports.isPrecedence13 = exports.Precedence13 = exports.isPrecedence12 = exports.Precedence12 = exports.isPrecedence11 = exports.Precedence11 = exports.isPrecedence10 = exports.Precedence10 = exports.isPrecedence1 = exports.Precedence1 = void 0;
+exports.reflection = exports.WhackoAstReflection = exports.isWhileStatement = exports.WhileStatement = exports.isVariableDeclarationStatement = exports.VariableDeclarationStatement = exports.isTypeDeclarationStatement = exports.TypeDeclarationStatement = exports.isReturnStatement = exports.ReturnStatement = exports.isGrabStatement = exports.GrabStatement = exports.isExpressionStatement = exports.ExpressionStatement = exports.isContinueStatement = exports.ContinueStatement = exports.isBreakStatement = exports.BreakStatement = exports.isBlockStatement = exports.BlockStatement = exports.isBinaryExpression = exports.BinaryExpression = exports.isTypeExpression = exports.TypeExpression = exports.isVariableDeclarator = exports.VariableDeclarator = exports.isTypeDeclaration = exports.TypeDeclaration = exports.isStatement = exports.Statement = exports.isSetterClassMember = exports.SetterClassMember = exports.isProgram = exports.Program = exports.isParameter = exports.Parameter = exports.isMethodClassMember = exports.MethodClassMember = exports.isMemberAccessPath = exports.MemberAccessPath = exports.isImportStatement = exports.ImportStatement = exports.isImportDeclarator = exports.ImportDeclarator = exports.isID = exports.ID = exports.isGetterClassMember = exports.GetterClassMember = void 0;
 /* eslint-disable */
 const langium_1 = require("langium");
-exports.Greeting = 'Greeting';
-function isGreeting(item) {
-    return exports.reflection.isInstance(item, exports.Greeting);
+exports.Precedence1 = 'Precedence1';
+function isPrecedence1(item) {
+    return exports.reflection.isInstance(item, exports.Precedence1);
 }
-exports.isGreeting = isGreeting;
-exports.Model = 'Model';
-function isModel(item) {
-    return exports.reflection.isInstance(item, exports.Model);
+exports.isPrecedence1 = isPrecedence1;
+exports.Precedence10 = 'Precedence10';
+function isPrecedence10(item) {
+    return exports.reflection.isInstance(item, exports.Precedence10);
 }
-exports.isModel = isModel;
-exports.Person = 'Person';
-function isPerson(item) {
-    return exports.reflection.isInstance(item, exports.Person);
+exports.isPrecedence10 = isPrecedence10;
+exports.Precedence11 = 'Precedence11';
+function isPrecedence11(item) {
+    return exports.reflection.isInstance(item, exports.Precedence11);
 }
-exports.isPerson = isPerson;
+exports.isPrecedence11 = isPrecedence11;
+exports.Precedence12 = 'Precedence12';
+function isPrecedence12(item) {
+    return exports.reflection.isInstance(item, exports.Precedence12);
+}
+exports.isPrecedence12 = isPrecedence12;
+exports.Precedence13 = 'Precedence13';
+function isPrecedence13(item) {
+    return exports.reflection.isInstance(item, exports.Precedence13);
+}
+exports.isPrecedence13 = isPrecedence13;
+exports.Precedence14 = 'Precedence14';
+function isPrecedence14(item) {
+    return exports.reflection.isInstance(item, exports.Precedence14);
+}
+exports.isPrecedence14 = isPrecedence14;
+exports.Precedence2 = 'Precedence2';
+function isPrecedence2(item) {
+    return exports.reflection.isInstance(item, exports.Precedence2);
+}
+exports.isPrecedence2 = isPrecedence2;
+exports.Precedence3 = 'Precedence3';
+function isPrecedence3(item) {
+    return exports.reflection.isInstance(item, exports.Precedence3);
+}
+exports.isPrecedence3 = isPrecedence3;
+exports.Precedence4 = 'Precedence4';
+function isPrecedence4(item) {
+    return exports.reflection.isInstance(item, exports.Precedence4);
+}
+exports.isPrecedence4 = isPrecedence4;
+exports.Precedence5 = 'Precedence5';
+function isPrecedence5(item) {
+    return exports.reflection.isInstance(item, exports.Precedence5);
+}
+exports.isPrecedence5 = isPrecedence5;
+exports.Precedence6 = 'Precedence6';
+function isPrecedence6(item) {
+    return exports.reflection.isInstance(item, exports.Precedence6);
+}
+exports.isPrecedence6 = isPrecedence6;
+exports.Precedence7 = 'Precedence7';
+function isPrecedence7(item) {
+    return exports.reflection.isInstance(item, exports.Precedence7);
+}
+exports.isPrecedence7 = isPrecedence7;
+exports.Precedence8 = 'Precedence8';
+function isPrecedence8(item) {
+    return exports.reflection.isInstance(item, exports.Precedence8);
+}
+exports.isPrecedence8 = isPrecedence8;
+exports.Precedence9 = 'Precedence9';
+function isPrecedence9(item) {
+    return exports.reflection.isInstance(item, exports.Precedence9);
+}
+exports.isPrecedence9 = isPrecedence9;
+exports.PrimaryExpression = 'PrimaryExpression';
+function isPrimaryExpression(item) {
+    return exports.reflection.isInstance(item, exports.PrimaryExpression);
+}
+exports.isPrimaryExpression = isPrimaryExpression;
+exports.ArrayAccessPath = 'ArrayAccessPath';
+function isArrayAccessPath(item) {
+    return exports.reflection.isInstance(item, exports.ArrayAccessPath);
+}
+exports.isArrayAccessPath = isArrayAccessPath;
+exports.CallPath = 'CallPath';
+function isCallPath(item) {
+    return exports.reflection.isInstance(item, exports.CallPath);
+}
+exports.isCallPath = isCallPath;
+exports.ClassDeclaration = 'ClassDeclaration';
+function isClassDeclaration(item) {
+    return exports.reflection.isInstance(item, exports.ClassDeclaration);
+}
+exports.isClassDeclaration = isClassDeclaration;
+exports.ClassMember = 'ClassMember';
+function isClassMember(item) {
+    return exports.reflection.isInstance(item, exports.ClassMember);
+}
+exports.isClassMember = isClassMember;
+exports.ConstructorClassMember = 'ConstructorClassMember';
+function isConstructorClassMember(item) {
+    return exports.reflection.isInstance(item, exports.ConstructorClassMember);
+}
+exports.isConstructorClassMember = isConstructorClassMember;
+exports.ExportDeclaration = 'ExportDeclaration';
+function isExportDeclaration(item) {
+    return exports.reflection.isInstance(item, exports.ExportDeclaration);
+}
+exports.isExportDeclaration = isExportDeclaration;
+exports.ExportDeclarator = 'ExportDeclarator';
+function isExportDeclarator(item) {
+    return exports.reflection.isInstance(item, exports.ExportDeclarator);
+}
+exports.isExportDeclarator = isExportDeclarator;
+exports.Expression = 'Expression';
+function isExpression(item) {
+    return exports.reflection.isInstance(item, exports.Expression);
+}
+exports.isExpression = isExpression;
+exports.FieldClassMember = 'FieldClassMember';
+function isFieldClassMember(item) {
+    return exports.reflection.isInstance(item, exports.FieldClassMember);
+}
+exports.isFieldClassMember = isFieldClassMember;
+exports.FunctionDeclaration = 'FunctionDeclaration';
+function isFunctionDeclaration(item) {
+    return exports.reflection.isInstance(item, exports.FunctionDeclaration);
+}
+exports.isFunctionDeclaration = isFunctionDeclaration;
+exports.GetterClassMember = 'GetterClassMember';
+function isGetterClassMember(item) {
+    return exports.reflection.isInstance(item, exports.GetterClassMember);
+}
+exports.isGetterClassMember = isGetterClassMember;
+exports.ID = 'ID';
+function isID(item) {
+    return exports.reflection.isInstance(item, exports.ID);
+}
+exports.isID = isID;
+exports.ImportDeclarator = 'ImportDeclarator';
+function isImportDeclarator(item) {
+    return exports.reflection.isInstance(item, exports.ImportDeclarator);
+}
+exports.isImportDeclarator = isImportDeclarator;
+exports.ImportStatement = 'ImportStatement';
+function isImportStatement(item) {
+    return exports.reflection.isInstance(item, exports.ImportStatement);
+}
+exports.isImportStatement = isImportStatement;
+exports.MemberAccessPath = 'MemberAccessPath';
+function isMemberAccessPath(item) {
+    return exports.reflection.isInstance(item, exports.MemberAccessPath);
+}
+exports.isMemberAccessPath = isMemberAccessPath;
+exports.MethodClassMember = 'MethodClassMember';
+function isMethodClassMember(item) {
+    return exports.reflection.isInstance(item, exports.MethodClassMember);
+}
+exports.isMethodClassMember = isMethodClassMember;
+exports.Parameter = 'Parameter';
+function isParameter(item) {
+    return exports.reflection.isInstance(item, exports.Parameter);
+}
+exports.isParameter = isParameter;
+exports.Program = 'Program';
+function isProgram(item) {
+    return exports.reflection.isInstance(item, exports.Program);
+}
+exports.isProgram = isProgram;
+exports.SetterClassMember = 'SetterClassMember';
+function isSetterClassMember(item) {
+    return exports.reflection.isInstance(item, exports.SetterClassMember);
+}
+exports.isSetterClassMember = isSetterClassMember;
+exports.Statement = 'Statement';
+function isStatement(item) {
+    return exports.reflection.isInstance(item, exports.Statement);
+}
+exports.isStatement = isStatement;
+exports.TypeDeclaration = 'TypeDeclaration';
+function isTypeDeclaration(item) {
+    return exports.reflection.isInstance(item, exports.TypeDeclaration);
+}
+exports.isTypeDeclaration = isTypeDeclaration;
+exports.VariableDeclarator = 'VariableDeclarator';
+function isVariableDeclarator(item) {
+    return exports.reflection.isInstance(item, exports.VariableDeclarator);
+}
+exports.isVariableDeclarator = isVariableDeclarator;
+exports.TypeExpression = 'TypeExpression';
+function isTypeExpression(item) {
+    return exports.reflection.isInstance(item, exports.TypeExpression);
+}
+exports.isTypeExpression = isTypeExpression;
+exports.BinaryExpression = 'BinaryExpression';
+function isBinaryExpression(item) {
+    return exports.reflection.isInstance(item, exports.BinaryExpression);
+}
+exports.isBinaryExpression = isBinaryExpression;
+exports.BlockStatement = 'BlockStatement';
+function isBlockStatement(item) {
+    return exports.reflection.isInstance(item, exports.BlockStatement);
+}
+exports.isBlockStatement = isBlockStatement;
+exports.BreakStatement = 'BreakStatement';
+function isBreakStatement(item) {
+    return exports.reflection.isInstance(item, exports.BreakStatement);
+}
+exports.isBreakStatement = isBreakStatement;
+exports.ContinueStatement = 'ContinueStatement';
+function isContinueStatement(item) {
+    return exports.reflection.isInstance(item, exports.ContinueStatement);
+}
+exports.isContinueStatement = isContinueStatement;
+exports.ExpressionStatement = 'ExpressionStatement';
+function isExpressionStatement(item) {
+    return exports.reflection.isInstance(item, exports.ExpressionStatement);
+}
+exports.isExpressionStatement = isExpressionStatement;
+exports.GrabStatement = 'GrabStatement';
+function isGrabStatement(item) {
+    return exports.reflection.isInstance(item, exports.GrabStatement);
+}
+exports.isGrabStatement = isGrabStatement;
+exports.ReturnStatement = 'ReturnStatement';
+function isReturnStatement(item) {
+    return exports.reflection.isInstance(item, exports.ReturnStatement);
+}
+exports.isReturnStatement = isReturnStatement;
+exports.TypeDeclarationStatement = 'TypeDeclarationStatement';
+function isTypeDeclarationStatement(item) {
+    return exports.reflection.isInstance(item, exports.TypeDeclarationStatement);
+}
+exports.isTypeDeclarationStatement = isTypeDeclarationStatement;
+exports.VariableDeclarationStatement = 'VariableDeclarationStatement';
+function isVariableDeclarationStatement(item) {
+    return exports.reflection.isInstance(item, exports.VariableDeclarationStatement);
+}
+exports.isVariableDeclarationStatement = isVariableDeclarationStatement;
+exports.WhileStatement = 'WhileStatement';
+function isWhileStatement(item) {
+    return exports.reflection.isInstance(item, exports.WhileStatement);
+}
+exports.isWhileStatement = isWhileStatement;
 class WhackoAstReflection extends langium_1.AbstractAstReflection {
     getAllTypes() {
-        return ['Greeting', 'Model', 'Person'];
+        return ['ArrayAccessPath', 'BinaryExpression', 'BlockStatement', 'BreakStatement', 'CallPath', 'ClassDeclaration', 'ClassMember', 'ConstructorClassMember', 'ContinueStatement', 'ExportDeclaration', 'ExportDeclarator', 'Expression', 'ExpressionStatement', 'FieldClassMember', 'FunctionDeclaration', 'GetterClassMember', 'GrabStatement', 'ID', 'ImportDeclarator', 'ImportStatement', 'MemberAccessPath', 'MethodClassMember', 'Parameter', 'Precedence1', 'Precedence10', 'Precedence11', 'Precedence12', 'Precedence13', 'Precedence14', 'Precedence2', 'Precedence3', 'Precedence4', 'Precedence5', 'Precedence6', 'Precedence7', 'Precedence8', 'Precedence9', 'PrimaryExpression', 'Program', 'ReturnStatement', 'SetterClassMember', 'Statement', 'TypeDeclaration', 'TypeDeclarationStatement', 'TypeExpression', 'VariableDeclarationStatement', 'VariableDeclarator', 'WhileStatement'];
     }
     computeIsSubtype(subtype, supertype) {
         switch (subtype) {
+            case exports.Expression: {
+                return this.isSubtype(exports.Precedence1, supertype) || this.isSubtype(exports.Precedence2, supertype) || this.isSubtype(exports.Precedence3, supertype) || this.isSubtype(exports.Precedence4, supertype) || this.isSubtype(exports.Precedence5, supertype) || this.isSubtype(exports.Precedence6, supertype) || this.isSubtype(exports.Precedence7, supertype) || this.isSubtype(exports.Precedence8, supertype) || this.isSubtype(exports.Precedence9, supertype) || this.isSubtype(exports.Precedence10, supertype) || this.isSubtype(exports.Precedence11, supertype) || this.isSubtype(exports.Precedence12, supertype) || this.isSubtype(exports.Precedence13, supertype) || this.isSubtype(exports.Precedence14, supertype) || this.isSubtype(exports.PrimaryExpression, supertype);
+            }
+            case exports.ID: {
+                return this.isSubtype(exports.PrimaryExpression, supertype);
+            }
+            case exports.TypeExpression: {
+                return this.isSubtype(exports.ClassDeclaration, supertype);
+            }
+            case exports.BinaryExpression:
+            case exports.Precedence1:
+            case exports.Precedence10:
+            case exports.Precedence11:
+            case exports.Precedence12:
+            case exports.Precedence13:
+            case exports.Precedence4:
+            case exports.Precedence5:
+            case exports.Precedence6:
+            case exports.Precedence7:
+            case exports.Precedence8:
+            case exports.Precedence9:
+            case exports.PrimaryExpression: {
+                return this.isSubtype(exports.Expression, supertype);
+            }
+            case exports.BlockStatement:
+            case exports.BreakStatement:
+            case exports.ContinueStatement:
+            case exports.ExpressionStatement:
+            case exports.GrabStatement:
+            case exports.ReturnStatement:
+            case exports.TypeDeclarationStatement:
+            case exports.VariableDeclarationStatement:
+            case exports.WhileStatement: {
+                return this.isSubtype(exports.Statement, supertype);
+            }
+            case exports.Precedence14: {
+                return this.isSubtype(exports.Precedence13, supertype);
+            }
+            case exports.Precedence2: {
+                return this.isSubtype(exports.Precedence1, supertype);
+            }
+            case exports.Precedence3: {
+                return this.isSubtype(exports.Precedence2, supertype);
+            }
             default: {
                 return false;
             }
@@ -36,9 +306,6 @@ class WhackoAstReflection extends langium_1.AbstractAstReflection {
     getReferenceType(refInfo) {
         const referenceId = `${refInfo.container.$type}:${refInfo.property}`;
         switch (referenceId) {
-            case 'Greeting:person': {
-                return exports.Person;
-            }
             default: {
                 throw new Error(`${referenceId} is not a valid reference id.`);
             }
@@ -46,12 +313,118 @@ class WhackoAstReflection extends langium_1.AbstractAstReflection {
     }
     getTypeMetaData(type) {
         switch (type) {
-            case 'Model': {
+            case 'CallPath': {
                 return {
-                    name: 'Model',
+                    name: 'CallPath',
                     mandatory: [
-                        { name: 'greetings', type: 'array' },
-                        { name: 'persons', type: 'array' }
+                        { name: 'arguments', type: 'array' }
+                    ]
+                };
+            }
+            case 'ClassDeclaration': {
+                return {
+                    name: 'ClassDeclaration',
+                    mandatory: [
+                        { name: 'members', type: 'array' }
+                    ]
+                };
+            }
+            case 'ClassMember': {
+                return {
+                    name: 'ClassMember',
+                    mandatory: [
+                        { name: 'members', type: 'array' }
+                    ]
+                };
+            }
+            case 'ConstructorClassMember': {
+                return {
+                    name: 'ConstructorClassMember',
+                    mandatory: [
+                        { name: 'parameters', type: 'array' }
+                    ]
+                };
+            }
+            case 'ExportDeclaration': {
+                return {
+                    name: 'ExportDeclaration',
+                    mandatory: [
+                        { name: 'declarators', type: 'array' }
+                    ]
+                };
+            }
+            case 'Expression': {
+                return {
+                    name: 'Expression',
+                    mandatory: [
+                        { name: 'path', type: 'array' }
+                    ]
+                };
+            }
+            case 'FunctionDeclaration': {
+                return {
+                    name: 'FunctionDeclaration',
+                    mandatory: [
+                        { name: 'parameters', type: 'array' }
+                    ]
+                };
+            }
+            case 'ImportStatement': {
+                return {
+                    name: 'ImportStatement',
+                    mandatory: [
+                        { name: 'declarators', type: 'array' }
+                    ]
+                };
+            }
+            case 'MethodClassMember': {
+                return {
+                    name: 'MethodClassMember',
+                    mandatory: [
+                        { name: 'parameters', type: 'array' }
+                    ]
+                };
+            }
+            case 'Program': {
+                return {
+                    name: 'Program',
+                    mandatory: [
+                        { name: 'declarations', type: 'array' },
+                        { name: 'exports', type: 'array' },
+                        { name: 'imports', type: 'array' }
+                    ]
+                };
+            }
+            case 'TypeExpression': {
+                return {
+                    name: 'TypeExpression',
+                    mandatory: [
+                        { name: 'members', type: 'array' },
+                        { name: 'typeParameters', type: 'array' }
+                    ]
+                };
+            }
+            case 'BinaryExpression': {
+                return {
+                    name: 'BinaryExpression',
+                    mandatory: [
+                        { name: 'path', type: 'array' }
+                    ]
+                };
+            }
+            case 'BlockStatement': {
+                return {
+                    name: 'BlockStatement',
+                    mandatory: [
+                        { name: 'statements', type: 'array' }
+                    ]
+                };
+            }
+            case 'VariableDeclarationStatement': {
+                return {
+                    name: 'VariableDeclarationStatement',
+                    mandatory: [
+                        { name: 'declarators', type: 'array' }
                     ]
                 };
             }

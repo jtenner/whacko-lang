@@ -4,58 +4,684 @@
  ******************************************************************************/
 
 /* eslint-disable */
-import { AstNode, AbstractAstReflection, Reference, ReferenceInfo, TypeMetaData } from 'langium';
+import { AstNode, AbstractAstReflection, ReferenceInfo, TypeMetaData } from 'langium';
 
-export interface Greeting extends AstNode {
-    readonly $container: Model;
-    readonly $type: 'Greeting';
-    person: Reference<Person>
+export type Precedence1 = Expression | Precedence2;
+
+export const Precedence1 = 'Precedence1';
+
+export function isPrecedence1(item: unknown): item is Precedence1 {
+    return reflection.isInstance(item, Precedence1);
 }
 
-export const Greeting = 'Greeting';
+export type Precedence10 = Expression;
 
-export function isGreeting(item: unknown): item is Greeting {
-    return reflection.isInstance(item, Greeting);
+export const Precedence10 = 'Precedence10';
+
+export function isPrecedence10(item: unknown): item is Precedence10 {
+    return reflection.isInstance(item, Precedence10);
 }
 
-export interface Model extends AstNode {
-    readonly $type: 'Model';
-    greetings: Array<Greeting>
-    persons: Array<Person>
+export type Precedence11 = Expression;
+
+export const Precedence11 = 'Precedence11';
+
+export function isPrecedence11(item: unknown): item is Precedence11 {
+    return reflection.isInstance(item, Precedence11);
 }
 
-export const Model = 'Model';
+export type Precedence12 = Expression;
 
-export function isModel(item: unknown): item is Model {
-    return reflection.isInstance(item, Model);
+export const Precedence12 = 'Precedence12';
+
+export function isPrecedence12(item: unknown): item is Precedence12 {
+    return reflection.isInstance(item, Precedence12);
 }
 
-export interface Person extends AstNode {
-    readonly $container: Model;
-    readonly $type: 'Person';
+export type Precedence13 = Expression | Precedence14;
+
+export const Precedence13 = 'Precedence13';
+
+export function isPrecedence13(item: unknown): item is Precedence13 {
+    return reflection.isInstance(item, Precedence13);
+}
+
+export type Precedence14 = Expression;
+
+export const Precedence14 = 'Precedence14';
+
+export function isPrecedence14(item: unknown): item is Precedence14 {
+    return reflection.isInstance(item, Precedence14);
+}
+
+export type Precedence2 = Expression | Precedence3;
+
+export const Precedence2 = 'Precedence2';
+
+export function isPrecedence2(item: unknown): item is Precedence2 {
+    return reflection.isInstance(item, Precedence2);
+}
+
+export type Precedence3 = Expression;
+
+export const Precedence3 = 'Precedence3';
+
+export function isPrecedence3(item: unknown): item is Precedence3 {
+    return reflection.isInstance(item, Precedence3);
+}
+
+export type Precedence4 = Expression;
+
+export const Precedence4 = 'Precedence4';
+
+export function isPrecedence4(item: unknown): item is Precedence4 {
+    return reflection.isInstance(item, Precedence4);
+}
+
+export type Precedence5 = Expression;
+
+export const Precedence5 = 'Precedence5';
+
+export function isPrecedence5(item: unknown): item is Precedence5 {
+    return reflection.isInstance(item, Precedence5);
+}
+
+export type Precedence6 = Expression;
+
+export const Precedence6 = 'Precedence6';
+
+export function isPrecedence6(item: unknown): item is Precedence6 {
+    return reflection.isInstance(item, Precedence6);
+}
+
+export type Precedence7 = Expression;
+
+export const Precedence7 = 'Precedence7';
+
+export function isPrecedence7(item: unknown): item is Precedence7 {
+    return reflection.isInstance(item, Precedence7);
+}
+
+export type Precedence8 = Expression;
+
+export const Precedence8 = 'Precedence8';
+
+export function isPrecedence8(item: unknown): item is Precedence8 {
+    return reflection.isInstance(item, Precedence8);
+}
+
+export type Precedence9 = Expression;
+
+export const Precedence9 = 'Precedence9';
+
+export function isPrecedence9(item: unknown): item is Precedence9 {
+    return reflection.isInstance(item, Precedence9);
+}
+
+export type PrimaryExpression = Expression | ID;
+
+export const PrimaryExpression = 'PrimaryExpression';
+
+export function isPrimaryExpression(item: unknown): item is PrimaryExpression {
+    return reflection.isInstance(item, PrimaryExpression);
+}
+
+export interface ArrayAccessPath extends AstNode {
+    readonly $container: Expression;
+    readonly $type: 'ArrayAccessPath';
+    expression: Expression
+}
+
+export const ArrayAccessPath = 'ArrayAccessPath';
+
+export function isArrayAccessPath(item: unknown): item is ArrayAccessPath {
+    return reflection.isInstance(item, ArrayAccessPath);
+}
+
+export interface CallPath extends AstNode {
+    readonly $container: Expression;
+    readonly $type: 'CallPath';
+    arguments: Array<Expression>
+}
+
+export const CallPath = 'CallPath';
+
+export function isCallPath(item: unknown): item is CallPath {
+    return reflection.isInstance(item, CallPath);
+}
+
+export interface ClassDeclaration extends AstNode {
+    readonly $container: Expression | FieldClassMember | FunctionDeclaration | GetterClassMember | MethodClassMember | Program | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
+    readonly $type: 'ClassDeclaration' | 'TypeExpression';
+    final?: string
+    members: Array<ClassMember>
+    name: ID
+}
+
+export const ClassDeclaration = 'ClassDeclaration';
+
+export function isClassDeclaration(item: unknown): item is ClassDeclaration {
+    return reflection.isInstance(item, ClassDeclaration);
+}
+
+export interface ClassMember extends AstNode {
+    readonly $container: ClassDeclaration;
+    readonly $type: 'ClassMember';
+    members: Array<ConstructorClassMember> | Array<FieldClassMember> | Array<GetterClassMember> | Array<MethodClassMember> | Array<SetterClassMember>
+}
+
+export const ClassMember = 'ClassMember';
+
+export function isClassMember(item: unknown): item is ClassMember {
+    return reflection.isInstance(item, ClassMember);
+}
+
+export interface ConstructorClassMember extends AstNode {
+    readonly $container: ClassMember;
+    readonly $type: 'ConstructorClassMember';
+    block: BlockStatement
+    parameters: Array<Parameter>
+    private?: string
+}
+
+export const ConstructorClassMember = 'ConstructorClassMember';
+
+export function isConstructorClassMember(item: unknown): item is ConstructorClassMember {
+    return reflection.isInstance(item, ConstructorClassMember);
+}
+
+export interface ExportDeclaration extends AstNode {
+    readonly $container: Program;
+    readonly $type: 'ExportDeclaration';
+    declarators: Array<ExportDeclarator>
+}
+
+export const ExportDeclaration = 'ExportDeclaration';
+
+export function isExportDeclaration(item: unknown): item is ExportDeclaration {
+    return reflection.isInstance(item, ExportDeclaration);
+}
+
+export interface ExportDeclarator extends AstNode {
+    readonly $container: ExportDeclaration;
+    readonly $type: 'ExportDeclarator';
+    alias?: ID
+    name: ID
+}
+
+export const ExportDeclarator = 'ExportDeclarator';
+
+export function isExportDeclarator(item: unknown): item is ExportDeclarator {
+    return reflection.isInstance(item, ExportDeclarator);
+}
+
+export interface Expression extends AstNode {
+    readonly $container: ArrayAccessPath | BinaryExpression | CallPath | ClassDeclaration | ExportDeclarator | Expression | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | ImportDeclarator | MemberAccessPath | MethodClassMember | Parameter | ReturnStatement | SetterClassMember | Statement | TypeDeclaration | TypeDeclarationStatement | TypeExpression | VariableDeclarator | WhileStatement;
+    readonly $type: 'BinaryExpression' | 'Expression' | 'ID' | 'Precedence1' | 'Precedence10' | 'Precedence11' | 'Precedence12' | 'Precedence13' | 'Precedence14' | 'Precedence2' | 'Precedence4' | 'Precedence5' | 'Precedence6' | 'Precedence7' | 'Precedence8' | 'Precedence9' | 'PrimaryExpression';
+    block?: BlockStatement
+    conditional?: Precedence2
+    constructor?: Expression
+    expression?: Expression | Precedence13
+    exprpression?: Expression
+    false?: string
+    falsy?: Precedence1
+    held?: Precedence13
+    lhs?: Expression
+    null?: string
+    op?: '!' | '%=' | '&=' | '*=' | '+=' | '-' | '-=' | '/=' | '<<=' | '=' | '>>=' | '^=' | '|=' | '~'
+    path: Array<ArrayAccessPath> | Array<CallPath> | Array<MemberAccessPath>
+    rhs?: Precedence2
+    super?: string
+    this?: string
+    true?: string
+    truthy?: Precedence1
+    type?: TypeExpression
+    value?: string
+}
+
+export const Expression = 'Expression';
+
+export function isExpression(item: unknown): item is Expression {
+    return reflection.isInstance(item, Expression);
+}
+
+export interface FieldClassMember extends AstNode {
+    readonly $container: ClassMember;
+    readonly $type: 'FieldClassMember';
+    initializer?: Expression
+    name: ID
+    private?: string
+    type: TypeExpression
+}
+
+export const FieldClassMember = 'FieldClassMember';
+
+export function isFieldClassMember(item: unknown): item is FieldClassMember {
+    return reflection.isInstance(item, FieldClassMember);
+}
+
+export interface FunctionDeclaration extends AstNode {
+    readonly $container: Program;
+    readonly $type: 'FunctionDeclaration';
+    async?: string
+    block: BlockStatement
+    name: ID
+    parameters: Array<Parameter>
+    returnType: TypeExpression
+}
+
+export const FunctionDeclaration = 'FunctionDeclaration';
+
+export function isFunctionDeclaration(item: unknown): item is FunctionDeclaration {
+    return reflection.isInstance(item, FunctionDeclaration);
+}
+
+export interface GetterClassMember extends AstNode {
+    readonly $container: ClassMember;
+    readonly $type: 'GetterClassMember';
+    block: BlockStatement
+    name: ID
+    private?: string
+    returnType: TypeExpression
+}
+
+export const GetterClassMember = 'GetterClassMember';
+
+export function isGetterClassMember(item: unknown): item is GetterClassMember {
+    return reflection.isInstance(item, GetterClassMember);
+}
+
+export interface ID extends AstNode {
+    readonly $container: ArrayAccessPath | BinaryExpression | CallPath | ClassDeclaration | ExportDeclarator | Expression | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | ImportDeclarator | MemberAccessPath | MethodClassMember | Parameter | ReturnStatement | SetterClassMember | Statement | TypeDeclaration | TypeDeclarationStatement | TypeExpression | VariableDeclarator | WhileStatement;
+    readonly $type: 'ID';
     name: string
 }
 
-export const Person = 'Person';
+export const ID = 'ID';
 
-export function isPerson(item: unknown): item is Person {
-    return reflection.isInstance(item, Person);
+export function isID(item: unknown): item is ID {
+    return reflection.isInstance(item, ID);
+}
+
+export interface ImportDeclarator extends AstNode {
+    readonly $container: ImportStatement;
+    readonly $type: 'ImportDeclarator';
+    alias?: ID
+    name: ID
+}
+
+export const ImportDeclarator = 'ImportDeclarator';
+
+export function isImportDeclarator(item: unknown): item is ImportDeclarator {
+    return reflection.isInstance(item, ImportDeclarator);
+}
+
+export interface ImportStatement extends AstNode {
+    readonly $container: Program;
+    readonly $type: 'ImportStatement';
+    declarators: Array<ImportDeclarator>
+    path: string
+}
+
+export const ImportStatement = 'ImportStatement';
+
+export function isImportStatement(item: unknown): item is ImportStatement {
+    return reflection.isInstance(item, ImportStatement);
+}
+
+export interface MemberAccessPath extends AstNode {
+    readonly $container: Expression;
+    readonly $type: 'MemberAccessPath';
+    name: ID
+}
+
+export const MemberAccessPath = 'MemberAccessPath';
+
+export function isMemberAccessPath(item: unknown): item is MemberAccessPath {
+    return reflection.isInstance(item, MemberAccessPath);
+}
+
+export interface MethodClassMember extends AstNode {
+    readonly $container: ClassMember;
+    readonly $type: 'MethodClassMember';
+    block: BlockStatement
+    name: ID
+    parameters: Array<Parameter>
+    private?: string
+    returnType: TypeExpression
+}
+
+export const MethodClassMember = 'MethodClassMember';
+
+export function isMethodClassMember(item: unknown): item is MethodClassMember {
+    return reflection.isInstance(item, MethodClassMember);
+}
+
+export interface Parameter extends AstNode {
+    readonly $container: ConstructorClassMember | FunctionDeclaration | MethodClassMember | SetterClassMember;
+    readonly $type: 'Parameter';
+    name: ID
+    type: ID
+}
+
+export const Parameter = 'Parameter';
+
+export function isParameter(item: unknown): item is Parameter {
+    return reflection.isInstance(item, Parameter);
+}
+
+export interface Program extends AstNode {
+    readonly $type: 'Program';
+    declarations: Array<ClassDeclaration> | Array<FunctionDeclaration> | Array<TypeDeclaration>
+    exports: Array<ExportDeclaration>
+    imports: Array<ImportStatement>
+}
+
+export const Program = 'Program';
+
+export function isProgram(item: unknown): item is Program {
+    return reflection.isInstance(item, Program);
+}
+
+export interface SetterClassMember extends AstNode {
+    readonly $container: ClassMember;
+    readonly $type: 'SetterClassMember';
+    block: BlockStatement
+    name: ID
+    parameter: Parameter
+    private?: string
+}
+
+export const SetterClassMember = 'SetterClassMember';
+
+export function isSetterClassMember(item: unknown): item is SetterClassMember {
+    return reflection.isInstance(item, SetterClassMember);
+}
+
+export interface Statement extends AstNode {
+    readonly $container: BlockStatement | ConstructorClassMember | Expression | FunctionDeclaration | GetterClassMember | GrabStatement | MethodClassMember | SetterClassMember | Statement | WhileStatement;
+    readonly $type: 'BlockStatement' | 'BreakStatement' | 'ContinueStatement' | 'ExpressionStatement' | 'GrabStatement' | 'ReturnStatement' | 'Statement' | 'TypeDeclarationStatement' | 'VariableDeclarationStatement' | 'WhileStatement';
+    condition: Expression
+    falsy: Statement
+    truthy: Statement
+}
+
+export const Statement = 'Statement';
+
+export function isStatement(item: unknown): item is Statement {
+    return reflection.isInstance(item, Statement);
+}
+
+export interface TypeDeclaration extends AstNode {
+    readonly $container: Program;
+    readonly $type: 'TypeDeclaration';
+    name: ID
+    type: TypeExpression
+}
+
+export const TypeDeclaration = 'TypeDeclaration';
+
+export function isTypeDeclaration(item: unknown): item is TypeDeclaration {
+    return reflection.isInstance(item, TypeDeclaration);
+}
+
+export interface VariableDeclarator extends AstNode {
+    readonly $container: VariableDeclarationStatement;
+    readonly $type: 'VariableDeclarator';
+    expression: Expression
+    name: ID
+    type?: TypeExpression
+}
+
+export const VariableDeclarator = 'VariableDeclarator';
+
+export function isVariableDeclarator(item: unknown): item is VariableDeclarator {
+    return reflection.isInstance(item, VariableDeclarator);
+}
+
+export interface TypeExpression extends ClassDeclaration {
+    readonly $container: Expression | FieldClassMember | FunctionDeclaration | GetterClassMember | MethodClassMember | Program | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
+    readonly $type: 'TypeExpression';
+    name: ID
+    typeParameters: Array<ID>
+}
+
+export const TypeExpression = 'TypeExpression';
+
+export function isTypeExpression(item: unknown): item is TypeExpression {
+    return reflection.isInstance(item, TypeExpression);
+}
+
+// @ts-ignore
+export interface BinaryExpression extends Expression {
+    readonly $container: ArrayAccessPath | BinaryExpression | CallPath | ClassDeclaration | ExportDeclarator | Expression | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | ImportDeclarator | MemberAccessPath | MethodClassMember | Parameter | ReturnStatement | SetterClassMember | Statement | TypeDeclaration | TypeDeclarationStatement | TypeExpression | VariableDeclarator | WhileStatement;
+    readonly $type: 'BinaryExpression';
+    lhs: Precedence10 | Precedence11 | Precedence12 | Precedence4 | Precedence5 | Precedence6 | Precedence7 | Precedence8 | Precedence9
+    op: '!=' | '%' | '&&' | '&' | '*' | '+' | '-' | '/' | '<' | '<<' | '<=' | '==' | '>' | '>=' | '>>' | '^' | '|' | '||'
+    rhs: Precedence10 | Precedence11 | Precedence12 | Precedence4 | Precedence5 | Precedence6 | Precedence7 | Precedence8 | Precedence9
+}
+
+export const BinaryExpression = 'BinaryExpression';
+
+export function isBinaryExpression(item: unknown): item is BinaryExpression {
+    return reflection.isInstance(item, BinaryExpression);
+}
+
+export interface BlockStatement extends Statement {
+    readonly $container: BlockStatement | ConstructorClassMember | Expression | FunctionDeclaration | GetterClassMember | GrabStatement | MethodClassMember | SetterClassMember | Statement | WhileStatement;
+    readonly $type: 'BlockStatement';
+    statements: Array<Statement>
+}
+
+export const BlockStatement = 'BlockStatement';
+
+export function isBlockStatement(item: unknown): item is BlockStatement {
+    return reflection.isInstance(item, BlockStatement);
+}
+
+export interface BreakStatement extends Statement {
+    readonly $container: BlockStatement | ConstructorClassMember | Expression | FunctionDeclaration | GetterClassMember | GrabStatement | MethodClassMember | SetterClassMember | Statement | WhileStatement;
+    readonly $type: 'BreakStatement';
+    brk: string
+}
+
+export const BreakStatement = 'BreakStatement';
+
+export function isBreakStatement(item: unknown): item is BreakStatement {
+    return reflection.isInstance(item, BreakStatement);
+}
+
+export interface ContinueStatement extends Statement {
+    readonly $container: BlockStatement | ConstructorClassMember | Expression | FunctionDeclaration | GetterClassMember | GrabStatement | MethodClassMember | SetterClassMember | Statement | WhileStatement;
+    readonly $type: 'ContinueStatement';
+    cont: string
+}
+
+export const ContinueStatement = 'ContinueStatement';
+
+export function isContinueStatement(item: unknown): item is ContinueStatement {
+    return reflection.isInstance(item, ContinueStatement);
+}
+
+export interface ExpressionStatement extends Statement {
+    readonly $container: BlockStatement | ConstructorClassMember | Expression | FunctionDeclaration | GetterClassMember | GrabStatement | MethodClassMember | SetterClassMember | Statement | WhileStatement;
+    readonly $type: 'ExpressionStatement';
+    expr: Expression
+}
+
+export const ExpressionStatement = 'ExpressionStatement';
+
+export function isExpressionStatement(item: unknown): item is ExpressionStatement {
+    return reflection.isInstance(item, ExpressionStatement);
+}
+
+export interface GrabStatement extends Statement {
+    readonly $container: BlockStatement | ConstructorClassMember | Expression | FunctionDeclaration | GetterClassMember | GrabStatement | MethodClassMember | SetterClassMember | Statement | WhileStatement;
+    readonly $type: 'GrabStatement';
+    heldExpression: Expression
+    statement: Statement
+}
+
+export const GrabStatement = 'GrabStatement';
+
+export function isGrabStatement(item: unknown): item is GrabStatement {
+    return reflection.isInstance(item, GrabStatement);
+}
+
+export interface ReturnStatement extends Statement {
+    readonly $container: BlockStatement | ConstructorClassMember | Expression | FunctionDeclaration | GetterClassMember | GrabStatement | MethodClassMember | SetterClassMember | Statement | WhileStatement;
+    readonly $type: 'ReturnStatement';
+    expression: Expression
+}
+
+export const ReturnStatement = 'ReturnStatement';
+
+export function isReturnStatement(item: unknown): item is ReturnStatement {
+    return reflection.isInstance(item, ReturnStatement);
+}
+
+export interface TypeDeclarationStatement extends Statement {
+    readonly $container: BlockStatement | ConstructorClassMember | Expression | FunctionDeclaration | GetterClassMember | GrabStatement | MethodClassMember | SetterClassMember | Statement | WhileStatement;
+    readonly $type: 'TypeDeclarationStatement';
+    name: ID
+    type: TypeExpression
+}
+
+export const TypeDeclarationStatement = 'TypeDeclarationStatement';
+
+export function isTypeDeclarationStatement(item: unknown): item is TypeDeclarationStatement {
+    return reflection.isInstance(item, TypeDeclarationStatement);
+}
+
+export interface VariableDeclarationStatement extends Statement {
+    readonly $container: BlockStatement | ConstructorClassMember | Expression | FunctionDeclaration | GetterClassMember | GrabStatement | MethodClassMember | SetterClassMember | Statement | WhileStatement;
+    readonly $type: 'VariableDeclarationStatement';
+    declarators: Array<VariableDeclarator>
+    type: string
+}
+
+export const VariableDeclarationStatement = 'VariableDeclarationStatement';
+
+export function isVariableDeclarationStatement(item: unknown): item is VariableDeclarationStatement {
+    return reflection.isInstance(item, VariableDeclarationStatement);
+}
+
+export interface WhileStatement extends Statement {
+    readonly $container: BlockStatement | ConstructorClassMember | Expression | FunctionDeclaration | GetterClassMember | GrabStatement | MethodClassMember | SetterClassMember | Statement | WhileStatement;
+    readonly $type: 'WhileStatement';
+    expression: Expression
+    statement: Statement
+}
+
+export const WhileStatement = 'WhileStatement';
+
+export function isWhileStatement(item: unknown): item is WhileStatement {
+    return reflection.isInstance(item, WhileStatement);
 }
 
 export interface WhackoAstType {
-    Greeting: Greeting
-    Model: Model
-    Person: Person
+    ArrayAccessPath: ArrayAccessPath
+    BinaryExpression: BinaryExpression
+    BlockStatement: BlockStatement
+    BreakStatement: BreakStatement
+    CallPath: CallPath
+    ClassDeclaration: ClassDeclaration
+    ClassMember: ClassMember
+    ConstructorClassMember: ConstructorClassMember
+    ContinueStatement: ContinueStatement
+    ExportDeclaration: ExportDeclaration
+    ExportDeclarator: ExportDeclarator
+    Expression: Expression
+    ExpressionStatement: ExpressionStatement
+    FieldClassMember: FieldClassMember
+    FunctionDeclaration: FunctionDeclaration
+    GetterClassMember: GetterClassMember
+    GrabStatement: GrabStatement
+    ID: ID
+    ImportDeclarator: ImportDeclarator
+    ImportStatement: ImportStatement
+    MemberAccessPath: MemberAccessPath
+    MethodClassMember: MethodClassMember
+    Parameter: Parameter
+    Precedence1: Precedence1
+    Precedence10: Precedence10
+    Precedence11: Precedence11
+    Precedence12: Precedence12
+    Precedence13: Precedence13
+    Precedence14: Precedence14
+    Precedence2: Precedence2
+    Precedence3: Precedence3
+    Precedence4: Precedence4
+    Precedence5: Precedence5
+    Precedence6: Precedence6
+    Precedence7: Precedence7
+    Precedence8: Precedence8
+    Precedence9: Precedence9
+    PrimaryExpression: PrimaryExpression
+    Program: Program
+    ReturnStatement: ReturnStatement
+    SetterClassMember: SetterClassMember
+    Statement: Statement
+    TypeDeclaration: TypeDeclaration
+    TypeDeclarationStatement: TypeDeclarationStatement
+    TypeExpression: TypeExpression
+    VariableDeclarationStatement: VariableDeclarationStatement
+    VariableDeclarator: VariableDeclarator
+    WhileStatement: WhileStatement
 }
 
 export class WhackoAstReflection extends AbstractAstReflection {
 
     getAllTypes(): string[] {
-        return ['Greeting', 'Model', 'Person'];
+        return ['ArrayAccessPath', 'BinaryExpression', 'BlockStatement', 'BreakStatement', 'CallPath', 'ClassDeclaration', 'ClassMember', 'ConstructorClassMember', 'ContinueStatement', 'ExportDeclaration', 'ExportDeclarator', 'Expression', 'ExpressionStatement', 'FieldClassMember', 'FunctionDeclaration', 'GetterClassMember', 'GrabStatement', 'ID', 'ImportDeclarator', 'ImportStatement', 'MemberAccessPath', 'MethodClassMember', 'Parameter', 'Precedence1', 'Precedence10', 'Precedence11', 'Precedence12', 'Precedence13', 'Precedence14', 'Precedence2', 'Precedence3', 'Precedence4', 'Precedence5', 'Precedence6', 'Precedence7', 'Precedence8', 'Precedence9', 'PrimaryExpression', 'Program', 'ReturnStatement', 'SetterClassMember', 'Statement', 'TypeDeclaration', 'TypeDeclarationStatement', 'TypeExpression', 'VariableDeclarationStatement', 'VariableDeclarator', 'WhileStatement'];
     }
 
     protected override computeIsSubtype(subtype: string, supertype: string): boolean {
         switch (subtype) {
+            case Expression: {
+                return this.isSubtype(Precedence1, supertype) || this.isSubtype(Precedence2, supertype) || this.isSubtype(Precedence3, supertype) || this.isSubtype(Precedence4, supertype) || this.isSubtype(Precedence5, supertype) || this.isSubtype(Precedence6, supertype) || this.isSubtype(Precedence7, supertype) || this.isSubtype(Precedence8, supertype) || this.isSubtype(Precedence9, supertype) || this.isSubtype(Precedence10, supertype) || this.isSubtype(Precedence11, supertype) || this.isSubtype(Precedence12, supertype) || this.isSubtype(Precedence13, supertype) || this.isSubtype(Precedence14, supertype) || this.isSubtype(PrimaryExpression, supertype);
+            }
+            case ID: {
+                return this.isSubtype(PrimaryExpression, supertype);
+            }
+            case TypeExpression: {
+                return this.isSubtype(ClassDeclaration, supertype);
+            }
+            case BinaryExpression:
+            case Precedence1:
+            case Precedence10:
+            case Precedence11:
+            case Precedence12:
+            case Precedence13:
+            case Precedence4:
+            case Precedence5:
+            case Precedence6:
+            case Precedence7:
+            case Precedence8:
+            case Precedence9:
+            case PrimaryExpression: {
+                return this.isSubtype(Expression, supertype);
+            }
+            case BlockStatement:
+            case BreakStatement:
+            case ContinueStatement:
+            case ExpressionStatement:
+            case GrabStatement:
+            case ReturnStatement:
+            case TypeDeclarationStatement:
+            case VariableDeclarationStatement:
+            case WhileStatement: {
+                return this.isSubtype(Statement, supertype);
+            }
+            case Precedence14: {
+                return this.isSubtype(Precedence13, supertype);
+            }
+            case Precedence2: {
+                return this.isSubtype(Precedence1, supertype);
+            }
+            case Precedence3: {
+                return this.isSubtype(Precedence2, supertype);
+            }
             default: {
                 return false;
             }
@@ -65,9 +691,6 @@ export class WhackoAstReflection extends AbstractAstReflection {
     getReferenceType(refInfo: ReferenceInfo): string {
         const referenceId = `${refInfo.container.$type}:${refInfo.property}`;
         switch (referenceId) {
-            case 'Greeting:person': {
-                return Person;
-            }
             default: {
                 throw new Error(`${referenceId} is not a valid reference id.`);
             }
@@ -76,12 +699,118 @@ export class WhackoAstReflection extends AbstractAstReflection {
 
     getTypeMetaData(type: string): TypeMetaData {
         switch (type) {
-            case 'Model': {
+            case 'CallPath': {
                 return {
-                    name: 'Model',
+                    name: 'CallPath',
                     mandatory: [
-                        { name: 'greetings', type: 'array' },
-                        { name: 'persons', type: 'array' }
+                        { name: 'arguments', type: 'array' }
+                    ]
+                };
+            }
+            case 'ClassDeclaration': {
+                return {
+                    name: 'ClassDeclaration',
+                    mandatory: [
+                        { name: 'members', type: 'array' }
+                    ]
+                };
+            }
+            case 'ClassMember': {
+                return {
+                    name: 'ClassMember',
+                    mandatory: [
+                        { name: 'members', type: 'array' }
+                    ]
+                };
+            }
+            case 'ConstructorClassMember': {
+                return {
+                    name: 'ConstructorClassMember',
+                    mandatory: [
+                        { name: 'parameters', type: 'array' }
+                    ]
+                };
+            }
+            case 'ExportDeclaration': {
+                return {
+                    name: 'ExportDeclaration',
+                    mandatory: [
+                        { name: 'declarators', type: 'array' }
+                    ]
+                };
+            }
+            case 'Expression': {
+                return {
+                    name: 'Expression',
+                    mandatory: [
+                        { name: 'path', type: 'array' }
+                    ]
+                };
+            }
+            case 'FunctionDeclaration': {
+                return {
+                    name: 'FunctionDeclaration',
+                    mandatory: [
+                        { name: 'parameters', type: 'array' }
+                    ]
+                };
+            }
+            case 'ImportStatement': {
+                return {
+                    name: 'ImportStatement',
+                    mandatory: [
+                        { name: 'declarators', type: 'array' }
+                    ]
+                };
+            }
+            case 'MethodClassMember': {
+                return {
+                    name: 'MethodClassMember',
+                    mandatory: [
+                        { name: 'parameters', type: 'array' }
+                    ]
+                };
+            }
+            case 'Program': {
+                return {
+                    name: 'Program',
+                    mandatory: [
+                        { name: 'declarations', type: 'array' },
+                        { name: 'exports', type: 'array' },
+                        { name: 'imports', type: 'array' }
+                    ]
+                };
+            }
+            case 'TypeExpression': {
+                return {
+                    name: 'TypeExpression',
+                    mandatory: [
+                        { name: 'members', type: 'array' },
+                        { name: 'typeParameters', type: 'array' }
+                    ]
+                };
+            }
+            case 'BinaryExpression': {
+                return {
+                    name: 'BinaryExpression',
+                    mandatory: [
+                        { name: 'path', type: 'array' }
+                    ]
+                };
+            }
+            case 'BlockStatement': {
+                return {
+                    name: 'BlockStatement',
+                    mandatory: [
+                        { name: 'statements', type: 'array' }
+                    ]
+                };
+            }
+            case 'VariableDeclarationStatement': {
+                return {
+                    name: 'VariableDeclarationStatement',
+                    mandatory: [
+                        { name: 'declarators', type: 'array' }
                     ]
                 };
             }
