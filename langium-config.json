@@ -1,0 +1,12 @@
+{
+    "projectName": "Whacko",
+    "languages": [{
+        "id": "whacko",
+        "grammar": "src/language-server/whacko.langium",
+        "fileExtensions": [".wo"],
+        "textMate": {
+            "out": "syntaxes/whacko.tmLanguage.json"
+        }
+    }],
+    "out": "src/language-server/generated"
+}

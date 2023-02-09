@@ -1,0 +1,57 @@
+{
+  "name": "whacko",
+  "scopeName": "source.whacko",
+  "fileTypes": [
+    ".wo"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "name": "keyword.control.whacko",
+      "match": "\\b(Hello|person)\\b"
+    },
+    {
+      "name": "string.quoted.double.whacko",
+      "begin": "\"",
+      "end": "\""
+    },
+    {
+      "name": "string.quoted.single.whacko",
+      "begin": "'",
+      "end": "'"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.block.whacko",
+          "begin": "/\\*",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.comment.whacko"
+            }
+          },
+          "end": "\\*/",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.comment.whacko"
+            }
+          }
+        },
+        {
+          "begin": "//",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.whitespace.comment.leading.whacko"
+            }
+          },
+          "end": "(?=$)",
+          "name": "comment.line.whacko"
+        }
+      ]
+    }
+  }
+}
