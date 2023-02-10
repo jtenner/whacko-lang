@@ -1,5 +1,32 @@
 import { test } from "test";
-fn myFn(): void {
-  let a = async<i32> {  };
 
+fn main(): void {
+  yield a ? b : c;
+  a = b ? b : c;
+  a.b = c;
+  a || b && c;
+  a && b | c;
+  a | b & c;
+  a ^ b & c;
+  a & b == c;
+  "test";
+  1;
+  a != t <= some;
+  test << 1 <= a >> v;
+  c >> d + e;
+  a << b;
+  test + test * test;
+  test * test ** test;
+  test ** test;
+  +test;
+  -test;
+  !test;
+  await test;
+  hold test;
+  let a = 1;
+  async {
+    1;
+    2;
+    3;
+  };
 }

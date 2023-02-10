@@ -4,28 +4,28 @@ entry Program:
     (imports+=ImportStatement | exports+=ExportDeclaration | declarations+=FunctionDeclaration | declarations+=ClassDeclaration | declarations+=TypeDeclaration)*;
 
 ImportStatement:
-    Import "{" (declarators+=ImportDeclarator ("," declarators+=ImportDeclarator)* )? "}" From path=String ";";
+    "import" "{" (declarators+=ImportDeclarator ("," declarators+=ImportDeclarator)* )? "}" "from" path=String ";";
 
 ImportDeclarator:
-    name=ID (As alias=ID)?;
+    name=ID ("as" alias=ID)?;
 
 ExportDeclaration:
-    Export "{" declarators+=ExportDeclarator ("," declarators+=ExportDeclarator)* "}";
+    "export" "{" declarators+=ExportDeclarator ("," declarators+=ExportDeclarator)* "}";
 
 ExportDeclarator:
-    name=ID (As alias=ID)?;
+    name=ID ("as" alias=ID)?;
 
 FunctionDeclaration:
-    (async=Async)? Fn name=ID "(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")" ":" returnType=TypeExpression block=BlockStatement;
+    (async="async")? "fn" name=ID "(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")" ":" returnType=TypeExpression block=BlockStatement;
 
 Parameter:
     name=ID ":" type=ID;
 
 TypeDeclaration:
-    Type name=ID "=" type=TypeExpression;
+    "type" name=ID "=" type=TypeExpression;
 
 ClassDeclaration:
-    (final=Final)? Class name=ID Extends TypeExpression "{" (members+=ClassMember (members+=ClassMember)* )? "}";
+    (final="final")? "class" name=ID "extends" TypeExpression "{" (members+=ClassMember (members+=ClassMember)* )? "}";
 
 TypeExpression:
     name=ID ("<" typeParameters+=ID ("," typeParameters+=ID)* ">")?;
@@ -34,19 +34,19 @@ ClassMember:
     (members+=ConstructorClassMember | members+=FieldClassMember | members+=MethodClassMember | members+=GetterClassMember | members+=SetterClassMember);
 
 FieldClassMember:
-    (private=Private)? name=ID ":" type=TypeExpression ("=" initializer=Expression)? ";";
+    (private="private")? name=ID ":" type=TypeExpression ("=" initializer=Expression)? ";";
 
 MethodClassMember:
-    (private=Private)? name=ID "(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")" ":" returnType=TypeExpression block=BlockStatement;
+    (private="private")? name=ID "(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")" ":" returnType=TypeExpression block=BlockStatement;
 
 GetterClassMember:
-    (private=Private)? Get name=ID ":" returnType=TypeExpression block=BlockStatement;
+    (private="private")? "get" name=ID ":" returnType=TypeExpression block=BlockStatement;
 
 SetterClassMember:
-    (private=Private)? Set name=ID "(" parameter=Parameter ")" block=BlockStatement;
+    (private="private")? "set" name=ID "(" parameter=Parameter ")" block=BlockStatement;
 
 ConstructorClassMember:
-    (private=Private)? Constructor "(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")" block=BlockStatement;
+    (private="private")? "constructor" "(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")" block=BlockStatement;
 
 Statement: BlockStatement | TypeDeclarationStatement | GrabStatement | WhileStatement | ContinueStatement | BreakStatement | IfElseStatement | ReturnStatement | ExpressionStatement | VariableDeclarationStatement;
 
@@ -54,166 +54,149 @@ BlockStatement:
     "{" (statements+=Statement)* "}";
 
 TypeDeclarationStatement:
-    Type name=ID "=" type=TypeExpression ";";
+    "type" name=ID "=" type=TypeExpression ";";
 
 GrabStatement:
-    Grab "(" heldExpression=Expression ")" statement=Statement;
+    "grab" "(" heldExpression=Expression ")" statement=Statement;
 
 WhileStatement:
-    While "(" expression=Expression ")" statement=Statement;
+    "while" "(" expression=Expression ")" statement=Statement;
 
 ContinueStatement:
-    cont=Continue ";";
+    cont="continue" ";";
 
 BreakStatement:
-    brk=Break ";";
+    brk="break" ";";
 
-IfElseStatement infers Statement:
-    If "(" condition=Expression ")" truthy=Statement Else falsy=Statement;
+IfElseStatement:
+    "if" "(" condition=Expression ")" truthy=Statement ("else" falsy=Statement)?;
 
 ReturnStatement:
-    Return expression=Expression ";";
+    "return" expression=Expression ";";
 
 VariableDeclarationStatement:
-    type=(Const | Let) declarators+=VariableDeclarator ("," declarators+=VariableDeclarator)* ";";
+    declarationType=("const" | "let") declarators+=VariableDeclarator ("," declarators+=VariableDeclarator)* ";";
 
 VariableDeclarator:
     name=ID (":" type=TypeExpression)? "=" expression=Expression;
 
 ExpressionStatement:
-    expr=Expression ";";
+    expression=Expression ";";
 
-Expression: Precedence1;
+Expression: YieldExpression;
 
-Precedence1: YieldExpression | ConditionalExpression | Precedence2;
+YieldExpression:
+    "yield" expression=YieldExpression
+    | TernaryExpression;
 
-YieldExpression infers Expression: Yield exprpression=Expression;
-
-ConditionalExpression infers Expression: conditional=Precedence2 "?" truthy=Precedence1 ":" falsy=Precedence1;
-
-Precedence2: AssignmentExpression | Precedence3;
+TernaryExpression:
+    condition=AssignmentExpression "?" truthy=TernaryExpression ":" falsy=TernaryExpression
+    | AssignmentExpression;
 
 AssignmentExpression infers Expression:
-    lhs=PathExpression op=("=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=") rhs=Precedence2;
-
-Precedence3: LogicalOrExpression;
+    LogicalOrExpression ({infer BinaryExpression.e1=current} op=("=" | "+=" | "-=" | "**=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | ">>>=" | "&=" | "^=" | "|=" | "&&=" | "||=" | "??=") e2=LogicalOrExpression)*;
 
 LogicalOrExpression infers Expression:
-    Precedence4 ({infer BinaryExpression.lhs=current} op=("||") rhs=Precedence4)*;
-
-Precedence4: LogicalAndExpression;
+    LogicalAndExpression ({infer BinaryExpression.e1=current} op=("||") e2=LogicalAndExpression)*;
 
 LogicalAndExpression infers Expression:
-    Precedence5 ({infer BinaryExpression.lhs=current} op=("&&") rhs=Precedence5)*;
-
-Precedence5: EqualityExpression;
-
-EqualityExpression infers Expression:
-    Precedence6 ({infer BinaryExpression.lhs=current} op=("==" | "!=" | "<" | ">" | "<=" | ">=") rhs=Precedence6)*;
-
-Precedence6: BitwiseOrExpression;
+    BitwiseOrExpression ({infer BinaryExpression.e1=current} op=("&&") e2=BitwiseOrExpression)*;
 
 BitwiseOrExpression infers Expression:
-    Precedence7 ({infer BinaryExpression.lhs=current} op=("|") rhs=Precedence7)*;
-
-Precedence7: BitwiseXOrExpression;
+    BitwiseXOrExpression ({infer BinaryExpression.e1=current} op=("|") e2=BitwiseXOrExpression)*;
 
 BitwiseXOrExpression infers Expression:
-    Precedence8 ({infer BinaryExpression.lhs=current} op=("^") rhs=Precedence8)*;
-
-Precedence8: BitwiseAndExpression;
+    BitwiseAndExpression ({infer BinaryExpression.e1=current} op=("^") e2=BitwiseAndExpression)*;
 
 BitwiseAndExpression infers Expression:
-    Precedence9 ({infer BinaryExpression.lhs=current} op=("&") rhs=Precedence9)*;
+    EqualityExpression ({infer BinaryExpression.e1=current} op=("&") e2=EqualityExpression)*;
 
-Precedence9: BitshiftExpression;
+EqualityExpression infers Expression:
+    ComaprisonExpression ({infer BinaryExpression.e1=current} op=("==" | "!=") e2=ComaprisonExpression)*;
 
-BitshiftExpression infers Expression:
-    Precedence10 ({infer BinaryExpression.lhs=current} op=("<<" | ">>") rhs=Precedence10)*;
+ComaprisonExpression infers Expression:
+    BitShiftExpression ({infer BinaryExpression.e1=current} op=("<=" | "<" | ">=" | ">") e2=BitShiftExpression)*;
 
-Precedence10: SumExpression;
+BitShiftExpression infers Expression:
+    SumExpression ({infer BinaryExpression.e1=current} op=("<<" | ">>") e2=SumExpression)*;
 
-SumExpression infers Expression:
-    Precedence11 ({infer BinaryExpression.lhs=current} op=("+" | "-") rhs=Precedence11)*;
+SumExpression infers Expression: 
+    ProductExpression ({infer BinaryExpression.e1=current} op=("+" | "-") e2=ProductExpression)*;
 
-Precedence11: ProductExpression;
+ProductExpression infers Expression: 
+    ExponentiationExpression ({infer BinaryExpression.e1=current} op=("*" | "/" | "%") e2=ExponentiationExpression)*;
 
-ProductExpression infers Expression:
-    Precedence12 ({infer BinaryExpression.lhs=current} op=("*" | "/" | "%") rhs=Precedence12)*;
+ExponentiationExpression infers Expression: 
+    LeftUnaryExpression ({infer BinaryExpression.e1=current} op="**" e2=LeftUnaryExpression)*;
 
-Precedence12: CastExpression;
+LeftUnaryExpression:
+    op=("!" | "-" | "+" | "~") expression=LeftUnaryExpression
+    | AwaitExpression;
 
-CastExpression infers Expression:
-    "<" type=TypeExpression ">" expression=Precedence13;
+AwaitExpression:
+    "await" expression=LeftUnaryExpression
+    | HoldExpression;
 
-Precedence13: LeftUnaryExpression | AwaitExpression | ConstructorExpression | HeldExpression | Precedence14;
+HoldExpression:
+    "hold" expression=LeftUnaryExpression
+    | PathExpression;
 
-LeftUnaryExpression infers Expression:
-    op=("!" | "-" | "~") Precedence13;
+PathExpression:
+    path+=PrimaryExpression (path+=NewPath | path+=MemberAccessPath | path+=ArrayAccessPath | path+=CallPath)+
+    | PrimaryExpression;
 
-AwaitExpression infers Expression:
-    Await expression=Precedence13;
-
-ConstructorExpression infers Expression:
-    New constructor=PathExpression;
-
-HeldExpression infers Expression:
-    Hold held=Precedence13;
-
-Precedence14: PathExpression;
-
-PathExpression infers Expression: 
-    PrimaryExpression (path+=MemberAccessPath | path+=CallPath | path+=ArrayAccessPath)*;
+NewPath:
+    "." "new" ("<" typeParameters+=TypeExpression ("," typeParameters+=TypeExpression)* ">")? "(" (parameters+=Expression ("," parameters+=Expression)*)? ")";
 
 MemberAccessPath:
     "." name=ID;
 
-CallPath:
-    "(" (arguments+=Expression ("," arguments+=Expression)* )? ")";
-
 ArrayAccessPath:
     "[" expression=Expression "]";
 
+CallPath:
+    ("<" typeParameters+=TypeExpression ("," typeParameters+=TypeExpression)* ">")? "(" ")";
+
 PrimaryExpression: GroupLiteral | ID | FloatLiteral | IntegerLiteral | HexLiteral | BinaryLiteral | OctalLiteral | StringLiteral | FalseLiteral | TrueLiteral | NullLiteral | ThisLiteral | SuperLiteral | AsyncBlockLiteral;
 
-GroupLiteral infers Expression:
+GroupLiteral:
     "(" expression=Expression ")";
 
-FloatLiteral infers Expression:
+FloatLiteral:
     value=Float;
 
-IntegerLiteral infers Expression:
+IntegerLiteral:
     value=Integer;
 
-HexLiteral infers Expression:
+HexLiteral:
     value=Hex;
 
-BinaryLiteral infers Expression:
+BinaryLiteral:
     value=Binary;
 
-OctalLiteral infers Expression:
+OctalLiteral:
     value=Octal;
 
-StringLiteral infers Expression:
+StringLiteral:
     value=String;
 
-FalseLiteral infers Expression:
-    false=False;
+FalseLiteral:
+    false="false";
 
-TrueLiteral infers Expression:
-    true=True;
+TrueLiteral:
+    true="true";
 
-NullLiteral infers Expression:
-    null=Null;
+NullLiteral:
+    null="null";
 
-ThisLiteral infers Expression:
-    this=This;
+ThisLiteral:
+    this="this";
 
-SuperLiteral infers Expression:
-    super=Super;
+SuperLiteral:
+    super="super";
 
-AsyncBlockLiteral infers Expression:
-    Async "<" type=TypeExpression ">" block=BlockStatement;
+AsyncBlockLiteral:
+    "async" ("<" type=TypeExpression ">")? "{" statements+=Statement* "}";
 
 ID:
     name=Identifier;
@@ -221,44 +204,12 @@ ID:
 
 terminal String: /"([^"\r\n]|\\\.)*"/;
 
-terminal Import: "import";
-terminal Export: "export";
-terminal Final: "final";
-terminal Type: "type";
-terminal Class: "class";
-terminal Extends: "extends";
-terminal Private: "private";
-terminal Get: "get";
-terminal Set: "set";
-terminal Constructor: "constructor";
-terminal Grab: "grab";
-terminal While: "while";
-terminal Continue: "continue";
-terminal Await: "await";
-terminal Async: "async";
-terminal False: "false";
-terminal True: "true";
-terminal Null: "null";
-terminal This: "this";
-terminal Super: "super";
-terminal Break: "break";
-terminal If: "if";
-terminal Return: "return";
-terminal Const: "const";
-terminal Let: "let";
-terminal Yield: "yield";
-terminal New: "new";
-terminal Hold: "hold";
-terminal From: "from";
-terminal As: "as";
-terminal Fn: "fn";
-terminal Else: "else";
 terminal Identifier: /[a-zA-Z$_][a-zA-Z$_0-9]*/;
 
 terminal Binary: /0b[10]+/;
 terminal Hex: /0x[0-9a-fA-F]+/;
 terminal Octal: /0o[0-8]+/;
-terminal Float: /[-+]?[0-9]+[.]?[0-9]*([eE][-+]?[0-9]+)?/;
+terminal Float: /[-+]?[0-9]+[.][0-9]+([eE][-+]?[0-9]+)?/;
 terminal Integer: /[-+]?[0-9]+/;
 
 // hidden stuff

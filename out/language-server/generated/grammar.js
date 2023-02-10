@@ -7,7 +7,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.WhackoGrammar = void 0;
 const langium_1 = require("langium");
 let loadedWhackoGrammar;
-const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar !== void 0 ? loadedWhackoGrammar : (loadedWhackoGrammar = (0, langium_1.loadGrammarFromJson)(`{
+const WhackoGrammar = () => loadedWhackoGrammar ?? (loadedWhackoGrammar = (0, langium_1.loadGrammarFromJson)(`{
   "$type": "Grammar",
   "isDeclared": true,
   "name": "Whacko",
@@ -95,11 +95,8 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
         "$type": "Group",
         "elements": [
           {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@80"
-            },
-            "arguments": []
+            "$type": "Keyword",
+            "value": "import"
           },
           {
             "$type": "Keyword",
@@ -150,11 +147,8 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "value": "}"
           },
           {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@108"
-            },
-            "arguments": []
+            "$type": "Keyword",
+            "value": "from"
           },
           {
             "$type": "Assignment",
@@ -163,7 +157,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@79"
+                "$ref": "#/rules@66"
               },
               "arguments": []
             }
@@ -194,7 +188,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@78"
+                "$ref": "#/rules@65"
               },
               "arguments": []
             }
@@ -203,11 +197,8 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "$type": "Group",
             "elements": [
               {
-                "$type": "RuleCall",
-                "rule": {
-                  "$ref": "#/rules@109"
-                },
-                "arguments": []
+                "$type": "Keyword",
+                "value": "as"
               },
               {
                 "$type": "Assignment",
@@ -216,7 +207,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
                 "terminal": {
                   "$type": "RuleCall",
                   "rule": {
-                    "$ref": "#/rules@78"
+                    "$ref": "#/rules@65"
                   },
                   "arguments": []
                 }
@@ -240,11 +231,8 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
         "$type": "Group",
         "elements": [
           {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@81"
-            },
-            "arguments": []
+            "$type": "Keyword",
+            "value": "export"
           },
           {
             "$type": "Keyword",
@@ -310,7 +298,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@78"
+                "$ref": "#/rules@65"
               },
               "arguments": []
             }
@@ -319,11 +307,8 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "$type": "Group",
             "elements": [
               {
-                "$type": "RuleCall",
-                "rule": {
-                  "$ref": "#/rules@109"
-                },
-                "arguments": []
+                "$type": "Keyword",
+                "value": "as"
               },
               {
                 "$type": "Assignment",
@@ -332,7 +317,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
                 "terminal": {
                   "$type": "RuleCall",
                   "rule": {
-                    "$ref": "#/rules@78"
+                    "$ref": "#/rules@65"
                   },
                   "arguments": []
                 }
@@ -360,20 +345,14 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "feature": "async",
             "operator": "=",
             "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@94"
-              },
-              "arguments": []
+              "$type": "Keyword",
+              "value": "async"
             },
             "cardinality": "?"
           },
           {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@110"
-            },
-            "arguments": []
+            "$type": "Keyword",
+            "value": "fn"
           },
           {
             "$type": "Assignment",
@@ -382,7 +361,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@78"
+                "$ref": "#/rules@65"
               },
               "arguments": []
             }
@@ -485,7 +464,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@78"
+                "$ref": "#/rules@65"
               },
               "arguments": []
             }
@@ -501,7 +480,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@78"
+                "$ref": "#/rules@65"
               },
               "arguments": []
             }
@@ -522,11 +501,8 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
         "$type": "Group",
         "elements": [
           {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@83"
-            },
-            "arguments": []
+            "$type": "Keyword",
+            "value": "type"
           },
           {
             "$type": "Assignment",
@@ -535,7 +511,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@78"
+                "$ref": "#/rules@65"
               },
               "arguments": []
             }
@@ -576,20 +552,14 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "feature": "final",
             "operator": "=",
             "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@82"
-              },
-              "arguments": []
+              "$type": "Keyword",
+              "value": "final"
             },
             "cardinality": "?"
           },
           {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@84"
-            },
-            "arguments": []
+            "$type": "Keyword",
+            "value": "class"
           },
           {
             "$type": "Assignment",
@@ -598,17 +568,14 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@78"
+                "$ref": "#/rules@65"
               },
               "arguments": []
             }
           },
           {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@85"
-            },
-            "arguments": []
+            "$type": "Keyword",
+            "value": "extends"
           },
           {
             "$type": "RuleCall",
@@ -678,7 +645,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@78"
+                "$ref": "#/rules@65"
               },
               "arguments": []
             }
@@ -697,7 +664,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
                 "terminal": {
                   "$type": "RuleCall",
                   "rule": {
-                    "$ref": "#/rules@78"
+                    "$ref": "#/rules@65"
                   },
                   "arguments": []
                 }
@@ -716,7 +683,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
                     "terminal": {
                       "$type": "RuleCall",
                       "rule": {
-                        "$ref": "#/rules@78"
+                        "$ref": "#/rules@65"
                       },
                       "arguments": []
                     }
@@ -826,11 +793,8 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "feature": "private",
             "operator": "=",
             "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@86"
-              },
-              "arguments": []
+              "$type": "Keyword",
+              "value": "private"
             },
             "cardinality": "?"
           },
@@ -841,7 +805,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@78"
+                "$ref": "#/rules@65"
               },
               "arguments": []
             }
@@ -908,11 +872,8 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "feature": "private",
             "operator": "=",
             "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@86"
-              },
-              "arguments": []
+              "$type": "Keyword",
+              "value": "private"
             },
             "cardinality": "?"
           },
@@ -923,7 +884,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@78"
+                "$ref": "#/rules@65"
               },
               "arguments": []
             }
@@ -1024,20 +985,14 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "feature": "private",
             "operator": "=",
             "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@86"
-              },
-              "arguments": []
+              "$type": "Keyword",
+              "value": "private"
             },
             "cardinality": "?"
           },
           {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@87"
-            },
-            "arguments": []
+            "$type": "Keyword",
+            "value": "get"
           },
           {
             "$type": "Assignment",
@@ -1046,7 +1001,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@78"
+                "$ref": "#/rules@65"
               },
               "arguments": []
             }
@@ -1099,20 +1054,14 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "feature": "private",
             "operator": "=",
             "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@86"
-              },
-              "arguments": []
+              "$type": "Keyword",
+              "value": "private"
             },
             "cardinality": "?"
           },
           {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@88"
-            },
-            "arguments": []
+            "$type": "Keyword",
+            "value": "set"
           },
           {
             "$type": "Assignment",
@@ -1121,7 +1070,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@78"
+                "$ref": "#/rules@65"
               },
               "arguments": []
             }
@@ -1178,20 +1127,14 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "feature": "private",
             "operator": "=",
             "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@86"
-              },
-              "arguments": []
+              "$type": "Keyword",
+              "value": "private"
             },
             "cardinality": "?"
           },
           {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@89"
-            },
-            "arguments": []
+            "$type": "Keyword",
+            "value": "constructor"
           },
           {
             "$type": "Keyword",
@@ -1390,11 +1333,8 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
         "$type": "Group",
         "elements": [
           {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@83"
-            },
-            "arguments": []
+            "$type": "Keyword",
+            "value": "type"
           },
           {
             "$type": "Assignment",
@@ -1403,7 +1343,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@78"
+                "$ref": "#/rules@65"
               },
               "arguments": []
             }
@@ -1444,11 +1384,8 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
         "$type": "Group",
         "elements": [
           {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@90"
-            },
-            "arguments": []
+            "$type": "Keyword",
+            "value": "grab"
           },
           {
             "$type": "Keyword",
@@ -1498,11 +1435,8 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
         "$type": "Group",
         "elements": [
           {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@91"
-            },
-            "arguments": []
+            "$type": "Keyword",
+            "value": "while"
           },
           {
             "$type": "Keyword",
@@ -1556,11 +1490,8 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "feature": "cont",
             "operator": "=",
             "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@92"
-              },
-              "arguments": []
+              "$type": "Keyword",
+              "value": "continue"
             }
           },
           {
@@ -1587,11 +1518,8 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "feature": "brk",
             "operator": "=",
             "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@100"
-              },
-              "arguments": []
+              "$type": "Keyword",
+              "value": "break"
             }
           },
           {
@@ -1610,19 +1538,12 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     {
       "$type": "ParserRule",
       "name": "IfElseStatement",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Statement"
-      },
       "definition": {
         "$type": "Group",
         "elements": [
           {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@101"
-            },
-            "arguments": []
+            "$type": "Keyword",
+            "value": "if"
           },
           {
             "$type": "Keyword",
@@ -1657,23 +1578,26 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             }
           },
           {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@111"
-            },
-            "arguments": []
-          },
-          {
-            "$type": "Assignment",
-            "feature": "falsy",
-            "operator": "=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@16"
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Keyword",
+                "value": "else"
               },
-              "arguments": []
-            }
+              {
+                "$type": "Assignment",
+                "feature": "falsy",
+                "operator": "=",
+                "terminal": {
+                  "$type": "RuleCall",
+                  "rule": {
+                    "$ref": "#/rules@16"
+                  },
+                  "arguments": []
+                }
+              }
+            ],
+            "cardinality": "?"
           }
         ]
       },
@@ -1691,11 +1615,8 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
         "$type": "Group",
         "elements": [
           {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@102"
-            },
-            "arguments": []
+            "$type": "Keyword",
+            "value": "return"
           },
           {
             "$type": "Assignment",
@@ -1730,24 +1651,18 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
         "elements": [
           {
             "$type": "Assignment",
-            "feature": "type",
+            "feature": "declarationType",
             "operator": "=",
             "terminal": {
               "$type": "Alternatives",
               "elements": [
                 {
-                  "$type": "RuleCall",
-                  "rule": {
-                    "$ref": "#/rules@103"
-                  },
-                  "arguments": []
+                  "$type": "Keyword",
+                  "value": "const"
                 },
                 {
-                  "$type": "RuleCall",
-                  "rule": {
-                    "$ref": "#/rules@104"
-                  },
-                  "arguments": []
+                  "$type": "Keyword",
+                  "value": "let"
                 }
               ]
             }
@@ -1812,7 +1727,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@78"
+                "$ref": "#/rules@65"
               },
               "arguments": []
             }
@@ -1872,7 +1787,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
         "elements": [
           {
             "$type": "Assignment",
-            "feature": "expr",
+            "feature": "expression",
             "operator": "=",
             "terminal": {
               "$type": "RuleCall",
@@ -1914,158 +1829,106 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     },
     {
       "$type": "ParserRule",
-      "name": "Precedence1",
+      "name": "YieldExpression",
       "definition": {
         "$type": "Alternatives",
         "elements": [
+          {
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Keyword",
+                "value": "yield"
+              },
+              {
+                "$type": "Assignment",
+                "feature": "expression",
+                "operator": "=",
+                "terminal": {
+                  "$type": "RuleCall",
+                  "rule": {
+                    "$ref": "#/rules@29"
+                  },
+                  "arguments": []
+                }
+              }
+            ]
+          },
           {
             "$type": "RuleCall",
             "rule": {
               "$ref": "#/rules@30"
             },
             "arguments": []
+          }
+        ]
+      },
+      "definesHiddenTokens": false,
+      "entry": false,
+      "fragment": false,
+      "hiddenTokens": [],
+      "parameters": [],
+      "wildcard": false
+    },
+    {
+      "$type": "ParserRule",
+      "name": "TernaryExpression",
+      "definition": {
+        "$type": "Alternatives",
+        "elements": [
+          {
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Assignment",
+                "feature": "condition",
+                "operator": "=",
+                "terminal": {
+                  "$type": "RuleCall",
+                  "rule": {
+                    "$ref": "#/rules@31"
+                  },
+                  "arguments": []
+                }
+              },
+              {
+                "$type": "Keyword",
+                "value": "?"
+              },
+              {
+                "$type": "Assignment",
+                "feature": "truthy",
+                "operator": "=",
+                "terminal": {
+                  "$type": "RuleCall",
+                  "rule": {
+                    "$ref": "#/rules@30"
+                  },
+                  "arguments": []
+                }
+              },
+              {
+                "$type": "Keyword",
+                "value": ":"
+              },
+              {
+                "$type": "Assignment",
+                "feature": "falsy",
+                "operator": "=",
+                "terminal": {
+                  "$type": "RuleCall",
+                  "rule": {
+                    "$ref": "#/rules@30"
+                  },
+                  "arguments": []
+                }
+              }
+            ]
           },
           {
             "$type": "RuleCall",
             "rule": {
               "$ref": "#/rules@31"
-            },
-            "arguments": []
-          },
-          {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@32"
-            },
-            "arguments": []
-          }
-        ]
-      },
-      "definesHiddenTokens": false,
-      "entry": false,
-      "fragment": false,
-      "hiddenTokens": [],
-      "parameters": [],
-      "wildcard": false
-    },
-    {
-      "$type": "ParserRule",
-      "name": "YieldExpression",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Expression"
-      },
-      "definition": {
-        "$type": "Group",
-        "elements": [
-          {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@105"
-            },
-            "arguments": []
-          },
-          {
-            "$type": "Assignment",
-            "feature": "exprpression",
-            "operator": "=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@28"
-              },
-              "arguments": []
-            }
-          }
-        ]
-      },
-      "definesHiddenTokens": false,
-      "entry": false,
-      "fragment": false,
-      "hiddenTokens": [],
-      "parameters": [],
-      "wildcard": false
-    },
-    {
-      "$type": "ParserRule",
-      "name": "ConditionalExpression",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Expression"
-      },
-      "definition": {
-        "$type": "Group",
-        "elements": [
-          {
-            "$type": "Assignment",
-            "feature": "conditional",
-            "operator": "=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@32"
-              },
-              "arguments": []
-            }
-          },
-          {
-            "$type": "Keyword",
-            "value": "?"
-          },
-          {
-            "$type": "Assignment",
-            "feature": "truthy",
-            "operator": "=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@29"
-              },
-              "arguments": []
-            }
-          },
-          {
-            "$type": "Keyword",
-            "value": ":"
-          },
-          {
-            "$type": "Assignment",
-            "feature": "falsy",
-            "operator": "=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@29"
-              },
-              "arguments": []
-            }
-          }
-        ]
-      },
-      "definesHiddenTokens": false,
-      "entry": false,
-      "fragment": false,
-      "hiddenTokens": [],
-      "parameters": [],
-      "wildcard": false
-    },
-    {
-      "$type": "ParserRule",
-      "name": "Precedence2",
-      "definition": {
-        "$type": "Alternatives",
-        "elements": [
-          {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@33"
-            },
-            "arguments": []
-          },
-          {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@34"
             },
             "arguments": []
           }
@@ -2089,82 +1952,112 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
         "$type": "Group",
         "elements": [
           {
-            "$type": "Assignment",
-            "feature": "lhs",
-            "operator": "=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@60"
-              },
-              "arguments": []
-            }
+            "$type": "RuleCall",
+            "rule": {
+              "$ref": "#/rules@32"
+            },
+            "arguments": []
           },
           {
-            "$type": "Assignment",
-            "feature": "op",
-            "operator": "=",
-            "terminal": {
-              "$type": "Alternatives",
-              "elements": [
-                {
-                  "$type": "Keyword",
-                  "value": "="
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Action",
+                "inferredType": {
+                  "$type": "InferredType",
+                  "name": "BinaryExpression"
                 },
-                {
-                  "$type": "Keyword",
-                  "value": "+="
-                },
-                {
-                  "$type": "Keyword",
-                  "value": "-="
-                },
-                {
-                  "$type": "Keyword",
-                  "value": "*="
-                },
-                {
-                  "$type": "Keyword",
-                  "value": "/="
-                },
-                {
-                  "$type": "Keyword",
-                  "value": "%="
-                },
-                {
-                  "$type": "Keyword",
-                  "value": "&="
-                },
-                {
-                  "$type": "Keyword",
-                  "value": "|="
-                },
-                {
-                  "$type": "Keyword",
-                  "value": "^="
-                },
-                {
-                  "$type": "Keyword",
-                  "value": "<<="
-                },
-                {
-                  "$type": "Keyword",
-                  "value": ">>="
+                "feature": "e1",
+                "operator": "="
+              },
+              {
+                "$type": "Assignment",
+                "feature": "op",
+                "operator": "=",
+                "terminal": {
+                  "$type": "Alternatives",
+                  "elements": [
+                    {
+                      "$type": "Keyword",
+                      "value": "="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "+="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "-="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "**="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "*="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "/="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "%="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "<<="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": ">>="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": ">>>="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "&="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "^="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "|="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "&&="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "||="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "??="
+                    }
+                  ]
                 }
-              ]
-            }
-          },
-          {
-            "$type": "Assignment",
-            "feature": "rhs",
-            "operator": "=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@32"
               },
-              "arguments": []
-            }
+              {
+                "$type": "Assignment",
+                "feature": "e2",
+                "operator": "=",
+                "terminal": {
+                  "$type": "RuleCall",
+                  "rule": {
+                    "$ref": "#/rules@32"
+                  },
+                  "arguments": []
+                }
+              }
+            ],
+            "cardinality": "*"
           }
         ]
       },
@@ -2177,13 +2070,58 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     },
     {
       "$type": "ParserRule",
-      "name": "Precedence3",
+      "name": "LogicalOrExpression",
+      "inferredType": {
+        "$type": "InferredType",
+        "name": "Expression"
+      },
       "definition": {
-        "$type": "RuleCall",
-        "rule": {
-          "$ref": "#/rules@35"
-        },
-        "arguments": []
+        "$type": "Group",
+        "elements": [
+          {
+            "$type": "RuleCall",
+            "rule": {
+              "$ref": "#/rules@33"
+            },
+            "arguments": []
+          },
+          {
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Action",
+                "inferredType": {
+                  "$type": "InferredType",
+                  "name": "BinaryExpression"
+                },
+                "feature": "e1",
+                "operator": "="
+              },
+              {
+                "$type": "Assignment",
+                "feature": "op",
+                "operator": "=",
+                "terminal": {
+                  "$type": "Keyword",
+                  "value": "||"
+                }
+              },
+              {
+                "$type": "Assignment",
+                "feature": "e2",
+                "operator": "=",
+                "terminal": {
+                  "$type": "RuleCall",
+                  "rule": {
+                    "$ref": "#/rules@33"
+                  },
+                  "arguments": []
+                }
+              }
+            ],
+            "cardinality": "*"
+          }
+        ]
       },
       "definesHiddenTokens": false,
       "entry": false,
@@ -2194,7 +2132,131 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     },
     {
       "$type": "ParserRule",
-      "name": "LogicalOrExpression",
+      "name": "LogicalAndExpression",
+      "inferredType": {
+        "$type": "InferredType",
+        "name": "Expression"
+      },
+      "definition": {
+        "$type": "Group",
+        "elements": [
+          {
+            "$type": "RuleCall",
+            "rule": {
+              "$ref": "#/rules@34"
+            },
+            "arguments": []
+          },
+          {
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Action",
+                "inferredType": {
+                  "$type": "InferredType",
+                  "name": "BinaryExpression"
+                },
+                "feature": "e1",
+                "operator": "="
+              },
+              {
+                "$type": "Assignment",
+                "feature": "op",
+                "operator": "=",
+                "terminal": {
+                  "$type": "Keyword",
+                  "value": "&&"
+                }
+              },
+              {
+                "$type": "Assignment",
+                "feature": "e2",
+                "operator": "=",
+                "terminal": {
+                  "$type": "RuleCall",
+                  "rule": {
+                    "$ref": "#/rules@34"
+                  },
+                  "arguments": []
+                }
+              }
+            ],
+            "cardinality": "*"
+          }
+        ]
+      },
+      "definesHiddenTokens": false,
+      "entry": false,
+      "fragment": false,
+      "hiddenTokens": [],
+      "parameters": [],
+      "wildcard": false
+    },
+    {
+      "$type": "ParserRule",
+      "name": "BitwiseOrExpression",
+      "inferredType": {
+        "$type": "InferredType",
+        "name": "Expression"
+      },
+      "definition": {
+        "$type": "Group",
+        "elements": [
+          {
+            "$type": "RuleCall",
+            "rule": {
+              "$ref": "#/rules@35"
+            },
+            "arguments": []
+          },
+          {
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Action",
+                "inferredType": {
+                  "$type": "InferredType",
+                  "name": "BinaryExpression"
+                },
+                "feature": "e1",
+                "operator": "="
+              },
+              {
+                "$type": "Assignment",
+                "feature": "op",
+                "operator": "=",
+                "terminal": {
+                  "$type": "Keyword",
+                  "value": "|"
+                }
+              },
+              {
+                "$type": "Assignment",
+                "feature": "e2",
+                "operator": "=",
+                "terminal": {
+                  "$type": "RuleCall",
+                  "rule": {
+                    "$ref": "#/rules@35"
+                  },
+                  "arguments": []
+                }
+              }
+            ],
+            "cardinality": "*"
+          }
+        ]
+      },
+      "definesHiddenTokens": false,
+      "entry": false,
+      "fragment": false,
+      "hiddenTokens": [],
+      "parameters": [],
+      "wildcard": false
+    },
+    {
+      "$type": "ParserRule",
+      "name": "BitwiseXOrExpression",
       "inferredType": {
         "$type": "InferredType",
         "name": "Expression"
@@ -2218,7 +2280,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
                   "$type": "InferredType",
                   "name": "BinaryExpression"
                 },
-                "feature": "lhs",
+                "feature": "e1",
                 "operator": "="
               },
               {
@@ -2227,12 +2289,12 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
                 "operator": "=",
                 "terminal": {
                   "$type": "Keyword",
-                  "value": "||"
+                  "value": "^"
                 }
               },
               {
                 "$type": "Assignment",
-                "feature": "rhs",
+                "feature": "e2",
                 "operator": "=",
                 "terminal": {
                   "$type": "RuleCall",
@@ -2256,13 +2318,58 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     },
     {
       "$type": "ParserRule",
-      "name": "Precedence4",
+      "name": "BitwiseAndExpression",
+      "inferredType": {
+        "$type": "InferredType",
+        "name": "Expression"
+      },
       "definition": {
-        "$type": "RuleCall",
-        "rule": {
-          "$ref": "#/rules@37"
-        },
-        "arguments": []
+        "$type": "Group",
+        "elements": [
+          {
+            "$type": "RuleCall",
+            "rule": {
+              "$ref": "#/rules@37"
+            },
+            "arguments": []
+          },
+          {
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Action",
+                "inferredType": {
+                  "$type": "InferredType",
+                  "name": "BinaryExpression"
+                },
+                "feature": "e1",
+                "operator": "="
+              },
+              {
+                "$type": "Assignment",
+                "feature": "op",
+                "operator": "=",
+                "terminal": {
+                  "$type": "Keyword",
+                  "value": "&"
+                }
+              },
+              {
+                "$type": "Assignment",
+                "feature": "e2",
+                "operator": "=",
+                "terminal": {
+                  "$type": "RuleCall",
+                  "rule": {
+                    "$ref": "#/rules@37"
+                  },
+                  "arguments": []
+                }
+              }
+            ],
+            "cardinality": "*"
+          }
+        ]
       },
       "definesHiddenTokens": false,
       "entry": false,
@@ -2273,7 +2380,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     },
     {
       "$type": "ParserRule",
-      "name": "LogicalAndExpression",
+      "name": "EqualityExpression",
       "inferredType": {
         "$type": "InferredType",
         "name": "Expression"
@@ -2297,7 +2404,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
                   "$type": "InferredType",
                   "name": "BinaryExpression"
                 },
-                "feature": "lhs",
+                "feature": "e1",
                 "operator": "="
               },
               {
@@ -2305,13 +2412,22 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
                 "feature": "op",
                 "operator": "=",
                 "terminal": {
-                  "$type": "Keyword",
-                  "value": "&&"
+                  "$type": "Alternatives",
+                  "elements": [
+                    {
+                      "$type": "Keyword",
+                      "value": "=="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "!="
+                    }
+                  ]
                 }
               },
               {
                 "$type": "Assignment",
-                "feature": "rhs",
+                "feature": "e2",
                 "operator": "=",
                 "terminal": {
                   "$type": "RuleCall",
@@ -2335,13 +2451,75 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     },
     {
       "$type": "ParserRule",
-      "name": "Precedence5",
+      "name": "ComaprisonExpression",
+      "inferredType": {
+        "$type": "InferredType",
+        "name": "Expression"
+      },
       "definition": {
-        "$type": "RuleCall",
-        "rule": {
-          "$ref": "#/rules@39"
-        },
-        "arguments": []
+        "$type": "Group",
+        "elements": [
+          {
+            "$type": "RuleCall",
+            "rule": {
+              "$ref": "#/rules@39"
+            },
+            "arguments": []
+          },
+          {
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Action",
+                "inferredType": {
+                  "$type": "InferredType",
+                  "name": "BinaryExpression"
+                },
+                "feature": "e1",
+                "operator": "="
+              },
+              {
+                "$type": "Assignment",
+                "feature": "op",
+                "operator": "=",
+                "terminal": {
+                  "$type": "Alternatives",
+                  "elements": [
+                    {
+                      "$type": "Keyword",
+                      "value": "<="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "<"
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": ">="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": ">"
+                    }
+                  ]
+                }
+              },
+              {
+                "$type": "Assignment",
+                "feature": "e2",
+                "operator": "=",
+                "terminal": {
+                  "$type": "RuleCall",
+                  "rule": {
+                    "$ref": "#/rules@39"
+                  },
+                  "arguments": []
+                }
+              }
+            ],
+            "cardinality": "*"
+          }
+        ]
       },
       "definesHiddenTokens": false,
       "entry": false,
@@ -2352,7 +2530,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     },
     {
       "$type": "ParserRule",
-      "name": "EqualityExpression",
+      "name": "BitShiftExpression",
       "inferredType": {
         "$type": "InferredType",
         "name": "Expression"
@@ -2376,7 +2554,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
                   "$type": "InferredType",
                   "name": "BinaryExpression"
                 },
-                "feature": "lhs",
+                "feature": "e1",
                 "operator": "="
               },
               {
@@ -2388,34 +2566,18 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
                   "elements": [
                     {
                       "$type": "Keyword",
-                      "value": "=="
+                      "value": "<<"
                     },
                     {
                       "$type": "Keyword",
-                      "value": "!="
-                    },
-                    {
-                      "$type": "Keyword",
-                      "value": "<"
-                    },
-                    {
-                      "$type": "Keyword",
-                      "value": ">"
-                    },
-                    {
-                      "$type": "Keyword",
-                      "value": "<="
-                    },
-                    {
-                      "$type": "Keyword",
-                      "value": ">="
+                      "value": ">>"
                     }
                   ]
                 }
               },
               {
                 "$type": "Assignment",
-                "feature": "rhs",
+                "feature": "e2",
                 "operator": "=",
                 "terminal": {
                   "$type": "RuleCall",
@@ -2439,13 +2601,67 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     },
     {
       "$type": "ParserRule",
-      "name": "Precedence6",
+      "name": "SumExpression",
+      "inferredType": {
+        "$type": "InferredType",
+        "name": "Expression"
+      },
       "definition": {
-        "$type": "RuleCall",
-        "rule": {
-          "$ref": "#/rules@41"
-        },
-        "arguments": []
+        "$type": "Group",
+        "elements": [
+          {
+            "$type": "RuleCall",
+            "rule": {
+              "$ref": "#/rules@41"
+            },
+            "arguments": []
+          },
+          {
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Action",
+                "inferredType": {
+                  "$type": "InferredType",
+                  "name": "BinaryExpression"
+                },
+                "feature": "e1",
+                "operator": "="
+              },
+              {
+                "$type": "Assignment",
+                "feature": "op",
+                "operator": "=",
+                "terminal": {
+                  "$type": "Alternatives",
+                  "elements": [
+                    {
+                      "$type": "Keyword",
+                      "value": "+"
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "-"
+                    }
+                  ]
+                }
+              },
+              {
+                "$type": "Assignment",
+                "feature": "e2",
+                "operator": "=",
+                "terminal": {
+                  "$type": "RuleCall",
+                  "rule": {
+                    "$ref": "#/rules@41"
+                  },
+                  "arguments": []
+                }
+              }
+            ],
+            "cardinality": "*"
+          }
+        ]
       },
       "definesHiddenTokens": false,
       "entry": false,
@@ -2456,7 +2672,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     },
     {
       "$type": "ParserRule",
-      "name": "BitwiseOrExpression",
+      "name": "ProductExpression",
       "inferredType": {
         "$type": "InferredType",
         "name": "Expression"
@@ -2480,420 +2696,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
                   "$type": "InferredType",
                   "name": "BinaryExpression"
                 },
-                "feature": "lhs",
-                "operator": "="
-              },
-              {
-                "$type": "Assignment",
-                "feature": "op",
-                "operator": "=",
-                "terminal": {
-                  "$type": "Keyword",
-                  "value": "|"
-                }
-              },
-              {
-                "$type": "Assignment",
-                "feature": "rhs",
-                "operator": "=",
-                "terminal": {
-                  "$type": "RuleCall",
-                  "rule": {
-                    "$ref": "#/rules@42"
-                  },
-                  "arguments": []
-                }
-              }
-            ],
-            "cardinality": "*"
-          }
-        ]
-      },
-      "definesHiddenTokens": false,
-      "entry": false,
-      "fragment": false,
-      "hiddenTokens": [],
-      "parameters": [],
-      "wildcard": false
-    },
-    {
-      "$type": "ParserRule",
-      "name": "Precedence7",
-      "definition": {
-        "$type": "RuleCall",
-        "rule": {
-          "$ref": "#/rules@43"
-        },
-        "arguments": []
-      },
-      "definesHiddenTokens": false,
-      "entry": false,
-      "fragment": false,
-      "hiddenTokens": [],
-      "parameters": [],
-      "wildcard": false
-    },
-    {
-      "$type": "ParserRule",
-      "name": "BitwiseXOrExpression",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Expression"
-      },
-      "definition": {
-        "$type": "Group",
-        "elements": [
-          {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@44"
-            },
-            "arguments": []
-          },
-          {
-            "$type": "Group",
-            "elements": [
-              {
-                "$type": "Action",
-                "inferredType": {
-                  "$type": "InferredType",
-                  "name": "BinaryExpression"
-                },
-                "feature": "lhs",
-                "operator": "="
-              },
-              {
-                "$type": "Assignment",
-                "feature": "op",
-                "operator": "=",
-                "terminal": {
-                  "$type": "Keyword",
-                  "value": "^"
-                }
-              },
-              {
-                "$type": "Assignment",
-                "feature": "rhs",
-                "operator": "=",
-                "terminal": {
-                  "$type": "RuleCall",
-                  "rule": {
-                    "$ref": "#/rules@44"
-                  },
-                  "arguments": []
-                }
-              }
-            ],
-            "cardinality": "*"
-          }
-        ]
-      },
-      "definesHiddenTokens": false,
-      "entry": false,
-      "fragment": false,
-      "hiddenTokens": [],
-      "parameters": [],
-      "wildcard": false
-    },
-    {
-      "$type": "ParserRule",
-      "name": "Precedence8",
-      "definition": {
-        "$type": "RuleCall",
-        "rule": {
-          "$ref": "#/rules@45"
-        },
-        "arguments": []
-      },
-      "definesHiddenTokens": false,
-      "entry": false,
-      "fragment": false,
-      "hiddenTokens": [],
-      "parameters": [],
-      "wildcard": false
-    },
-    {
-      "$type": "ParserRule",
-      "name": "BitwiseAndExpression",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Expression"
-      },
-      "definition": {
-        "$type": "Group",
-        "elements": [
-          {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@46"
-            },
-            "arguments": []
-          },
-          {
-            "$type": "Group",
-            "elements": [
-              {
-                "$type": "Action",
-                "inferredType": {
-                  "$type": "InferredType",
-                  "name": "BinaryExpression"
-                },
-                "feature": "lhs",
-                "operator": "="
-              },
-              {
-                "$type": "Assignment",
-                "feature": "op",
-                "operator": "=",
-                "terminal": {
-                  "$type": "Keyword",
-                  "value": "&"
-                }
-              },
-              {
-                "$type": "Assignment",
-                "feature": "rhs",
-                "operator": "=",
-                "terminal": {
-                  "$type": "RuleCall",
-                  "rule": {
-                    "$ref": "#/rules@46"
-                  },
-                  "arguments": []
-                }
-              }
-            ],
-            "cardinality": "*"
-          }
-        ]
-      },
-      "definesHiddenTokens": false,
-      "entry": false,
-      "fragment": false,
-      "hiddenTokens": [],
-      "parameters": [],
-      "wildcard": false
-    },
-    {
-      "$type": "ParserRule",
-      "name": "Precedence9",
-      "definition": {
-        "$type": "RuleCall",
-        "rule": {
-          "$ref": "#/rules@47"
-        },
-        "arguments": []
-      },
-      "definesHiddenTokens": false,
-      "entry": false,
-      "fragment": false,
-      "hiddenTokens": [],
-      "parameters": [],
-      "wildcard": false
-    },
-    {
-      "$type": "ParserRule",
-      "name": "BitshiftExpression",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Expression"
-      },
-      "definition": {
-        "$type": "Group",
-        "elements": [
-          {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@48"
-            },
-            "arguments": []
-          },
-          {
-            "$type": "Group",
-            "elements": [
-              {
-                "$type": "Action",
-                "inferredType": {
-                  "$type": "InferredType",
-                  "name": "BinaryExpression"
-                },
-                "feature": "lhs",
-                "operator": "="
-              },
-              {
-                "$type": "Assignment",
-                "feature": "op",
-                "operator": "=",
-                "terminal": {
-                  "$type": "Alternatives",
-                  "elements": [
-                    {
-                      "$type": "Keyword",
-                      "value": "<<"
-                    },
-                    {
-                      "$type": "Keyword",
-                      "value": ">>"
-                    }
-                  ]
-                }
-              },
-              {
-                "$type": "Assignment",
-                "feature": "rhs",
-                "operator": "=",
-                "terminal": {
-                  "$type": "RuleCall",
-                  "rule": {
-                    "$ref": "#/rules@48"
-                  },
-                  "arguments": []
-                }
-              }
-            ],
-            "cardinality": "*"
-          }
-        ]
-      },
-      "definesHiddenTokens": false,
-      "entry": false,
-      "fragment": false,
-      "hiddenTokens": [],
-      "parameters": [],
-      "wildcard": false
-    },
-    {
-      "$type": "ParserRule",
-      "name": "Precedence10",
-      "definition": {
-        "$type": "RuleCall",
-        "rule": {
-          "$ref": "#/rules@49"
-        },
-        "arguments": []
-      },
-      "definesHiddenTokens": false,
-      "entry": false,
-      "fragment": false,
-      "hiddenTokens": [],
-      "parameters": [],
-      "wildcard": false
-    },
-    {
-      "$type": "ParserRule",
-      "name": "SumExpression",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Expression"
-      },
-      "definition": {
-        "$type": "Group",
-        "elements": [
-          {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@50"
-            },
-            "arguments": []
-          },
-          {
-            "$type": "Group",
-            "elements": [
-              {
-                "$type": "Action",
-                "inferredType": {
-                  "$type": "InferredType",
-                  "name": "BinaryExpression"
-                },
-                "feature": "lhs",
-                "operator": "="
-              },
-              {
-                "$type": "Assignment",
-                "feature": "op",
-                "operator": "=",
-                "terminal": {
-                  "$type": "Alternatives",
-                  "elements": [
-                    {
-                      "$type": "Keyword",
-                      "value": "+"
-                    },
-                    {
-                      "$type": "Keyword",
-                      "value": "-"
-                    }
-                  ]
-                }
-              },
-              {
-                "$type": "Assignment",
-                "feature": "rhs",
-                "operator": "=",
-                "terminal": {
-                  "$type": "RuleCall",
-                  "rule": {
-                    "$ref": "#/rules@50"
-                  },
-                  "arguments": []
-                }
-              }
-            ],
-            "cardinality": "*"
-          }
-        ]
-      },
-      "definesHiddenTokens": false,
-      "entry": false,
-      "fragment": false,
-      "hiddenTokens": [],
-      "parameters": [],
-      "wildcard": false
-    },
-    {
-      "$type": "ParserRule",
-      "name": "Precedence11",
-      "definition": {
-        "$type": "RuleCall",
-        "rule": {
-          "$ref": "#/rules@51"
-        },
-        "arguments": []
-      },
-      "definesHiddenTokens": false,
-      "entry": false,
-      "fragment": false,
-      "hiddenTokens": [],
-      "parameters": [],
-      "wildcard": false
-    },
-    {
-      "$type": "ParserRule",
-      "name": "ProductExpression",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Expression"
-      },
-      "definition": {
-        "$type": "Group",
-        "elements": [
-          {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@52"
-            },
-            "arguments": []
-          },
-          {
-            "$type": "Group",
-            "elements": [
-              {
-                "$type": "Action",
-                "inferredType": {
-                  "$type": "InferredType",
-                  "name": "BinaryExpression"
-                },
-                "feature": "lhs",
+                "feature": "e1",
                 "operator": "="
               },
               {
@@ -2920,12 +2723,12 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
               },
               {
                 "$type": "Assignment",
-                "feature": "rhs",
+                "feature": "e2",
                 "operator": "=",
                 "terminal": {
                   "$type": "RuleCall",
                   "rule": {
-                    "$ref": "#/rules@52"
+                    "$ref": "#/rules@42"
                   },
                   "arguments": []
                 }
@@ -2944,24 +2747,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     },
     {
       "$type": "ParserRule",
-      "name": "Precedence12",
-      "definition": {
-        "$type": "RuleCall",
-        "rule": {
-          "$ref": "#/rules@53"
-        },
-        "arguments": []
-      },
-      "definesHiddenTokens": false,
-      "entry": false,
-      "fragment": false,
-      "hiddenTokens": [],
-      "parameters": [],
-      "wildcard": false
-    },
-    {
-      "$type": "ParserRule",
-      "name": "CastExpression",
+      "name": "ExponentiationExpression",
       "inferredType": {
         "$type": "InferredType",
         "name": "Expression"
@@ -2970,86 +2756,47 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
         "$type": "Group",
         "elements": [
           {
-            "$type": "Keyword",
-            "value": "<"
+            "$type": "RuleCall",
+            "rule": {
+              "$ref": "#/rules@43"
+            },
+            "arguments": []
           },
           {
-            "$type": "Assignment",
-            "feature": "type",
-            "operator": "=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@9"
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Action",
+                "inferredType": {
+                  "$type": "InferredType",
+                  "name": "BinaryExpression"
+                },
+                "feature": "e1",
+                "operator": "="
               },
-              "arguments": []
-            }
-          },
-          {
-            "$type": "Keyword",
-            "value": ">"
-          },
-          {
-            "$type": "Assignment",
-            "feature": "expression",
-            "operator": "=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@54"
+              {
+                "$type": "Assignment",
+                "feature": "op",
+                "operator": "=",
+                "terminal": {
+                  "$type": "Keyword",
+                  "value": "**"
+                }
               },
-              "arguments": []
-            }
-          }
-        ]
-      },
-      "definesHiddenTokens": false,
-      "entry": false,
-      "fragment": false,
-      "hiddenTokens": [],
-      "parameters": [],
-      "wildcard": false
-    },
-    {
-      "$type": "ParserRule",
-      "name": "Precedence13",
-      "definition": {
-        "$type": "Alternatives",
-        "elements": [
-          {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@55"
-            },
-            "arguments": []
-          },
-          {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@56"
-            },
-            "arguments": []
-          },
-          {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@57"
-            },
-            "arguments": []
-          },
-          {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@58"
-            },
-            "arguments": []
-          },
-          {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@59"
-            },
-            "arguments": []
+              {
+                "$type": "Assignment",
+                "feature": "e2",
+                "operator": "=",
+                "terminal": {
+                  "$type": "RuleCall",
+                  "rule": {
+                    "$ref": "#/rules@43"
+                  },
+                  "arguments": []
+                }
+              }
+            ],
+            "cardinality": "*"
           }
         ]
       },
@@ -3063,39 +2810,56 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     {
       "$type": "ParserRule",
       "name": "LeftUnaryExpression",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Expression"
-      },
       "definition": {
-        "$type": "Group",
+        "$type": "Alternatives",
         "elements": [
           {
-            "$type": "Assignment",
-            "feature": "op",
-            "operator": "=",
-            "terminal": {
-              "$type": "Alternatives",
-              "elements": [
-                {
-                  "$type": "Keyword",
-                  "value": "!"
-                },
-                {
-                  "$type": "Keyword",
-                  "value": "-"
-                },
-                {
-                  "$type": "Keyword",
-                  "value": "~"
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Assignment",
+                "feature": "op",
+                "operator": "=",
+                "terminal": {
+                  "$type": "Alternatives",
+                  "elements": [
+                    {
+                      "$type": "Keyword",
+                      "value": "!"
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "-"
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "+"
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "~"
+                    }
+                  ]
                 }
-              ]
-            }
+              },
+              {
+                "$type": "Assignment",
+                "feature": "expression",
+                "operator": "=",
+                "terminal": {
+                  "$type": "RuleCall",
+                  "rule": {
+                    "$ref": "#/rules@43"
+                  },
+                  "arguments": []
+                }
+              }
+            ]
           },
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@54"
+              "$ref": "#/rules@44"
             },
             "arguments": []
           }
@@ -3111,31 +2875,36 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     {
       "$type": "ParserRule",
       "name": "AwaitExpression",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Expression"
-      },
       "definition": {
-        "$type": "Group",
+        "$type": "Alternatives",
         "elements": [
+          {
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Keyword",
+                "value": "await"
+              },
+              {
+                "$type": "Assignment",
+                "feature": "expression",
+                "operator": "=",
+                "terminal": {
+                  "$type": "RuleCall",
+                  "rule": {
+                    "$ref": "#/rules@43"
+                  },
+                  "arguments": []
+                }
+              }
+            ]
+          },
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@93"
+              "$ref": "#/rules@45"
             },
             "arguments": []
-          },
-          {
-            "$type": "Assignment",
-            "feature": "expression",
-            "operator": "=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@54"
-              },
-              "arguments": []
-            }
           }
         ]
       },
@@ -3148,89 +2917,39 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     },
     {
       "$type": "ParserRule",
-      "name": "ConstructorExpression",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Expression"
-      },
+      "name": "HoldExpression",
       "definition": {
-        "$type": "Group",
+        "$type": "Alternatives",
         "elements": [
+          {
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Keyword",
+                "value": "hold"
+              },
+              {
+                "$type": "Assignment",
+                "feature": "expression",
+                "operator": "=",
+                "terminal": {
+                  "$type": "RuleCall",
+                  "rule": {
+                    "$ref": "#/rules@43"
+                  },
+                  "arguments": []
+                }
+              }
+            ]
+          },
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@106"
+              "$ref": "#/rules@46"
             },
             "arguments": []
-          },
-          {
-            "$type": "Assignment",
-            "feature": "constructor",
-            "operator": "=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@60"
-              },
-              "arguments": []
-            }
           }
         ]
-      },
-      "definesHiddenTokens": false,
-      "entry": false,
-      "fragment": false,
-      "hiddenTokens": [],
-      "parameters": [],
-      "wildcard": false
-    },
-    {
-      "$type": "ParserRule",
-      "name": "HeldExpression",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Expression"
-      },
-      "definition": {
-        "$type": "Group",
-        "elements": [
-          {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@107"
-            },
-            "arguments": []
-          },
-          {
-            "$type": "Assignment",
-            "feature": "held",
-            "operator": "=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@54"
-              },
-              "arguments": []
-            }
-          }
-        ]
-      },
-      "definesHiddenTokens": false,
-      "entry": false,
-      "fragment": false,
-      "hiddenTokens": [],
-      "parameters": [],
-      "wildcard": false
-    },
-    {
-      "$type": "ParserRule",
-      "name": "Precedence14",
-      "definition": {
-        "$type": "RuleCall",
-        "rule": {
-          "$ref": "#/rules@60"
-        },
-        "arguments": []
       },
       "definesHiddenTokens": false,
       "entry": false,
@@ -3242,22 +2961,11 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     {
       "$type": "ParserRule",
       "name": "PathExpression",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Expression"
-      },
       "definition": {
-        "$type": "Group",
+        "$type": "Alternatives",
         "elements": [
           {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@64"
-            },
-            "arguments": []
-          },
-          {
-            "$type": "Alternatives",
+            "$type": "Group",
             "elements": [
               {
                 "$type": "Assignment",
@@ -3266,37 +2974,192 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
                 "terminal": {
                   "$type": "RuleCall",
                   "rule": {
-                    "$ref": "#/rules@61"
+                    "$ref": "#/rules@51"
                   },
                   "arguments": []
                 }
               },
               {
+                "$type": "Alternatives",
+                "elements": [
+                  {
+                    "$type": "Assignment",
+                    "feature": "path",
+                    "operator": "+=",
+                    "terminal": {
+                      "$type": "RuleCall",
+                      "rule": {
+                        "$ref": "#/rules@47"
+                      },
+                      "arguments": []
+                    }
+                  },
+                  {
+                    "$type": "Assignment",
+                    "feature": "path",
+                    "operator": "+=",
+                    "terminal": {
+                      "$type": "RuleCall",
+                      "rule": {
+                        "$ref": "#/rules@48"
+                      },
+                      "arguments": []
+                    }
+                  },
+                  {
+                    "$type": "Assignment",
+                    "feature": "path",
+                    "operator": "+=",
+                    "terminal": {
+                      "$type": "RuleCall",
+                      "rule": {
+                        "$ref": "#/rules@49"
+                      },
+                      "arguments": []
+                    }
+                  },
+                  {
+                    "$type": "Assignment",
+                    "feature": "path",
+                    "operator": "+=",
+                    "terminal": {
+                      "$type": "RuleCall",
+                      "rule": {
+                        "$ref": "#/rules@50"
+                      },
+                      "arguments": []
+                    }
+                  }
+                ],
+                "cardinality": "+"
+              }
+            ]
+          },
+          {
+            "$type": "RuleCall",
+            "rule": {
+              "$ref": "#/rules@51"
+            },
+            "arguments": []
+          }
+        ]
+      },
+      "definesHiddenTokens": false,
+      "entry": false,
+      "fragment": false,
+      "hiddenTokens": [],
+      "parameters": [],
+      "wildcard": false
+    },
+    {
+      "$type": "ParserRule",
+      "name": "NewPath",
+      "definition": {
+        "$type": "Group",
+        "elements": [
+          {
+            "$type": "Keyword",
+            "value": "."
+          },
+          {
+            "$type": "Keyword",
+            "value": "new"
+          },
+          {
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Keyword",
+                "value": "<"
+              },
+              {
                 "$type": "Assignment",
-                "feature": "path",
+                "feature": "typeParameters",
                 "operator": "+=",
                 "terminal": {
                   "$type": "RuleCall",
                   "rule": {
-                    "$ref": "#/rules@62"
+                    "$ref": "#/rules@9"
                   },
                   "arguments": []
                 }
               },
               {
-                "$type": "Assignment",
-                "feature": "path",
-                "operator": "+=",
-                "terminal": {
-                  "$type": "RuleCall",
-                  "rule": {
-                    "$ref": "#/rules@63"
+                "$type": "Group",
+                "elements": [
+                  {
+                    "$type": "Keyword",
+                    "value": ","
                   },
-                  "arguments": []
-                }
+                  {
+                    "$type": "Assignment",
+                    "feature": "typeParameters",
+                    "operator": "+=",
+                    "terminal": {
+                      "$type": "RuleCall",
+                      "rule": {
+                        "$ref": "#/rules@9"
+                      },
+                      "arguments": []
+                    }
+                  }
+                ],
+                "cardinality": "*"
+              },
+              {
+                "$type": "Keyword",
+                "value": ">"
               }
             ],
-            "cardinality": "*"
+            "cardinality": "?"
+          },
+          {
+            "$type": "Keyword",
+            "value": "("
+          },
+          {
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Assignment",
+                "feature": "parameters",
+                "operator": "+=",
+                "terminal": {
+                  "$type": "RuleCall",
+                  "rule": {
+                    "$ref": "#/rules@28"
+                  },
+                  "arguments": []
+                }
+              },
+              {
+                "$type": "Group",
+                "elements": [
+                  {
+                    "$type": "Keyword",
+                    "value": ","
+                  },
+                  {
+                    "$type": "Assignment",
+                    "feature": "parameters",
+                    "operator": "+=",
+                    "terminal": {
+                      "$type": "RuleCall",
+                      "rule": {
+                        "$ref": "#/rules@28"
+                      },
+                      "arguments": []
+                    }
+                  }
+                ],
+                "cardinality": "*"
+              }
+            ],
+            "cardinality": "?"
+          },
+          {
+            "$type": "Keyword",
+            "value": ")"
           }
         ]
       },
@@ -3324,73 +3187,10 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@78"
+                "$ref": "#/rules@65"
               },
               "arguments": []
             }
-          }
-        ]
-      },
-      "definesHiddenTokens": false,
-      "entry": false,
-      "fragment": false,
-      "hiddenTokens": [],
-      "parameters": [],
-      "wildcard": false
-    },
-    {
-      "$type": "ParserRule",
-      "name": "CallPath",
-      "definition": {
-        "$type": "Group",
-        "elements": [
-          {
-            "$type": "Keyword",
-            "value": "("
-          },
-          {
-            "$type": "Group",
-            "elements": [
-              {
-                "$type": "Assignment",
-                "feature": "arguments",
-                "operator": "+=",
-                "terminal": {
-                  "$type": "RuleCall",
-                  "rule": {
-                    "$ref": "#/rules@28"
-                  },
-                  "arguments": []
-                }
-              },
-              {
-                "$type": "Group",
-                "elements": [
-                  {
-                    "$type": "Keyword",
-                    "value": ","
-                  },
-                  {
-                    "$type": "Assignment",
-                    "feature": "arguments",
-                    "operator": "+=",
-                    "terminal": {
-                      "$type": "RuleCall",
-                      "rule": {
-                        "$ref": "#/rules@28"
-                      },
-                      "arguments": []
-                    }
-                  }
-                ],
-                "cardinality": "*"
-              }
-            ],
-            "cardinality": "?"
-          },
-          {
-            "$type": "Keyword",
-            "value": ")"
           }
         ]
       },
@@ -3438,10 +3238,88 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     },
     {
       "$type": "ParserRule",
+      "name": "CallPath",
+      "definition": {
+        "$type": "Group",
+        "elements": [
+          {
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Keyword",
+                "value": "<"
+              },
+              {
+                "$type": "Assignment",
+                "feature": "typeParameters",
+                "operator": "+=",
+                "terminal": {
+                  "$type": "RuleCall",
+                  "rule": {
+                    "$ref": "#/rules@9"
+                  },
+                  "arguments": []
+                }
+              },
+              {
+                "$type": "Group",
+                "elements": [
+                  {
+                    "$type": "Keyword",
+                    "value": ","
+                  },
+                  {
+                    "$type": "Assignment",
+                    "feature": "typeParameters",
+                    "operator": "+=",
+                    "terminal": {
+                      "$type": "RuleCall",
+                      "rule": {
+                        "$ref": "#/rules@9"
+                      },
+                      "arguments": []
+                    }
+                  }
+                ],
+                "cardinality": "*"
+              },
+              {
+                "$type": "Keyword",
+                "value": ">"
+              }
+            ],
+            "cardinality": "?"
+          },
+          {
+            "$type": "Keyword",
+            "value": "("
+          },
+          {
+            "$type": "Keyword",
+            "value": ")"
+          }
+        ]
+      },
+      "definesHiddenTokens": false,
+      "entry": false,
+      "fragment": false,
+      "hiddenTokens": [],
+      "parameters": [],
+      "wildcard": false
+    },
+    {
+      "$type": "ParserRule",
       "name": "PrimaryExpression",
       "definition": {
         "$type": "Alternatives",
         "elements": [
+          {
+            "$type": "RuleCall",
+            "rule": {
+              "$ref": "#/rules@52"
+            },
+            "arguments": []
+          },
           {
             "$type": "RuleCall",
             "rule": {
@@ -3452,91 +3330,84 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@78"
+              "$ref": "#/rules@53"
             },
             "arguments": []
           },
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@66"
+              "$ref": "#/rules@54"
             },
             "arguments": []
           },
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@67"
+              "$ref": "#/rules@55"
             },
             "arguments": []
           },
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@68"
+              "$ref": "#/rules@56"
             },
             "arguments": []
           },
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@69"
+              "$ref": "#/rules@57"
             },
             "arguments": []
           },
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@70"
+              "$ref": "#/rules@58"
             },
             "arguments": []
           },
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@71"
+              "$ref": "#/rules@59"
             },
             "arguments": []
           },
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@72"
+              "$ref": "#/rules@60"
             },
             "arguments": []
           },
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@73"
+              "$ref": "#/rules@61"
             },
             "arguments": []
           },
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@74"
+              "$ref": "#/rules@62"
             },
             "arguments": []
           },
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@75"
+              "$ref": "#/rules@63"
             },
             "arguments": []
           },
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@76"
-            },
-            "arguments": []
-          },
-          {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@77"
+              "$ref": "#/rules@64"
             },
             "arguments": []
           }
@@ -3552,10 +3423,6 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     {
       "$type": "ParserRule",
       "name": "GroupLiteral",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Expression"
-      },
       "definition": {
         "$type": "Group",
         "elements": [
@@ -3591,10 +3458,6 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     {
       "$type": "ParserRule",
       "name": "FloatLiteral",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Expression"
-      },
       "definition": {
         "$type": "Assignment",
         "feature": "value",
@@ -3602,7 +3465,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
         "terminal": {
           "$type": "RuleCall",
           "rule": {
-            "$ref": "#/rules@116"
+            "$ref": "#/rules@71"
           },
           "arguments": []
         }
@@ -3617,10 +3480,6 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     {
       "$type": "ParserRule",
       "name": "IntegerLiteral",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Expression"
-      },
       "definition": {
         "$type": "Assignment",
         "feature": "value",
@@ -3628,7 +3487,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
         "terminal": {
           "$type": "RuleCall",
           "rule": {
-            "$ref": "#/rules@117"
+            "$ref": "#/rules@72"
           },
           "arguments": []
         }
@@ -3643,10 +3502,6 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     {
       "$type": "ParserRule",
       "name": "HexLiteral",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Expression"
-      },
       "definition": {
         "$type": "Assignment",
         "feature": "value",
@@ -3654,7 +3509,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
         "terminal": {
           "$type": "RuleCall",
           "rule": {
-            "$ref": "#/rules@114"
+            "$ref": "#/rules@69"
           },
           "arguments": []
         }
@@ -3669,10 +3524,6 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     {
       "$type": "ParserRule",
       "name": "BinaryLiteral",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Expression"
-      },
       "definition": {
         "$type": "Assignment",
         "feature": "value",
@@ -3680,7 +3531,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
         "terminal": {
           "$type": "RuleCall",
           "rule": {
-            "$ref": "#/rules@113"
+            "$ref": "#/rules@68"
           },
           "arguments": []
         }
@@ -3695,10 +3546,6 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     {
       "$type": "ParserRule",
       "name": "OctalLiteral",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Expression"
-      },
       "definition": {
         "$type": "Assignment",
         "feature": "value",
@@ -3706,7 +3553,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
         "terminal": {
           "$type": "RuleCall",
           "rule": {
-            "$ref": "#/rules@115"
+            "$ref": "#/rules@70"
           },
           "arguments": []
         }
@@ -3721,10 +3568,6 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     {
       "$type": "ParserRule",
       "name": "StringLiteral",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Expression"
-      },
       "definition": {
         "$type": "Assignment",
         "feature": "value",
@@ -3732,7 +3575,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
         "terminal": {
           "$type": "RuleCall",
           "rule": {
-            "$ref": "#/rules@79"
+            "$ref": "#/rules@66"
           },
           "arguments": []
         }
@@ -3747,20 +3590,13 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     {
       "$type": "ParserRule",
       "name": "FalseLiteral",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Expression"
-      },
       "definition": {
         "$type": "Assignment",
         "feature": "false",
         "operator": "=",
         "terminal": {
-          "$type": "RuleCall",
-          "rule": {
-            "$ref": "#/rules@95"
-          },
-          "arguments": []
+          "$type": "Keyword",
+          "value": "false"
         }
       },
       "definesHiddenTokens": false,
@@ -3773,20 +3609,13 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     {
       "$type": "ParserRule",
       "name": "TrueLiteral",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Expression"
-      },
       "definition": {
         "$type": "Assignment",
         "feature": "true",
         "operator": "=",
         "terminal": {
-          "$type": "RuleCall",
-          "rule": {
-            "$ref": "#/rules@96"
-          },
-          "arguments": []
+          "$type": "Keyword",
+          "value": "true"
         }
       },
       "definesHiddenTokens": false,
@@ -3799,20 +3628,13 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     {
       "$type": "ParserRule",
       "name": "NullLiteral",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Expression"
-      },
       "definition": {
         "$type": "Assignment",
         "feature": "null",
         "operator": "=",
         "terminal": {
-          "$type": "RuleCall",
-          "rule": {
-            "$ref": "#/rules@97"
-          },
-          "arguments": []
+          "$type": "Keyword",
+          "value": "null"
         }
       },
       "definesHiddenTokens": false,
@@ -3825,20 +3647,13 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     {
       "$type": "ParserRule",
       "name": "ThisLiteral",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Expression"
-      },
       "definition": {
         "$type": "Assignment",
         "feature": "this",
         "operator": "=",
         "terminal": {
-          "$type": "RuleCall",
-          "rule": {
-            "$ref": "#/rules@98"
-          },
-          "arguments": []
+          "$type": "Keyword",
+          "value": "this"
         }
       },
       "definesHiddenTokens": false,
@@ -3851,20 +3666,13 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     {
       "$type": "ParserRule",
       "name": "SuperLiteral",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Expression"
-      },
       "definition": {
         "$type": "Assignment",
         "feature": "super",
         "operator": "=",
         "terminal": {
-          "$type": "RuleCall",
-          "rule": {
-            "$ref": "#/rules@99"
-          },
-          "arguments": []
+          "$type": "Keyword",
+          "value": "super"
         }
       },
       "definesHiddenTokens": false,
@@ -3877,51 +3685,59 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
     {
       "$type": "ParserRule",
       "name": "AsyncBlockLiteral",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Expression"
-      },
       "definition": {
         "$type": "Group",
         "elements": [
           {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@94"
+            "$type": "Keyword",
+            "value": "async"
+          },
+          {
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Keyword",
+                "value": "<"
+              },
+              {
+                "$type": "Assignment",
+                "feature": "type",
+                "operator": "=",
+                "terminal": {
+                  "$type": "RuleCall",
+                  "rule": {
+                    "$ref": "#/rules@9"
+                  },
+                  "arguments": []
+                }
+              },
+              {
+                "$type": "Keyword",
+                "value": ">"
+              }
+            ],
+            "cardinality": "?"
+          },
+          {
+            "$type": "Keyword",
+            "value": "{"
+          },
+          {
+            "$type": "Assignment",
+            "feature": "statements",
+            "operator": "+=",
+            "terminal": {
+              "$type": "RuleCall",
+              "rule": {
+                "$ref": "#/rules@16"
+              },
+              "arguments": []
             },
-            "arguments": []
+            "cardinality": "*"
           },
           {
             "$type": "Keyword",
-            "value": "<"
-          },
-          {
-            "$type": "Assignment",
-            "feature": "type",
-            "operator": "=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@9"
-              },
-              "arguments": []
-            }
-          },
-          {
-            "$type": "Keyword",
-            "value": ">"
-          },
-          {
-            "$type": "Assignment",
-            "feature": "block",
-            "operator": "=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@17"
-              },
-              "arguments": []
-            }
+            "value": "}"
           }
         ]
       },
@@ -3942,7 +3758,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
         "terminal": {
           "$type": "RuleCall",
           "rule": {
-            "$ref": "#/rules@112"
+            "$ref": "#/rules@67"
           },
           "arguments": []
         }
@@ -3960,422 +3776,6 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
       "definition": {
         "$type": "RegexToken",
         "regex": "\\"([^\\"\\\\r\\\\n]|\\\\\\\\\\\\.)*\\""
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "Import",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "import"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "Export",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "export"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "Final",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "final"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "Type",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "type"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "Class",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "class"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "Extends",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "extends"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "Private",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "private"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "Get",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "get"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "Set",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "set"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "Constructor",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "constructor"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "Grab",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "grab"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "While",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "while"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "Continue",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "continue"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "Await",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "await"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "Async",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "async"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "False",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "false"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "True",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "true"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "Null",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "null"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "This",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "this"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "Super",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "super"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "Break",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "break"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "If",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "if"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "Return",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "return"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "Const",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "const"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "Let",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "let"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "Yield",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "yield"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "New",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "new"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "Hold",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "hold"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "From",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "from"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "As",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "as"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "Fn",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "fn"
-        }
-      },
-      "fragment": false,
-      "hidden": false
-    },
-    {
-      "$type": "TerminalRule",
-      "name": "Else",
-      "definition": {
-        "$type": "CharacterRange",
-        "left": {
-          "$type": "Keyword",
-          "value": "else"
-        }
       },
       "fragment": false,
       "hidden": false
@@ -4425,7 +3825,7 @@ const WhackoGrammar = () => loadedWhackoGrammar !== null && loadedWhackoGrammar 
       "name": "Float",
       "definition": {
         "$type": "RegexToken",
-        "regex": "[-+]?[0-9]+[.]?[0-9]*([eE][-+]?[0-9]+)?"
+        "regex": "[-+]?[0-9]+[.][0-9]+([eE][-+]?[0-9]+)?"
       },
       "fragment": false,
       "hidden": false

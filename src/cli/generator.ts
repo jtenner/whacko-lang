@@ -9,7 +9,11 @@ export function generateJavaScript(model: AST.Program, filePath: string, destina
     const generatedFilePath = `${path.join(data.destination, data.name)}.js`;
 
     const fileNode = new CompositeGeneratorNode();
-    console.log(model);
+
+    // @ts-ignore
+    for (const statement of model.declarations[0].block.statements) {
+        console.log(`${statement?.expression?.$type ?? statement.$type} ${statement?.expression?.op ?? ""}`);
+    }
     // fileNode.append('"use strict";', NL, NL);
     // model.greetings.forEach(greeting => fileNode.append(`console.log('Hello, ${greeting.person.ref?.name}!');`, NL));
 

@@ -7,7 +7,7 @@ const whacko_module_1 = require("./whacko-module");
 // Create a connection to the client
 const connection = (0, node_2.createConnection)(node_2.ProposedFeatures.all);
 // Inject the shared services and language-specific services
-const { shared } = (0, whacko_module_1.createWhackoServices)(Object.assign({ connection }, node_1.NodeFileSystem));
+const { shared } = (0, whacko_module_1.createWhackoServices)({ connection, ...node_1.NodeFileSystem });
 // Start the language server with the shared services
 (0, langium_1.startLanguageServer)(shared);
 //# sourceMappingURL=main.js.map
