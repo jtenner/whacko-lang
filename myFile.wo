@@ -30,3 +30,22 @@ fn main(): void {
     3;
   };
 }
+
+async fn prop(): void {
+  
+}
+
+class Whacko {
+
+}
+
+class Lang extends Whacko {
+  prop: i32 = 9;
+  get prop: T {
+    return T.new();
+  }
+  set prop(value: T) {
+    this.prop = value;
+  }
+}
+export { main }

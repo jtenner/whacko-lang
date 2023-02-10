@@ -574,15 +574,26 @@ const WhackoGrammar = () => loadedWhackoGrammar ?? (loadedWhackoGrammar = (0, la
             }
           },
           {
-            "$type": "Keyword",
-            "value": "extends"
-          },
-          {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@9"
-            },
-            "arguments": []
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Keyword",
+                "value": "extends"
+              },
+              {
+                "$type": "Assignment",
+                "feature": "extends",
+                "operator": "=",
+                "terminal": {
+                  "$type": "RuleCall",
+                  "rule": {
+                    "$ref": "#/rules@9"
+                  },
+                  "arguments": []
+                }
+              }
+            ],
+            "cardinality": "?"
           },
           {
             "$type": "Keyword",

@@ -25,7 +25,7 @@ TypeDeclaration:
     "type" name=ID "=" type=TypeExpression;
 
 ClassDeclaration:
-    (final="final")? "class" name=ID "extends" TypeExpression "{" (members+=ClassMember (members+=ClassMember)* )? "}";
+    (final="final")? "class" name=ID ("extends" extends=TypeExpression)? "{" (members+=ClassMember (members+=ClassMember)* )? "}";
 
 TypeExpression:
     name=ID ("<" typeParameters+=ID ("," typeParameters+=ID)* ">")?;

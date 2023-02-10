@@ -118,8 +118,9 @@ export function isCallPath(item: unknown): item is CallPath {
 }
 
 export interface ClassDeclaration extends AstNode {
-    readonly $container: AsyncBlockLiteral | CallPath | FieldClassMember | FunctionDeclaration | GetterClassMember | MethodClassMember | NewPath | Program | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
-    readonly $type: 'ClassDeclaration' | 'TypeExpression';
+    readonly $container: Program;
+    readonly $type: 'ClassDeclaration';
+    extends?: TypeExpression
     final?: 'final'
     members: Array<ClassMember>
     name: ID
@@ -582,6 +583,19 @@ export function isTypeDeclarationStatement(item: unknown): item is TypeDeclarati
     return reflection.isInstance(item, TypeDeclarationStatement);
 }
 
+export interface TypeExpression extends AstNode {
+    readonly $container: AsyncBlockLiteral | CallPath | ClassDeclaration | FieldClassMember | FunctionDeclaration | GetterClassMember | MethodClassMember | NewPath | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
+    readonly $type: 'TypeExpression';
+    name: ID
+    typeParameters: Array<ID>
+}
+
+export const TypeExpression = 'TypeExpression';
+
+export function isTypeExpression(item: unknown): item is TypeExpression {
+    return reflection.isInstance(item, TypeExpression);
+}
+
 export interface VariableDeclarationStatement extends AstNode {
     readonly $container: AsyncBlockLiteral | BlockStatement | ConstructorClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | IfElseStatement | MethodClassMember | SetterClassMember | WhileStatement;
     readonly $type: 'VariableDeclarationStatement';
@@ -632,19 +646,6 @@ export const YieldExpression = 'YieldExpression';
 
 export function isYieldExpression(item: unknown): item is YieldExpression {
     return reflection.isInstance(item, YieldExpression);
-}
-
-export interface TypeExpression extends ClassDeclaration {
-    readonly $container: AsyncBlockLiteral | CallPath | FieldClassMember | FunctionDeclaration | GetterClassMember | MethodClassMember | NewPath | Program | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
-    readonly $type: 'TypeExpression';
-    name: ID
-    typeParameters: Array<ID>
-}
-
-export const TypeExpression = 'TypeExpression';
-
-export function isTypeExpression(item: unknown): item is TypeExpression {
-    return reflection.isInstance(item, TypeExpression);
 }
 
 export interface AwaitExpression extends LeftUnaryExpression {
@@ -796,9 +797,6 @@ export class WhackoAstReflection extends AbstractAstReflection {
             case WhileStatement: {
                 return this.isSubtype(Statement, supertype);
             }
-            case TypeExpression: {
-                return this.isSubtype(ClassDeclaration, supertype);
-            }
             case AwaitExpression: {
                 return this.isSubtype(LeftUnaryExpression, supertype);
             }
@@ -933,20 +931,19 @@ export class WhackoAstReflection extends AbstractAstReflection {
                     ]
                 };
             }
+            case 'TypeExpression': {
+                return {
+                    name: 'TypeExpression',
+                    mandatory: [
+                        { name: 'typeParameters', type: 'array' }
+                    ]
+                };
+            }
             case 'VariableDeclarationStatement': {
                 return {
                     name: 'VariableDeclarationStatement',
                     mandatory: [
                         { name: 'declarators', type: 'array' }
-                    ]
-                };
-            }
-            case 'TypeExpression': {
-                return {
-                    name: 'TypeExpression',
-                    mandatory: [
-                        { name: 'members', type: 'array' },
-                        { name: 'typeParameters', type: 'array' }
                     ]
                 };
             }
