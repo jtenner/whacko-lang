@@ -6,7 +6,7 @@
 /* eslint-disable */
 import { AstNode, AbstractAstReflection, ReferenceInfo, TypeMetaData } from 'langium';
 
-export type Expression = BinaryExpression | LeftUnaryExpression | YieldExpression;
+export type Expression = BinaryExpression | LeftUnaryExpression | PathExpression | YieldExpression;
 
 export const Expression = 'Expression';
 
@@ -58,7 +58,7 @@ export function isAsyncBlockLiteral(item: unknown): item is AsyncBlockLiteral {
 export interface BinaryExpression extends AstNode {
     readonly $container: ArrayAccessPath | AwaitExpression | BinaryExpression | ClassDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessPath | MethodClassMember | NewPath | Parameter | PathExpression | ReturnStatement | SetterClassMember | TernaryExpression | TypeDeclaration | TypeDeclarationStatement | TypeExpression | VariableDeclarator | WhileStatement | YieldExpression;
     readonly $type: 'BinaryExpression';
-    e1: Expression | LeftUnaryExpression
+    e1: Expression | LeftUnaryExpression | PathExpression
     e2: Expression | LeftUnaryExpression
     op: '!=' | '%' | '%=' | '&&' | '&&=' | '&' | '&=' | '*' | '**' | '**=' | '*=' | '+' | '+=' | '-' | '-=' | '/' | '/=' | '<' | '<<' | '<<=' | '<=' | '=' | '==' | '>' | '>=' | '>>' | '>>=' | '>>>=' | '??=' | '^' | '^=' | '|' | '|=' | '||' | '||='
 }
@@ -168,6 +168,21 @@ export const ContinueStatement = 'ContinueStatement';
 
 export function isContinueStatement(item: unknown): item is ContinueStatement {
     return reflection.isInstance(item, ContinueStatement);
+}
+
+export interface DeclareDeclaration extends AstNode {
+    readonly $container: Program;
+    readonly $type: 'DeclareDeclaration';
+    method: string
+    namespace: string
+    parameters: Array<Parameter>
+    returnType: TypeExpression
+}
+
+export const DeclareDeclaration = 'DeclareDeclaration';
+
+export function isDeclareDeclaration(item: unknown): item is DeclareDeclaration {
+    return reflection.isInstance(item, DeclareDeclaration);
 }
 
 export interface ExportDeclaration extends AstNode {
@@ -340,8 +355,21 @@ export function isIfElseStatement(item: unknown): item is IfElseStatement {
     return reflection.isInstance(item, IfElseStatement);
 }
 
+export interface ImportDeclaration extends AstNode {
+    readonly $container: Program;
+    readonly $type: 'ImportDeclaration';
+    declarators: Array<ImportDeclarator>
+    path: string
+}
+
+export const ImportDeclaration = 'ImportDeclaration';
+
+export function isImportDeclaration(item: unknown): item is ImportDeclaration {
+    return reflection.isInstance(item, ImportDeclaration);
+}
+
 export interface ImportDeclarator extends AstNode {
-    readonly $container: ImportStatement;
+    readonly $container: ImportDeclaration;
     readonly $type: 'ImportDeclarator';
     alias?: ID
     name: ID
@@ -351,19 +379,6 @@ export const ImportDeclarator = 'ImportDeclarator';
 
 export function isImportDeclarator(item: unknown): item is ImportDeclarator {
     return reflection.isInstance(item, ImportDeclarator);
-}
-
-export interface ImportStatement extends AstNode {
-    readonly $container: Program;
-    readonly $type: 'ImportStatement';
-    declarators: Array<ImportDeclarator>
-    path: string
-}
-
-export const ImportStatement = 'ImportStatement';
-
-export function isImportStatement(item: unknown): item is ImportStatement {
-    return reflection.isInstance(item, ImportStatement);
 }
 
 export interface IntegerLiteral extends AstNode {
@@ -457,7 +472,7 @@ export function isOctalLiteral(item: unknown): item is OctalLiteral {
 }
 
 export interface Parameter extends AstNode {
-    readonly $container: ConstructorClassMember | FunctionDeclaration | MethodClassMember | SetterClassMember;
+    readonly $container: ConstructorClassMember | DeclareDeclaration | FunctionDeclaration | MethodClassMember | SetterClassMember;
     readonly $type: 'Parameter';
     name: ID
     type: ID
@@ -472,8 +487,9 @@ export function isParameter(item: unknown): item is Parameter {
 export interface Program extends AstNode {
     readonly $type: 'Program';
     declarations: Array<ClassDeclaration> | Array<FunctionDeclaration> | Array<TypeDeclaration>
+    declares: Array<DeclareDeclaration>
     exports: Array<ExportDeclaration>
-    imports: Array<ImportStatement>
+    imports: Array<ImportDeclaration>
 }
 
 export const Program = 'Program';
@@ -584,7 +600,7 @@ export function isTypeDeclarationStatement(item: unknown): item is TypeDeclarati
 }
 
 export interface TypeExpression extends AstNode {
-    readonly $container: AsyncBlockLiteral | CallPath | ClassDeclaration | FieldClassMember | FunctionDeclaration | GetterClassMember | MethodClassMember | NewPath | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
+    readonly $container: AsyncBlockLiteral | CallPath | ClassDeclaration | DeclareDeclaration | FieldClassMember | FunctionDeclaration | GetterClassMember | MethodClassMember | NewPath | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
     readonly $type: 'TypeExpression';
     name: ID
     typeParameters: Array<ID>
@@ -711,6 +727,7 @@ export interface WhackoAstType {
     ClassMember: ClassMember
     ConstructorClassMember: ConstructorClassMember
     ContinueStatement: ContinueStatement
+    DeclareDeclaration: DeclareDeclaration
     ExportDeclaration: ExportDeclaration
     ExportDeclarator: ExportDeclarator
     Expression: Expression
@@ -726,8 +743,8 @@ export interface WhackoAstType {
     HoldExpression: HoldExpression
     ID: ID
     IfElseStatement: IfElseStatement
+    ImportDeclaration: ImportDeclaration
     ImportDeclarator: ImportDeclarator
-    ImportStatement: ImportStatement
     IntegerLiteral: IntegerLiteral
     LeftUnaryExpression: LeftUnaryExpression
     MemberAccessPath: MemberAccessPath
@@ -759,7 +776,7 @@ export interface WhackoAstType {
 export class WhackoAstReflection extends AbstractAstReflection {
 
     getAllTypes(): string[] {
-        return ['ArrayAccessPath', 'AsyncBlockLiteral', 'AwaitExpression', 'BinaryExpression', 'BinaryLiteral', 'BlockStatement', 'BreakStatement', 'CallPath', 'ClassDeclaration', 'ClassMember', 'ConstructorClassMember', 'ContinueStatement', 'ExportDeclaration', 'ExportDeclarator', 'Expression', 'ExpressionStatement', 'FalseLiteral', 'FieldClassMember', 'FloatLiteral', 'FunctionDeclaration', 'GetterClassMember', 'GrabStatement', 'GroupLiteral', 'HexLiteral', 'HoldExpression', 'ID', 'IfElseStatement', 'ImportDeclarator', 'ImportStatement', 'IntegerLiteral', 'LeftUnaryExpression', 'MemberAccessPath', 'MethodClassMember', 'NewPath', 'NullLiteral', 'OctalLiteral', 'Parameter', 'PathExpression', 'PrimaryExpression', 'Program', 'ReturnStatement', 'SetterClassMember', 'Statement', 'StringLiteral', 'SuperLiteral', 'TernaryExpression', 'ThisLiteral', 'TrueLiteral', 'TypeDeclaration', 'TypeDeclarationStatement', 'TypeExpression', 'VariableDeclarationStatement', 'VariableDeclarator', 'WhileStatement', 'YieldExpression'];
+        return ['ArrayAccessPath', 'AsyncBlockLiteral', 'AwaitExpression', 'BinaryExpression', 'BinaryLiteral', 'BlockStatement', 'BreakStatement', 'CallPath', 'ClassDeclaration', 'ClassMember', 'ConstructorClassMember', 'ContinueStatement', 'DeclareDeclaration', 'ExportDeclaration', 'ExportDeclarator', 'Expression', 'ExpressionStatement', 'FalseLiteral', 'FieldClassMember', 'FloatLiteral', 'FunctionDeclaration', 'GetterClassMember', 'GrabStatement', 'GroupLiteral', 'HexLiteral', 'HoldExpression', 'ID', 'IfElseStatement', 'ImportDeclaration', 'ImportDeclarator', 'IntegerLiteral', 'LeftUnaryExpression', 'MemberAccessPath', 'MethodClassMember', 'NewPath', 'NullLiteral', 'OctalLiteral', 'Parameter', 'PathExpression', 'PrimaryExpression', 'Program', 'ReturnStatement', 'SetterClassMember', 'Statement', 'StringLiteral', 'SuperLiteral', 'TernaryExpression', 'ThisLiteral', 'TrueLiteral', 'TypeDeclaration', 'TypeDeclarationStatement', 'TypeExpression', 'VariableDeclarationStatement', 'VariableDeclarator', 'WhileStatement', 'YieldExpression'];
     }
 
     protected override computeIsSubtype(subtype: string, supertype: string): boolean {
@@ -807,7 +824,7 @@ export class WhackoAstReflection extends AbstractAstReflection {
                 return this.isSubtype(AwaitExpression, supertype);
             }
             case PathExpression: {
-                return this.isSubtype(HoldExpression, supertype);
+                return this.isSubtype(Expression, supertype) || this.isSubtype(HoldExpression, supertype);
             }
             case Expression: {
                 return this.isSubtype(TernaryExpression, supertype);
@@ -880,6 +897,14 @@ export class WhackoAstReflection extends AbstractAstReflection {
                     ]
                 };
             }
+            case 'DeclareDeclaration': {
+                return {
+                    name: 'DeclareDeclaration',
+                    mandatory: [
+                        { name: 'parameters', type: 'array' }
+                    ]
+                };
+            }
             case 'ExportDeclaration': {
                 return {
                     name: 'ExportDeclaration',
@@ -896,9 +921,9 @@ export class WhackoAstReflection extends AbstractAstReflection {
                     ]
                 };
             }
-            case 'ImportStatement': {
+            case 'ImportDeclaration': {
                 return {
-                    name: 'ImportStatement',
+                    name: 'ImportDeclaration',
                     mandatory: [
                         { name: 'declarators', type: 'array' }
                     ]
@@ -926,6 +951,7 @@ export class WhackoAstReflection extends AbstractAstReflection {
                     name: 'Program',
                     mandatory: [
                         { name: 'declarations', type: 'array' },
+                        { name: 'declares', type: 'array' },
                         { name: 'exports', type: 'array' },
                         { name: 'imports', type: 'array' }
                     ]

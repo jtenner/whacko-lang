@@ -10,7 +10,7 @@
     },
     {
       "name": "keyword.control.whacko",
-      "match": "\\b(as|async|await|break|class|const|constructor|continue|else|export|extends|false|final|fn|from|get|grab|hold|if|import|let|new|null|private|return|set|super|this|true|type|while|yield)\\b"
+      "match": "\\b(as|async|await|break|class|const|constructor|continue|declare|else|export|extends|false|final|fn|from|get|grab|hold|if|import|let|new|null|private|return|set|super|this|true|type|while|yield)\\b"
     },
     {
       "name": "string.quoted.double.whacko",

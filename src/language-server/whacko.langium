@@ -1,9 +1,12 @@
 grammar Whacko
 
 entry Program:
-    (imports+=ImportStatement | exports+=ExportDeclaration | declarations+=FunctionDeclaration | declarations+=ClassDeclaration | declarations+=TypeDeclaration)*;
+    (declares+=DeclareDeclaration | imports+=ImportDeclaration | exports+=ExportDeclaration | declarations+=FunctionDeclaration | declarations+=ClassDeclaration | declarations+=TypeDeclaration)*;
 
-ImportStatement:
+DeclareDeclaration:
+    "declare" namespace=String method=String "(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")" ":" returnType=TypeExpression ";";
+
+ImportDeclaration:
     "import" "{" (declarators+=ImportDeclarator ("," declarators+=ImportDeclarator)* )? "}" "from" path=String ";";
 
 ImportDeclarator:
@@ -94,7 +97,8 @@ TernaryExpression:
     | AssignmentExpression;
 
 AssignmentExpression infers Expression:
-    LogicalOrExpression ({infer BinaryExpression.e1=current} op=("=" | "+=" | "-=" | "**=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | ">>>=" | "&=" | "^=" | "|=" | "&&=" | "||=" | "??=") e2=LogicalOrExpression)*;
+    PathExpression ({infer BinaryExpression.e1=current} op=("=" | "+=" | "-=" | "**=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | ">>>=" | "&=" | "^=" | "|=" | "&&=" | "||=" | "??=") e2=LogicalOrExpression)*
+    | LogicalOrExpression;
 
 LogicalOrExpression infers Expression:
     LogicalAndExpression ({infer BinaryExpression.e1=current} op=("||") e2=LogicalAndExpression)*;

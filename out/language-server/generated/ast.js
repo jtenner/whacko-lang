@@ -4,9 +4,9 @@
  * DO NOT EDIT MANUALLY!
  ******************************************************************************/
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.isHexLiteral = exports.HexLiteral = exports.isGroupLiteral = exports.GroupLiteral = exports.isGrabStatement = exports.GrabStatement = exports.isGetterClassMember = exports.GetterClassMember = exports.isFunctionDeclaration = exports.FunctionDeclaration = exports.isFloatLiteral = exports.FloatLiteral = exports.isFieldClassMember = exports.FieldClassMember = exports.isFalseLiteral = exports.FalseLiteral = exports.isExpressionStatement = exports.ExpressionStatement = exports.isExportDeclarator = exports.ExportDeclarator = exports.isExportDeclaration = exports.ExportDeclaration = exports.isContinueStatement = exports.ContinueStatement = exports.isConstructorClassMember = exports.ConstructorClassMember = exports.isClassMember = exports.ClassMember = exports.isClassDeclaration = exports.ClassDeclaration = exports.isCallPath = exports.CallPath = exports.isBreakStatement = exports.BreakStatement = exports.isBlockStatement = exports.BlockStatement = exports.isBinaryLiteral = exports.BinaryLiteral = exports.isBinaryExpression = exports.BinaryExpression = exports.isAsyncBlockLiteral = exports.AsyncBlockLiteral = exports.isArrayAccessPath = exports.ArrayAccessPath = exports.isStatement = exports.Statement = exports.isPrimaryExpression = exports.PrimaryExpression = exports.isExpression = exports.Expression = void 0;
-exports.isWhileStatement = exports.WhileStatement = exports.isVariableDeclarator = exports.VariableDeclarator = exports.isVariableDeclarationStatement = exports.VariableDeclarationStatement = exports.isTypeExpression = exports.TypeExpression = exports.isTypeDeclarationStatement = exports.TypeDeclarationStatement = exports.isTypeDeclaration = exports.TypeDeclaration = exports.isTrueLiteral = exports.TrueLiteral = exports.isThisLiteral = exports.ThisLiteral = exports.isSuperLiteral = exports.SuperLiteral = exports.isStringLiteral = exports.StringLiteral = exports.isSetterClassMember = exports.SetterClassMember = exports.isReturnStatement = exports.ReturnStatement = exports.isProgram = exports.Program = exports.isParameter = exports.Parameter = exports.isOctalLiteral = exports.OctalLiteral = exports.isNullLiteral = exports.NullLiteral = exports.isNewPath = exports.NewPath = exports.isMethodClassMember = exports.MethodClassMember = exports.isMemberAccessPath = exports.MemberAccessPath = exports.isLeftUnaryExpression = exports.LeftUnaryExpression = exports.isIntegerLiteral = exports.IntegerLiteral = exports.isImportStatement = exports.ImportStatement = exports.isImportDeclarator = exports.ImportDeclarator = exports.isIfElseStatement = exports.IfElseStatement = exports.isID = exports.ID = void 0;
-exports.reflection = exports.WhackoAstReflection = exports.isPathExpression = exports.PathExpression = exports.isHoldExpression = exports.HoldExpression = exports.isTernaryExpression = exports.TernaryExpression = exports.isAwaitExpression = exports.AwaitExpression = exports.isYieldExpression = exports.YieldExpression = void 0;
+exports.isGroupLiteral = exports.GroupLiteral = exports.isGrabStatement = exports.GrabStatement = exports.isGetterClassMember = exports.GetterClassMember = exports.isFunctionDeclaration = exports.FunctionDeclaration = exports.isFloatLiteral = exports.FloatLiteral = exports.isFieldClassMember = exports.FieldClassMember = exports.isFalseLiteral = exports.FalseLiteral = exports.isExpressionStatement = exports.ExpressionStatement = exports.isExportDeclarator = exports.ExportDeclarator = exports.isExportDeclaration = exports.ExportDeclaration = exports.isDeclareDeclaration = exports.DeclareDeclaration = exports.isContinueStatement = exports.ContinueStatement = exports.isConstructorClassMember = exports.ConstructorClassMember = exports.isClassMember = exports.ClassMember = exports.isClassDeclaration = exports.ClassDeclaration = exports.isCallPath = exports.CallPath = exports.isBreakStatement = exports.BreakStatement = exports.isBlockStatement = exports.BlockStatement = exports.isBinaryLiteral = exports.BinaryLiteral = exports.isBinaryExpression = exports.BinaryExpression = exports.isAsyncBlockLiteral = exports.AsyncBlockLiteral = exports.isArrayAccessPath = exports.ArrayAccessPath = exports.isStatement = exports.Statement = exports.isPrimaryExpression = exports.PrimaryExpression = exports.isExpression = exports.Expression = void 0;
+exports.isVariableDeclarator = exports.VariableDeclarator = exports.isVariableDeclarationStatement = exports.VariableDeclarationStatement = exports.isTypeExpression = exports.TypeExpression = exports.isTypeDeclarationStatement = exports.TypeDeclarationStatement = exports.isTypeDeclaration = exports.TypeDeclaration = exports.isTrueLiteral = exports.TrueLiteral = exports.isThisLiteral = exports.ThisLiteral = exports.isSuperLiteral = exports.SuperLiteral = exports.isStringLiteral = exports.StringLiteral = exports.isSetterClassMember = exports.SetterClassMember = exports.isReturnStatement = exports.ReturnStatement = exports.isProgram = exports.Program = exports.isParameter = exports.Parameter = exports.isOctalLiteral = exports.OctalLiteral = exports.isNullLiteral = exports.NullLiteral = exports.isNewPath = exports.NewPath = exports.isMethodClassMember = exports.MethodClassMember = exports.isMemberAccessPath = exports.MemberAccessPath = exports.isLeftUnaryExpression = exports.LeftUnaryExpression = exports.isIntegerLiteral = exports.IntegerLiteral = exports.isImportDeclarator = exports.ImportDeclarator = exports.isImportDeclaration = exports.ImportDeclaration = exports.isIfElseStatement = exports.IfElseStatement = exports.isID = exports.ID = exports.isHexLiteral = exports.HexLiteral = void 0;
+exports.reflection = exports.WhackoAstReflection = exports.isPathExpression = exports.PathExpression = exports.isHoldExpression = exports.HoldExpression = exports.isTernaryExpression = exports.TernaryExpression = exports.isAwaitExpression = exports.AwaitExpression = exports.isYieldExpression = exports.YieldExpression = exports.isWhileStatement = exports.WhileStatement = void 0;
 /* eslint-disable */
 const langium_1 = require("langium");
 exports.Expression = 'Expression';
@@ -79,6 +79,11 @@ function isContinueStatement(item) {
     return exports.reflection.isInstance(item, exports.ContinueStatement);
 }
 exports.isContinueStatement = isContinueStatement;
+exports.DeclareDeclaration = 'DeclareDeclaration';
+function isDeclareDeclaration(item) {
+    return exports.reflection.isInstance(item, exports.DeclareDeclaration);
+}
+exports.isDeclareDeclaration = isDeclareDeclaration;
 exports.ExportDeclaration = 'ExportDeclaration';
 function isExportDeclaration(item) {
     return exports.reflection.isInstance(item, exports.ExportDeclaration);
@@ -144,16 +149,16 @@ function isIfElseStatement(item) {
     return exports.reflection.isInstance(item, exports.IfElseStatement);
 }
 exports.isIfElseStatement = isIfElseStatement;
+exports.ImportDeclaration = 'ImportDeclaration';
+function isImportDeclaration(item) {
+    return exports.reflection.isInstance(item, exports.ImportDeclaration);
+}
+exports.isImportDeclaration = isImportDeclaration;
 exports.ImportDeclarator = 'ImportDeclarator';
 function isImportDeclarator(item) {
     return exports.reflection.isInstance(item, exports.ImportDeclarator);
 }
 exports.isImportDeclarator = isImportDeclarator;
-exports.ImportStatement = 'ImportStatement';
-function isImportStatement(item) {
-    return exports.reflection.isInstance(item, exports.ImportStatement);
-}
-exports.isImportStatement = isImportStatement;
 exports.IntegerLiteral = 'IntegerLiteral';
 function isIntegerLiteral(item) {
     return exports.reflection.isInstance(item, exports.IntegerLiteral);
@@ -286,7 +291,7 @@ function isPathExpression(item) {
 exports.isPathExpression = isPathExpression;
 class WhackoAstReflection extends langium_1.AbstractAstReflection {
     getAllTypes() {
-        return ['ArrayAccessPath', 'AsyncBlockLiteral', 'AwaitExpression', 'BinaryExpression', 'BinaryLiteral', 'BlockStatement', 'BreakStatement', 'CallPath', 'ClassDeclaration', 'ClassMember', 'ConstructorClassMember', 'ContinueStatement', 'ExportDeclaration', 'ExportDeclarator', 'Expression', 'ExpressionStatement', 'FalseLiteral', 'FieldClassMember', 'FloatLiteral', 'FunctionDeclaration', 'GetterClassMember', 'GrabStatement', 'GroupLiteral', 'HexLiteral', 'HoldExpression', 'ID', 'IfElseStatement', 'ImportDeclarator', 'ImportStatement', 'IntegerLiteral', 'LeftUnaryExpression', 'MemberAccessPath', 'MethodClassMember', 'NewPath', 'NullLiteral', 'OctalLiteral', 'Parameter', 'PathExpression', 'PrimaryExpression', 'Program', 'ReturnStatement', 'SetterClassMember', 'Statement', 'StringLiteral', 'SuperLiteral', 'TernaryExpression', 'ThisLiteral', 'TrueLiteral', 'TypeDeclaration', 'TypeDeclarationStatement', 'TypeExpression', 'VariableDeclarationStatement', 'VariableDeclarator', 'WhileStatement', 'YieldExpression'];
+        return ['ArrayAccessPath', 'AsyncBlockLiteral', 'AwaitExpression', 'BinaryExpression', 'BinaryLiteral', 'BlockStatement', 'BreakStatement', 'CallPath', 'ClassDeclaration', 'ClassMember', 'ConstructorClassMember', 'ContinueStatement', 'DeclareDeclaration', 'ExportDeclaration', 'ExportDeclarator', 'Expression', 'ExpressionStatement', 'FalseLiteral', 'FieldClassMember', 'FloatLiteral', 'FunctionDeclaration', 'GetterClassMember', 'GrabStatement', 'GroupLiteral', 'HexLiteral', 'HoldExpression', 'ID', 'IfElseStatement', 'ImportDeclaration', 'ImportDeclarator', 'IntegerLiteral', 'LeftUnaryExpression', 'MemberAccessPath', 'MethodClassMember', 'NewPath', 'NullLiteral', 'OctalLiteral', 'Parameter', 'PathExpression', 'PrimaryExpression', 'Program', 'ReturnStatement', 'SetterClassMember', 'Statement', 'StringLiteral', 'SuperLiteral', 'TernaryExpression', 'ThisLiteral', 'TrueLiteral', 'TypeDeclaration', 'TypeDeclarationStatement', 'TypeExpression', 'VariableDeclarationStatement', 'VariableDeclarator', 'WhileStatement', 'YieldExpression'];
     }
     computeIsSubtype(subtype, supertype) {
         switch (subtype) {
@@ -333,7 +338,7 @@ class WhackoAstReflection extends langium_1.AbstractAstReflection {
                 return this.isSubtype(exports.AwaitExpression, supertype);
             }
             case exports.PathExpression: {
-                return this.isSubtype(exports.HoldExpression, supertype);
+                return this.isSubtype(exports.Expression, supertype) || this.isSubtype(exports.HoldExpression, supertype);
             }
             case exports.Expression: {
                 return this.isSubtype(exports.TernaryExpression, supertype);
@@ -404,6 +409,14 @@ class WhackoAstReflection extends langium_1.AbstractAstReflection {
                     ]
                 };
             }
+            case 'DeclareDeclaration': {
+                return {
+                    name: 'DeclareDeclaration',
+                    mandatory: [
+                        { name: 'parameters', type: 'array' }
+                    ]
+                };
+            }
             case 'ExportDeclaration': {
                 return {
                     name: 'ExportDeclaration',
@@ -420,9 +433,9 @@ class WhackoAstReflection extends langium_1.AbstractAstReflection {
                     ]
                 };
             }
-            case 'ImportStatement': {
+            case 'ImportDeclaration': {
                 return {
-                    name: 'ImportStatement',
+                    name: 'ImportDeclaration',
                     mandatory: [
                         { name: 'declarators', type: 'array' }
                     ]
@@ -450,6 +463,7 @@ class WhackoAstReflection extends langium_1.AbstractAstReflection {
                     name: 'Program',
                     mandatory: [
                         { name: 'declarations', type: 'array' },
+                        { name: 'declares', type: 'array' },
                         { name: 'exports', type: 'array' },
                         { name: 'imports', type: 'array' }
                     ]
