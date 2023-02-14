@@ -1,51 +1,11 @@
-import { test } from "test";
+type a = a;
+type b = b<Test>;
+type c = () => void;
+type d = (a, b, c) => i32;
+type e = held t;
+type f = (a,);
+type g = (h, i, j);
 
 fn main(): void {
-  yield a ? b : c;
-  a = b ? b : c;
-  a.b = c;
-  a || b && c;
-  a && b | c;
-  a | b & c;
-  a ^ b & c;
-  a & b == c;
-  "test";
-  1;
-  a != t <= some;
-  test << 1 <= a >> v;
-  c >> d + e;
-  a << b;
-  test + test * test;
-  test * test ** test;
-  test ** test;
-  +test;
-  -test;
-  !test;
-  await test;
-  hold test;
-  let a = 1;
-  async {
-    1;
-    2;
-    3;
-  };
+  id().test.some[a].b();
 }
-
-async fn prop(): void {
-  
-}
-
-class Whacko {
-
-}
-
-class Lang extends Whacko {
-  prop: i32 = 9;
-  get prop: T {
-    return T.new();
-  }
-  set prop(value: T) {
-    this.prop = value;
-  }
-}
-export { main }

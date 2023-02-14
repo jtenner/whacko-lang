@@ -4,26 +4,86 @@
  * DO NOT EDIT MANUALLY!
  ******************************************************************************/
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.isGroupLiteral = exports.GroupLiteral = exports.isGrabStatement = exports.GrabStatement = exports.isGetterClassMember = exports.GetterClassMember = exports.isFunctionDeclaration = exports.FunctionDeclaration = exports.isFloatLiteral = exports.FloatLiteral = exports.isFieldClassMember = exports.FieldClassMember = exports.isFalseLiteral = exports.FalseLiteral = exports.isExpressionStatement = exports.ExpressionStatement = exports.isExportDeclarator = exports.ExportDeclarator = exports.isExportDeclaration = exports.ExportDeclaration = exports.isDeclareDeclaration = exports.DeclareDeclaration = exports.isContinueStatement = exports.ContinueStatement = exports.isConstructorClassMember = exports.ConstructorClassMember = exports.isClassMember = exports.ClassMember = exports.isClassDeclaration = exports.ClassDeclaration = exports.isCallPath = exports.CallPath = exports.isBreakStatement = exports.BreakStatement = exports.isBlockStatement = exports.BlockStatement = exports.isBinaryLiteral = exports.BinaryLiteral = exports.isBinaryExpression = exports.BinaryExpression = exports.isAsyncBlockLiteral = exports.AsyncBlockLiteral = exports.isArrayAccessPath = exports.ArrayAccessPath = exports.isStatement = exports.Statement = exports.isPrimaryExpression = exports.PrimaryExpression = exports.isExpression = exports.Expression = void 0;
-exports.isVariableDeclarator = exports.VariableDeclarator = exports.isVariableDeclarationStatement = exports.VariableDeclarationStatement = exports.isTypeExpression = exports.TypeExpression = exports.isTypeDeclarationStatement = exports.TypeDeclarationStatement = exports.isTypeDeclaration = exports.TypeDeclaration = exports.isTrueLiteral = exports.TrueLiteral = exports.isThisLiteral = exports.ThisLiteral = exports.isSuperLiteral = exports.SuperLiteral = exports.isStringLiteral = exports.StringLiteral = exports.isSetterClassMember = exports.SetterClassMember = exports.isReturnStatement = exports.ReturnStatement = exports.isProgram = exports.Program = exports.isParameter = exports.Parameter = exports.isOctalLiteral = exports.OctalLiteral = exports.isNullLiteral = exports.NullLiteral = exports.isNewPath = exports.NewPath = exports.isMethodClassMember = exports.MethodClassMember = exports.isMemberAccessPath = exports.MemberAccessPath = exports.isLeftUnaryExpression = exports.LeftUnaryExpression = exports.isIntegerLiteral = exports.IntegerLiteral = exports.isImportDeclarator = exports.ImportDeclarator = exports.isImportDeclaration = exports.ImportDeclaration = exports.isIfElseStatement = exports.IfElseStatement = exports.isID = exports.ID = exports.isHexLiteral = exports.HexLiteral = void 0;
-exports.reflection = exports.WhackoAstReflection = exports.isPathExpression = exports.PathExpression = exports.isHoldExpression = exports.HoldExpression = exports.isTernaryExpression = exports.TernaryExpression = exports.isAwaitExpression = exports.AwaitExpression = exports.isYieldExpression = exports.YieldExpression = exports.isWhileStatement = exports.WhileStatement = void 0;
+exports.isFalseLiteral = exports.FalseLiteral = exports.isExportDeclarator = exports.ExportDeclarator = exports.isDeclaration = exports.Declaration = exports.isConstructorClassMember = exports.ConstructorClassMember = exports.isClassMember = exports.ClassMember = exports.isCallPath = exports.CallPath = exports.isBinaryLiteral = exports.BinaryLiteral = exports.isBinaryExpression = exports.BinaryExpression = exports.isAsyncBlockLiteral = exports.AsyncBlockLiteral = exports.isArrayAccessPath = exports.ArrayAccessPath = exports.isTypeExpression = exports.TypeExpression = exports.isSumExpression = exports.SumExpression = exports.isProductExpression = exports.ProductExpression = exports.isPrimaryExpression = exports.PrimaryExpression = exports.isLogicalOrExpression = exports.LogicalOrExpression = exports.isLogicalAndExpression = exports.LogicalAndExpression = exports.isExpression = exports.Expression = exports.isExponentiationExpression = exports.ExponentiationExpression = exports.isEqualityExpression = exports.EqualityExpression = exports.isComaprisonExpression = exports.ComaprisonExpression = exports.isBitwiseXOrExpression = exports.BitwiseXOrExpression = exports.isBitwiseOrExpression = exports.BitwiseOrExpression = exports.isBitwiseAndExpression = exports.BitwiseAndExpression = exports.isBitShiftExpression = exports.BitShiftExpression = exports.isAssignmentExpression = exports.AssignmentExpression = void 0;
+exports.isTrueLiteral = exports.TrueLiteral = exports.isThisLiteral = exports.ThisLiteral = exports.isSuperLiteral = exports.SuperLiteral = exports.isStringLiteral = exports.StringLiteral = exports.isStatement = exports.Statement = exports.isSetterClassMember = exports.SetterClassMember = exports.isProgram = exports.Program = exports.isParameter = exports.Parameter = exports.isOctalLiteral = exports.OctalLiteral = exports.isNullLiteral = exports.NullLiteral = exports.isNewPath = exports.NewPath = exports.isNamedTypeExpression = exports.NamedTypeExpression = exports.isMethodClassMember = exports.MethodClassMember = exports.isMemberAccessPath = exports.MemberAccessPath = exports.isLeftUnaryExpression = exports.LeftUnaryExpression = exports.isIntegerLiteral = exports.IntegerLiteral = exports.isImportDeclarator = exports.ImportDeclarator = exports.isID = exports.ID = exports.isHexLiteral = exports.HexLiteral = exports.isHeldTypeExpression = exports.HeldTypeExpression = exports.isGroupLiteral = exports.GroupLiteral = exports.isGetterClassMember = exports.GetterClassMember = exports.isFunctionTypeExpression = exports.FunctionTypeExpression = exports.isFloatLiteral = exports.FloatLiteral = exports.isFieldClassMember = exports.FieldClassMember = void 0;
+exports.reflection = exports.WhackoAstReflection = exports.isPathExpression = exports.PathExpression = exports.isTernaryExpression = exports.TernaryExpression = exports.isHoldExpression = exports.HoldExpression = exports.isYieldExpression = exports.YieldExpression = exports.isAwaitExpression = exports.AwaitExpression = exports.isVariableDeclarator = exports.VariableDeclarator = exports.isTupleTypeExpression = exports.TupleTypeExpression = exports.isTupleExpression = exports.TupleExpression = void 0;
 /* eslint-disable */
 const langium_1 = require("langium");
+exports.AssignmentExpression = 'AssignmentExpression';
+function isAssignmentExpression(item) {
+    return exports.reflection.isInstance(item, exports.AssignmentExpression);
+}
+exports.isAssignmentExpression = isAssignmentExpression;
+exports.BitShiftExpression = 'BitShiftExpression';
+function isBitShiftExpression(item) {
+    return exports.reflection.isInstance(item, exports.BitShiftExpression);
+}
+exports.isBitShiftExpression = isBitShiftExpression;
+exports.BitwiseAndExpression = 'BitwiseAndExpression';
+function isBitwiseAndExpression(item) {
+    return exports.reflection.isInstance(item, exports.BitwiseAndExpression);
+}
+exports.isBitwiseAndExpression = isBitwiseAndExpression;
+exports.BitwiseOrExpression = 'BitwiseOrExpression';
+function isBitwiseOrExpression(item) {
+    return exports.reflection.isInstance(item, exports.BitwiseOrExpression);
+}
+exports.isBitwiseOrExpression = isBitwiseOrExpression;
+exports.BitwiseXOrExpression = 'BitwiseXOrExpression';
+function isBitwiseXOrExpression(item) {
+    return exports.reflection.isInstance(item, exports.BitwiseXOrExpression);
+}
+exports.isBitwiseXOrExpression = isBitwiseXOrExpression;
+exports.ComaprisonExpression = 'ComaprisonExpression';
+function isComaprisonExpression(item) {
+    return exports.reflection.isInstance(item, exports.ComaprisonExpression);
+}
+exports.isComaprisonExpression = isComaprisonExpression;
+exports.EqualityExpression = 'EqualityExpression';
+function isEqualityExpression(item) {
+    return exports.reflection.isInstance(item, exports.EqualityExpression);
+}
+exports.isEqualityExpression = isEqualityExpression;
+exports.ExponentiationExpression = 'ExponentiationExpression';
+function isExponentiationExpression(item) {
+    return exports.reflection.isInstance(item, exports.ExponentiationExpression);
+}
+exports.isExponentiationExpression = isExponentiationExpression;
 exports.Expression = 'Expression';
 function isExpression(item) {
     return exports.reflection.isInstance(item, exports.Expression);
 }
 exports.isExpression = isExpression;
+exports.LogicalAndExpression = 'LogicalAndExpression';
+function isLogicalAndExpression(item) {
+    return exports.reflection.isInstance(item, exports.LogicalAndExpression);
+}
+exports.isLogicalAndExpression = isLogicalAndExpression;
+exports.LogicalOrExpression = 'LogicalOrExpression';
+function isLogicalOrExpression(item) {
+    return exports.reflection.isInstance(item, exports.LogicalOrExpression);
+}
+exports.isLogicalOrExpression = isLogicalOrExpression;
 exports.PrimaryExpression = 'PrimaryExpression';
 function isPrimaryExpression(item) {
     return exports.reflection.isInstance(item, exports.PrimaryExpression);
 }
 exports.isPrimaryExpression = isPrimaryExpression;
-exports.Statement = 'Statement';
-function isStatement(item) {
-    return exports.reflection.isInstance(item, exports.Statement);
+exports.ProductExpression = 'ProductExpression';
+function isProductExpression(item) {
+    return exports.reflection.isInstance(item, exports.ProductExpression);
 }
-exports.isStatement = isStatement;
+exports.isProductExpression = isProductExpression;
+exports.SumExpression = 'SumExpression';
+function isSumExpression(item) {
+    return exports.reflection.isInstance(item, exports.SumExpression);
+}
+exports.isSumExpression = isSumExpression;
+exports.TypeExpression = 'TypeExpression';
+function isTypeExpression(item) {
+    return exports.reflection.isInstance(item, exports.TypeExpression);
+}
+exports.isTypeExpression = isTypeExpression;
 exports.ArrayAccessPath = 'ArrayAccessPath';
 function isArrayAccessPath(item) {
     return exports.reflection.isInstance(item, exports.ArrayAccessPath);
@@ -44,26 +104,11 @@ function isBinaryLiteral(item) {
     return exports.reflection.isInstance(item, exports.BinaryLiteral);
 }
 exports.isBinaryLiteral = isBinaryLiteral;
-exports.BlockStatement = 'BlockStatement';
-function isBlockStatement(item) {
-    return exports.reflection.isInstance(item, exports.BlockStatement);
-}
-exports.isBlockStatement = isBlockStatement;
-exports.BreakStatement = 'BreakStatement';
-function isBreakStatement(item) {
-    return exports.reflection.isInstance(item, exports.BreakStatement);
-}
-exports.isBreakStatement = isBreakStatement;
 exports.CallPath = 'CallPath';
 function isCallPath(item) {
     return exports.reflection.isInstance(item, exports.CallPath);
 }
 exports.isCallPath = isCallPath;
-exports.ClassDeclaration = 'ClassDeclaration';
-function isClassDeclaration(item) {
-    return exports.reflection.isInstance(item, exports.ClassDeclaration);
-}
-exports.isClassDeclaration = isClassDeclaration;
 exports.ClassMember = 'ClassMember';
 function isClassMember(item) {
     return exports.reflection.isInstance(item, exports.ClassMember);
@@ -74,31 +119,16 @@ function isConstructorClassMember(item) {
     return exports.reflection.isInstance(item, exports.ConstructorClassMember);
 }
 exports.isConstructorClassMember = isConstructorClassMember;
-exports.ContinueStatement = 'ContinueStatement';
-function isContinueStatement(item) {
-    return exports.reflection.isInstance(item, exports.ContinueStatement);
+exports.Declaration = 'Declaration';
+function isDeclaration(item) {
+    return exports.reflection.isInstance(item, exports.Declaration);
 }
-exports.isContinueStatement = isContinueStatement;
-exports.DeclareDeclaration = 'DeclareDeclaration';
-function isDeclareDeclaration(item) {
-    return exports.reflection.isInstance(item, exports.DeclareDeclaration);
-}
-exports.isDeclareDeclaration = isDeclareDeclaration;
-exports.ExportDeclaration = 'ExportDeclaration';
-function isExportDeclaration(item) {
-    return exports.reflection.isInstance(item, exports.ExportDeclaration);
-}
-exports.isExportDeclaration = isExportDeclaration;
+exports.isDeclaration = isDeclaration;
 exports.ExportDeclarator = 'ExportDeclarator';
 function isExportDeclarator(item) {
     return exports.reflection.isInstance(item, exports.ExportDeclarator);
 }
 exports.isExportDeclarator = isExportDeclarator;
-exports.ExpressionStatement = 'ExpressionStatement';
-function isExpressionStatement(item) {
-    return exports.reflection.isInstance(item, exports.ExpressionStatement);
-}
-exports.isExpressionStatement = isExpressionStatement;
 exports.FalseLiteral = 'FalseLiteral';
 function isFalseLiteral(item) {
     return exports.reflection.isInstance(item, exports.FalseLiteral);
@@ -114,26 +144,26 @@ function isFloatLiteral(item) {
     return exports.reflection.isInstance(item, exports.FloatLiteral);
 }
 exports.isFloatLiteral = isFloatLiteral;
-exports.FunctionDeclaration = 'FunctionDeclaration';
-function isFunctionDeclaration(item) {
-    return exports.reflection.isInstance(item, exports.FunctionDeclaration);
+exports.FunctionTypeExpression = 'FunctionTypeExpression';
+function isFunctionTypeExpression(item) {
+    return exports.reflection.isInstance(item, exports.FunctionTypeExpression);
 }
-exports.isFunctionDeclaration = isFunctionDeclaration;
+exports.isFunctionTypeExpression = isFunctionTypeExpression;
 exports.GetterClassMember = 'GetterClassMember';
 function isGetterClassMember(item) {
     return exports.reflection.isInstance(item, exports.GetterClassMember);
 }
 exports.isGetterClassMember = isGetterClassMember;
-exports.GrabStatement = 'GrabStatement';
-function isGrabStatement(item) {
-    return exports.reflection.isInstance(item, exports.GrabStatement);
-}
-exports.isGrabStatement = isGrabStatement;
 exports.GroupLiteral = 'GroupLiteral';
 function isGroupLiteral(item) {
     return exports.reflection.isInstance(item, exports.GroupLiteral);
 }
 exports.isGroupLiteral = isGroupLiteral;
+exports.HeldTypeExpression = 'HeldTypeExpression';
+function isHeldTypeExpression(item) {
+    return exports.reflection.isInstance(item, exports.HeldTypeExpression);
+}
+exports.isHeldTypeExpression = isHeldTypeExpression;
 exports.HexLiteral = 'HexLiteral';
 function isHexLiteral(item) {
     return exports.reflection.isInstance(item, exports.HexLiteral);
@@ -144,16 +174,6 @@ function isID(item) {
     return exports.reflection.isInstance(item, exports.ID);
 }
 exports.isID = isID;
-exports.IfElseStatement = 'IfElseStatement';
-function isIfElseStatement(item) {
-    return exports.reflection.isInstance(item, exports.IfElseStatement);
-}
-exports.isIfElseStatement = isIfElseStatement;
-exports.ImportDeclaration = 'ImportDeclaration';
-function isImportDeclaration(item) {
-    return exports.reflection.isInstance(item, exports.ImportDeclaration);
-}
-exports.isImportDeclaration = isImportDeclaration;
 exports.ImportDeclarator = 'ImportDeclarator';
 function isImportDeclarator(item) {
     return exports.reflection.isInstance(item, exports.ImportDeclarator);
@@ -179,6 +199,11 @@ function isMethodClassMember(item) {
     return exports.reflection.isInstance(item, exports.MethodClassMember);
 }
 exports.isMethodClassMember = isMethodClassMember;
+exports.NamedTypeExpression = 'NamedTypeExpression';
+function isNamedTypeExpression(item) {
+    return exports.reflection.isInstance(item, exports.NamedTypeExpression);
+}
+exports.isNamedTypeExpression = isNamedTypeExpression;
 exports.NewPath = 'NewPath';
 function isNewPath(item) {
     return exports.reflection.isInstance(item, exports.NewPath);
@@ -204,16 +229,16 @@ function isProgram(item) {
     return exports.reflection.isInstance(item, exports.Program);
 }
 exports.isProgram = isProgram;
-exports.ReturnStatement = 'ReturnStatement';
-function isReturnStatement(item) {
-    return exports.reflection.isInstance(item, exports.ReturnStatement);
-}
-exports.isReturnStatement = isReturnStatement;
 exports.SetterClassMember = 'SetterClassMember';
 function isSetterClassMember(item) {
     return exports.reflection.isInstance(item, exports.SetterClassMember);
 }
 exports.isSetterClassMember = isSetterClassMember;
+exports.Statement = 'Statement';
+function isStatement(item) {
+    return exports.reflection.isInstance(item, exports.Statement);
+}
+exports.isStatement = isStatement;
 exports.StringLiteral = 'StringLiteral';
 function isStringLiteral(item) {
     return exports.reflection.isInstance(item, exports.StringLiteral);
@@ -234,56 +259,41 @@ function isTrueLiteral(item) {
     return exports.reflection.isInstance(item, exports.TrueLiteral);
 }
 exports.isTrueLiteral = isTrueLiteral;
-exports.TypeDeclaration = 'TypeDeclaration';
-function isTypeDeclaration(item) {
-    return exports.reflection.isInstance(item, exports.TypeDeclaration);
+exports.TupleExpression = 'TupleExpression';
+function isTupleExpression(item) {
+    return exports.reflection.isInstance(item, exports.TupleExpression);
 }
-exports.isTypeDeclaration = isTypeDeclaration;
-exports.TypeDeclarationStatement = 'TypeDeclarationStatement';
-function isTypeDeclarationStatement(item) {
-    return exports.reflection.isInstance(item, exports.TypeDeclarationStatement);
+exports.isTupleExpression = isTupleExpression;
+exports.TupleTypeExpression = 'TupleTypeExpression';
+function isTupleTypeExpression(item) {
+    return exports.reflection.isInstance(item, exports.TupleTypeExpression);
 }
-exports.isTypeDeclarationStatement = isTypeDeclarationStatement;
-exports.TypeExpression = 'TypeExpression';
-function isTypeExpression(item) {
-    return exports.reflection.isInstance(item, exports.TypeExpression);
-}
-exports.isTypeExpression = isTypeExpression;
-exports.VariableDeclarationStatement = 'VariableDeclarationStatement';
-function isVariableDeclarationStatement(item) {
-    return exports.reflection.isInstance(item, exports.VariableDeclarationStatement);
-}
-exports.isVariableDeclarationStatement = isVariableDeclarationStatement;
+exports.isTupleTypeExpression = isTupleTypeExpression;
 exports.VariableDeclarator = 'VariableDeclarator';
 function isVariableDeclarator(item) {
     return exports.reflection.isInstance(item, exports.VariableDeclarator);
 }
 exports.isVariableDeclarator = isVariableDeclarator;
-exports.WhileStatement = 'WhileStatement';
-function isWhileStatement(item) {
-    return exports.reflection.isInstance(item, exports.WhileStatement);
-}
-exports.isWhileStatement = isWhileStatement;
-exports.YieldExpression = 'YieldExpression';
-function isYieldExpression(item) {
-    return exports.reflection.isInstance(item, exports.YieldExpression);
-}
-exports.isYieldExpression = isYieldExpression;
 exports.AwaitExpression = 'AwaitExpression';
 function isAwaitExpression(item) {
     return exports.reflection.isInstance(item, exports.AwaitExpression);
 }
 exports.isAwaitExpression = isAwaitExpression;
-exports.TernaryExpression = 'TernaryExpression';
-function isTernaryExpression(item) {
-    return exports.reflection.isInstance(item, exports.TernaryExpression);
+exports.YieldExpression = 'YieldExpression';
+function isYieldExpression(item) {
+    return exports.reflection.isInstance(item, exports.YieldExpression);
 }
-exports.isTernaryExpression = isTernaryExpression;
+exports.isYieldExpression = isYieldExpression;
 exports.HoldExpression = 'HoldExpression';
 function isHoldExpression(item) {
     return exports.reflection.isInstance(item, exports.HoldExpression);
 }
 exports.isHoldExpression = isHoldExpression;
+exports.TernaryExpression = 'TernaryExpression';
+function isTernaryExpression(item) {
+    return exports.reflection.isInstance(item, exports.TernaryExpression);
+}
+exports.isTernaryExpression = isTernaryExpression;
 exports.PathExpression = 'PathExpression';
 function isPathExpression(item) {
     return exports.reflection.isInstance(item, exports.PathExpression);
@@ -291,7 +301,7 @@ function isPathExpression(item) {
 exports.isPathExpression = isPathExpression;
 class WhackoAstReflection extends langium_1.AbstractAstReflection {
     getAllTypes() {
-        return ['ArrayAccessPath', 'AsyncBlockLiteral', 'AwaitExpression', 'BinaryExpression', 'BinaryLiteral', 'BlockStatement', 'BreakStatement', 'CallPath', 'ClassDeclaration', 'ClassMember', 'ConstructorClassMember', 'ContinueStatement', 'DeclareDeclaration', 'ExportDeclaration', 'ExportDeclarator', 'Expression', 'ExpressionStatement', 'FalseLiteral', 'FieldClassMember', 'FloatLiteral', 'FunctionDeclaration', 'GetterClassMember', 'GrabStatement', 'GroupLiteral', 'HexLiteral', 'HoldExpression', 'ID', 'IfElseStatement', 'ImportDeclaration', 'ImportDeclarator', 'IntegerLiteral', 'LeftUnaryExpression', 'MemberAccessPath', 'MethodClassMember', 'NewPath', 'NullLiteral', 'OctalLiteral', 'Parameter', 'PathExpression', 'PrimaryExpression', 'Program', 'ReturnStatement', 'SetterClassMember', 'Statement', 'StringLiteral', 'SuperLiteral', 'TernaryExpression', 'ThisLiteral', 'TrueLiteral', 'TypeDeclaration', 'TypeDeclarationStatement', 'TypeExpression', 'VariableDeclarationStatement', 'VariableDeclarator', 'WhileStatement', 'YieldExpression'];
+        return ['ArrayAccessPath', 'AssignmentExpression', 'AsyncBlockLiteral', 'AwaitExpression', 'BinaryExpression', 'BinaryLiteral', 'BitShiftExpression', 'BitwiseAndExpression', 'BitwiseOrExpression', 'BitwiseXOrExpression', 'CallPath', 'ClassMember', 'ComaprisonExpression', 'ConstructorClassMember', 'Declaration', 'EqualityExpression', 'ExponentiationExpression', 'ExportDeclarator', 'Expression', 'FalseLiteral', 'FieldClassMember', 'FloatLiteral', 'FunctionTypeExpression', 'GetterClassMember', 'GroupLiteral', 'HeldTypeExpression', 'HexLiteral', 'HoldExpression', 'ID', 'ImportDeclarator', 'IntegerLiteral', 'LeftUnaryExpression', 'LogicalAndExpression', 'LogicalOrExpression', 'MemberAccessPath', 'MethodClassMember', 'NamedTypeExpression', 'NewPath', 'NullLiteral', 'OctalLiteral', 'Parameter', 'PathExpression', 'PrimaryExpression', 'ProductExpression', 'Program', 'SetterClassMember', 'Statement', 'StringLiteral', 'SumExpression', 'SuperLiteral', 'TernaryExpression', 'ThisLiteral', 'TrueLiteral', 'TupleExpression', 'TupleTypeExpression', 'TypeExpression', 'VariableDeclarator', 'YieldExpression'];
     }
     computeIsSubtype(subtype, supertype) {
         switch (subtype) {
@@ -311,40 +321,74 @@ class WhackoAstReflection extends langium_1.AbstractAstReflection {
             case exports.TrueLiteral: {
                 return this.isSubtype(exports.PrimaryExpression, supertype);
             }
-            case exports.BinaryExpression:
-            case exports.LeftUnaryExpression:
-            case exports.YieldExpression: {
-                return this.isSubtype(exports.Expression, supertype);
+            case exports.BinaryExpression: {
+                return this.isSubtype(exports.AssignmentExpression, supertype) || this.isSubtype(exports.LogicalOrExpression, supertype) || this.isSubtype(exports.LogicalAndExpression, supertype) || this.isSubtype(exports.BitwiseOrExpression, supertype) || this.isSubtype(exports.BitwiseXOrExpression, supertype) || this.isSubtype(exports.BitwiseAndExpression, supertype) || this.isSubtype(exports.EqualityExpression, supertype) || this.isSubtype(exports.ComaprisonExpression, supertype) || this.isSubtype(exports.BitShiftExpression, supertype) || this.isSubtype(exports.SumExpression, supertype) || this.isSubtype(exports.ProductExpression, supertype) || this.isSubtype(exports.ExponentiationExpression, supertype);
             }
-            case exports.BlockStatement:
-            case exports.BreakStatement:
-            case exports.ContinueStatement:
-            case exports.ExpressionStatement:
-            case exports.GrabStatement:
-            case exports.IfElseStatement:
-            case exports.ReturnStatement:
-            case exports.TypeDeclarationStatement:
-            case exports.VariableDeclarationStatement:
-            case exports.WhileStatement: {
-                return this.isSubtype(exports.Statement, supertype);
+            case exports.FunctionTypeExpression:
+            case exports.HeldTypeExpression:
+            case exports.NamedTypeExpression:
+            case exports.TupleTypeExpression: {
+                return this.isSubtype(exports.TypeExpression, supertype);
+            }
+            case exports.LeftUnaryExpression: {
+                return this.isSubtype(exports.ExponentiationExpression, supertype);
+            }
+            case exports.TupleExpression: {
+                return this.isSubtype(exports.Expression, supertype);
             }
             case exports.AwaitExpression: {
                 return this.isSubtype(exports.LeftUnaryExpression, supertype);
             }
-            case exports.TernaryExpression: {
-                return this.isSubtype(exports.YieldExpression, supertype);
+            case exports.YieldExpression: {
+                return this.isSubtype(exports.TupleExpression, supertype);
             }
             case exports.HoldExpression: {
                 return this.isSubtype(exports.AwaitExpression, supertype);
             }
-            case exports.PathExpression: {
-                return this.isSubtype(exports.Expression, supertype) || this.isSubtype(exports.HoldExpression, supertype);
+            case exports.TernaryExpression: {
+                return this.isSubtype(exports.YieldExpression, supertype);
             }
-            case exports.Expression: {
+            case exports.PathExpression: {
+                return this.isSubtype(exports.AssignmentExpression, supertype) || this.isSubtype(exports.HoldExpression, supertype);
+            }
+            case exports.AssignmentExpression: {
                 return this.isSubtype(exports.TernaryExpression, supertype);
+            }
+            case exports.BitShiftExpression: {
+                return this.isSubtype(exports.ComaprisonExpression, supertype);
+            }
+            case exports.BitwiseAndExpression: {
+                return this.isSubtype(exports.BitwiseXOrExpression, supertype);
+            }
+            case exports.BitwiseOrExpression: {
+                return this.isSubtype(exports.LogicalAndExpression, supertype);
+            }
+            case exports.BitwiseXOrExpression: {
+                return this.isSubtype(exports.BitwiseOrExpression, supertype);
+            }
+            case exports.ComaprisonExpression: {
+                return this.isSubtype(exports.EqualityExpression, supertype);
+            }
+            case exports.EqualityExpression: {
+                return this.isSubtype(exports.BitwiseAndExpression, supertype);
+            }
+            case exports.ExponentiationExpression: {
+                return this.isSubtype(exports.ProductExpression, supertype);
+            }
+            case exports.LogicalAndExpression: {
+                return this.isSubtype(exports.LogicalOrExpression, supertype);
+            }
+            case exports.LogicalOrExpression: {
+                return this.isSubtype(exports.AssignmentExpression, supertype);
             }
             case exports.PrimaryExpression: {
                 return this.isSubtype(exports.PathExpression, supertype);
+            }
+            case exports.ProductExpression: {
+                return this.isSubtype(exports.SumExpression, supertype);
+            }
+            case exports.SumExpression: {
+                return this.isSubtype(exports.BitShiftExpression, supertype);
             }
             default: {
                 return false;
@@ -369,27 +413,11 @@ class WhackoAstReflection extends langium_1.AbstractAstReflection {
                     ]
                 };
             }
-            case 'BlockStatement': {
-                return {
-                    name: 'BlockStatement',
-                    mandatory: [
-                        { name: 'statements', type: 'array' }
-                    ]
-                };
-            }
             case 'CallPath': {
                 return {
                     name: 'CallPath',
                     mandatory: [
                         { name: 'typeParameters', type: 'array' }
-                    ]
-                };
-            }
-            case 'ClassDeclaration': {
-                return {
-                    name: 'ClassDeclaration',
-                    mandatory: [
-                        { name: 'members', type: 'array' }
                     ]
                 };
             }
@@ -409,35 +437,21 @@ class WhackoAstReflection extends langium_1.AbstractAstReflection {
                     ]
                 };
             }
-            case 'DeclareDeclaration': {
+            case 'Declaration': {
                 return {
-                    name: 'DeclareDeclaration',
+                    name: 'Declaration',
                     mandatory: [
+                        { name: 'declarators', type: 'array' },
+                        { name: 'members', type: 'array' },
                         { name: 'parameters', type: 'array' }
                     ]
                 };
             }
-            case 'ExportDeclaration': {
+            case 'FunctionTypeExpression': {
                 return {
-                    name: 'ExportDeclaration',
-                    mandatory: [
-                        { name: 'declarators', type: 'array' }
-                    ]
-                };
-            }
-            case 'FunctionDeclaration': {
-                return {
-                    name: 'FunctionDeclaration',
+                    name: 'FunctionTypeExpression',
                     mandatory: [
                         { name: 'parameters', type: 'array' }
-                    ]
-                };
-            }
-            case 'ImportDeclaration': {
-                return {
-                    name: 'ImportDeclaration',
-                    mandatory: [
-                        { name: 'declarators', type: 'array' }
                     ]
                 };
             }
@@ -446,6 +460,14 @@ class WhackoAstReflection extends langium_1.AbstractAstReflection {
                     name: 'MethodClassMember',
                     mandatory: [
                         { name: 'parameters', type: 'array' }
+                    ]
+                };
+            }
+            case 'NamedTypeExpression': {
+                return {
+                    name: 'NamedTypeExpression',
+                    mandatory: [
+                        { name: 'typeParameters', type: 'array' }
                     ]
                 };
             }
@@ -463,25 +485,49 @@ class WhackoAstReflection extends langium_1.AbstractAstReflection {
                     name: 'Program',
                     mandatory: [
                         { name: 'declarations', type: 'array' },
-                        { name: 'declares', type: 'array' },
                         { name: 'exports', type: 'array' },
                         { name: 'imports', type: 'array' }
                     ]
                 };
             }
-            case 'TypeExpression': {
+            case 'Statement': {
                 return {
-                    name: 'TypeExpression',
+                    name: 'Statement',
                     mandatory: [
-                        { name: 'typeParameters', type: 'array' }
+                        { name: 'declarators', type: 'array' },
+                        { name: 'statements', type: 'array' }
                     ]
                 };
             }
-            case 'VariableDeclarationStatement': {
+            case 'TupleExpression': {
                 return {
-                    name: 'VariableDeclarationStatement',
+                    name: 'TupleExpression',
                     mandatory: [
-                        { name: 'declarators', type: 'array' }
+                        { name: 'expressions', type: 'array' }
+                    ]
+                };
+            }
+            case 'TupleTypeExpression': {
+                return {
+                    name: 'TupleTypeExpression',
+                    mandatory: [
+                        { name: 'types', type: 'array' }
+                    ]
+                };
+            }
+            case 'YieldExpression': {
+                return {
+                    name: 'YieldExpression',
+                    mandatory: [
+                        { name: 'expressions', type: 'array' }
+                    ]
+                };
+            }
+            case 'TernaryExpression': {
+                return {
+                    name: 'TernaryExpression',
+                    mandatory: [
+                        { name: 'expressions', type: 'array' }
                     ]
                 };
             }

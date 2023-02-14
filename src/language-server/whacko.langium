@@ -1,37 +1,53 @@
 grammar Whacko
 
 entry Program:
-    (declares+=DeclareDeclaration | imports+=ImportDeclaration | exports+=ExportDeclaration | declarations+=FunctionDeclaration | declarations+=ClassDeclaration | declarations+=TypeDeclaration)*;
+    ( declarations+=DeclareDeclaration
+    | imports+=ImportDeclaration
+    | exports+=ExportDeclaration
+    | declarations+=FunctionDeclaration
+    | declarations+=ClassDeclaration
+    | declarations+=TypeDeclaration)*;
 
-DeclareDeclaration:
+DeclareDeclaration infers Declaration:
     "declare" namespace=String method=String "(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")" ":" returnType=TypeExpression ";";
 
-ImportDeclaration:
-    "import" "{" (declarators+=ImportDeclarator ("," declarators+=ImportDeclarator)* )? "}" "from" path=String ";";
+ImportDeclaration infers Declaration:
+    "import" "{" (declarators+=ImportDeclarator ("," declarators+=ImportDeclarator)*)? "}" "from" path=String ";";
 
 ImportDeclarator:
     name=ID ("as" alias=ID)?;
 
-ExportDeclaration:
+ExportDeclaration infers Declaration:
     "export" "{" declarators+=ExportDeclarator ("," declarators+=ExportDeclarator)* "}";
 
 ExportDeclarator:
     name=ID ("as" alias=ID)?;
 
-FunctionDeclaration:
+FunctionDeclaration infers Declaration:
     (async="async")? "fn" name=ID "(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")" ":" returnType=TypeExpression block=BlockStatement;
 
 Parameter:
     name=ID ":" type=ID;
 
-TypeDeclaration:
+TypeDeclaration infers Declaration:
     "type" name=ID "=" type=TypeExpression;
 
-ClassDeclaration:
+ClassDeclaration infers Declaration:
     (final="final")? "class" name=ID ("extends" extends=TypeExpression)? "{" (members+=ClassMember (members+=ClassMember)* )? "}";
 
-TypeExpression:
-    name=ID ("<" typeParameters+=ID ("," typeParameters+=ID)* ">")?;
+TypeExpression: HeldTypeExpression | FunctionTypeExpression | NamedTypeExpression | TupleTypeExpression;
+
+HeldTypeExpression: 
+    "held" type=TypeExpression;
+
+FunctionTypeExpression:
+    "(" (parameters+=TypeExpression ("," parameters+=TypeExpression)* )? ")" "=>" returnType=TypeExpression;
+
+TupleTypeExpression:
+    "(" types+=TypeExpression "," (types+=TypeExpression ("," types+=TypeExpression)* )? ")";
+
+NamedTypeExpression:
+    name=ID ("<" typeParameters+=TypeExpression ("," typeParameters+=TypeExpression)* ">")?;
 
 ClassMember:
     (members+=ConstructorClassMember | members+=FieldClassMember | members+=MethodClassMember | members+=GetterClassMember | members+=SetterClassMember);
@@ -53,40 +69,44 @@ ConstructorClassMember:
 
 Statement: BlockStatement | TypeDeclarationStatement | GrabStatement | WhileStatement | ContinueStatement | BreakStatement | IfElseStatement | ReturnStatement | ExpressionStatement | VariableDeclarationStatement;
 
-BlockStatement:
+BlockStatement infers Statement:
     "{" (statements+=Statement)* "}";
 
-TypeDeclarationStatement:
+TypeDeclarationStatement infers Statement:
     "type" name=ID "=" type=TypeExpression ";";
 
-GrabStatement:
+GrabStatement infers Statement:
     "grab" "(" heldExpression=Expression ")" statement=Statement;
 
-WhileStatement:
+WhileStatement infers Statement:
     "while" "(" expression=Expression ")" statement=Statement;
 
-ContinueStatement:
+ContinueStatement infers Statement:
     cont="continue" ";";
 
-BreakStatement:
+BreakStatement infers Statement:
     brk="break" ";";
 
-IfElseStatement:
+IfElseStatement infers Statement:
     "if" "(" condition=Expression ")" truthy=Statement ("else" falsy=Statement)?;
 
-ReturnStatement:
+ReturnStatement infers Statement:
     "return" expression=Expression ";";
 
-VariableDeclarationStatement:
+VariableDeclarationStatement infers Statement:
     declarationType=("const" | "let") declarators+=VariableDeclarator ("," declarators+=VariableDeclarator)* ";";
 
 VariableDeclarator:
     name=ID (":" type=TypeExpression)? "=" expression=Expression;
 
-ExpressionStatement:
+ExpressionStatement infers Statement:
     expression=Expression ";";
 
-Expression: YieldExpression;
+Expression: TupleExpression;
+
+TupleExpression:
+    "(" expressions+=Expression "," (expressions+=Expression ("," expressions+=Expression)* )? ")"
+    | YieldExpression;
 
 YieldExpression:
     "yield" expression=YieldExpression
@@ -96,42 +116,42 @@ TernaryExpression:
     condition=AssignmentExpression "?" truthy=TernaryExpression ":" falsy=TernaryExpression
     | AssignmentExpression;
 
-AssignmentExpression infers Expression:
-    PathExpression ({infer BinaryExpression.e1=current} op=("=" | "+=" | "-=" | "**=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | ">>>=" | "&=" | "^=" | "|=" | "&&=" | "||=" | "??=") e2=LogicalOrExpression)*
+AssignmentExpression:
+    PathExpression ({infer BinaryExpression.lhs=current} op=("=" | "+=" | "-=" | "**=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | ">>>=" | "&=" | "^=" | "|=" | "&&=" | "||=" | "??=") rhs=LogicalOrExpression)*
     | LogicalOrExpression;
 
-LogicalOrExpression infers Expression:
-    LogicalAndExpression ({infer BinaryExpression.e1=current} op=("||") e2=LogicalAndExpression)*;
+LogicalOrExpression:
+    LogicalAndExpression ({infer BinaryExpression.lhs=current} op=("||") rhs=LogicalAndExpression)*;
 
-LogicalAndExpression infers Expression:
-    BitwiseOrExpression ({infer BinaryExpression.e1=current} op=("&&") e2=BitwiseOrExpression)*;
+LogicalAndExpression:
+    BitwiseOrExpression ({infer BinaryExpression.lhs=current} op=("&&") rhs=BitwiseOrExpression)*;
 
-BitwiseOrExpression infers Expression:
-    BitwiseXOrExpression ({infer BinaryExpression.e1=current} op=("|") e2=BitwiseXOrExpression)*;
+BitwiseOrExpression:
+    BitwiseXOrExpression ({infer BinaryExpression.lhs=current} op=("|") rhs=BitwiseXOrExpression)*;
 
-BitwiseXOrExpression infers Expression:
-    BitwiseAndExpression ({infer BinaryExpression.e1=current} op=("^") e2=BitwiseAndExpression)*;
+BitwiseXOrExpression:
+    BitwiseAndExpression ({infer BinaryExpression.lhs=current} op=("^") rhs=BitwiseAndExpression)*;
 
-BitwiseAndExpression infers Expression:
-    EqualityExpression ({infer BinaryExpression.e1=current} op=("&") e2=EqualityExpression)*;
+BitwiseAndExpression:
+    EqualityExpression ({infer BinaryExpression.lhs=current} op=("&") rhs=EqualityExpression)*;
 
-EqualityExpression infers Expression:
-    ComaprisonExpression ({infer BinaryExpression.e1=current} op=("==" | "!=") e2=ComaprisonExpression)*;
+EqualityExpression:
+    ComaprisonExpression ({infer BinaryExpression.lhs=current} op=("==" | "!=") rhs=ComaprisonExpression)*;
 
-ComaprisonExpression infers Expression:
-    BitShiftExpression ({infer BinaryExpression.e1=current} op=("<=" | "<" | ">=" | ">") e2=BitShiftExpression)*;
+ComaprisonExpression:
+    BitShiftExpression ({infer BinaryExpression.lhs=current} op=("<=" | "<" | ">=" | ">") rhs=BitShiftExpression)*;
 
-BitShiftExpression infers Expression:
-    SumExpression ({infer BinaryExpression.e1=current} op=("<<" | ">>") e2=SumExpression)*;
+BitShiftExpression:
+    SumExpression ({infer BinaryExpression.lhs=current} op=("<<" | ">>") rhs=SumExpression)*;
 
-SumExpression infers Expression: 
-    ProductExpression ({infer BinaryExpression.e1=current} op=("+" | "-") e2=ProductExpression)*;
+SumExpression: 
+    ProductExpression ({infer BinaryExpression.lhs=current} op=("+" | "-") rhs=ProductExpression)*;
 
-ProductExpression infers Expression: 
-    ExponentiationExpression ({infer BinaryExpression.e1=current} op=("*" | "/" | "%") e2=ExponentiationExpression)*;
+ProductExpression: 
+    ExponentiationExpression ({infer BinaryExpression.lhs=current} op=("*" | "/" | "%") rhs=ExponentiationExpression)*;
 
-ExponentiationExpression infers Expression: 
-    LeftUnaryExpression ({infer BinaryExpression.e1=current} op="**" e2=LeftUnaryExpression)*;
+ExponentiationExpression: 
+    LeftUnaryExpression ({infer BinaryExpression.lhs=current} op="**" rhs=LeftUnaryExpression)*;
 
 LeftUnaryExpression:
     op=("!" | "-" | "+" | "~") expression=LeftUnaryExpression
@@ -146,14 +166,14 @@ HoldExpression:
     | PathExpression;
 
 PathExpression:
-    path+=PrimaryExpression (path+=NewPath | path+=MemberAccessPath | path+=ArrayAccessPath | path+=CallPath)+
+    root=PrimaryExpression (path+=NewPath | path+=MemberAccessPath | path+=ArrayAccessPath | path+=CallPath)+
     | PrimaryExpression;
 
 NewPath:
     "." "new" ("<" typeParameters+=TypeExpression ("," typeParameters+=TypeExpression)* ">")? "(" (parameters+=Expression ("," parameters+=Expression)*)? ")";
 
 MemberAccessPath:
-    "." name=ID;
+    "." member=ID;
 
 ArrayAccessPath:
     "[" expression=Expression "]";
