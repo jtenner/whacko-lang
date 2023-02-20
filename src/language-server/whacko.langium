@@ -8,32 +8,32 @@ entry Program:
     | declarations+=ClassDeclaration
     | declarations+=TypeDeclaration)*;
 
-DeclareDeclaration infers Declaration:
+DeclareDeclaration:
     "declare" namespace=String method=String "(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")" ":" returnType=TypeExpression ";";
 
-ImportDeclaration infers Declaration:
+ImportDeclaration:
     "import" "{" (declarators+=ImportDeclarator ("," declarators+=ImportDeclarator)*)? "}" "from" path=String ";";
 
 ImportDeclarator:
     name=ID ("as" alias=ID)?;
 
-ExportDeclaration infers Declaration:
+ExportDeclaration:
     "export" "{" declarators+=ExportDeclarator ("," declarators+=ExportDeclarator)* "}";
 
 ExportDeclarator:
     name=ID ("as" alias=ID)?;
 
-FunctionDeclaration infers Declaration:
+FunctionDeclaration:
     (async="async")? "fn" name=ID "(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")" ":" returnType=TypeExpression block=BlockStatement;
 
 Parameter:
     name=ID ":" type=ID;
 
-TypeDeclaration infers Declaration:
+TypeDeclaration:
     "type" name=ID "=" type=TypeExpression;
 
-ClassDeclaration infers Declaration:
-    (final="final")? "class" name=ID ("extends" extends=TypeExpression)? "{" (members+=ClassMember (members+=ClassMember)* )? "}";
+ClassDeclaration:
+    (final="final")? "class" name=ID ("extends" extends=TypeExpression)? "{" members+=ClassMember* "}";
 
 TypeExpression: HeldTypeExpression | FunctionTypeExpression | NamedTypeExpression | TupleTypeExpression;
 
@@ -49,8 +49,7 @@ TupleTypeExpression:
 NamedTypeExpression:
     name=ID ("<" typeParameters+=TypeExpression ("," typeParameters+=TypeExpression)* ">")?;
 
-ClassMember:
-    (members+=ConstructorClassMember | members+=FieldClassMember | members+=MethodClassMember | members+=GetterClassMember | members+=SetterClassMember);
+ClassMember: ConstructorClassMember | FieldClassMember | MethodClassMember | GetterClassMember | SetterClassMember;
 
 FieldClassMember:
     (private="private")? name=ID ":" type=TypeExpression ("=" initializer=Expression)? ";";
@@ -69,37 +68,37 @@ ConstructorClassMember:
 
 Statement: BlockStatement | TypeDeclarationStatement | GrabStatement | WhileStatement | ContinueStatement | BreakStatement | IfElseStatement | ReturnStatement | ExpressionStatement | VariableDeclarationStatement;
 
-BlockStatement infers Statement:
+BlockStatement:
     "{" (statements+=Statement)* "}";
 
-TypeDeclarationStatement infers Statement:
+TypeDeclarationStatement:
     "type" name=ID "=" type=TypeExpression ";";
 
-GrabStatement infers Statement:
+GrabStatement:
     "grab" "(" heldExpression=Expression ")" statement=Statement;
 
-WhileStatement infers Statement:
+WhileStatement:
     "while" "(" expression=Expression ")" statement=Statement;
 
-ContinueStatement infers Statement:
+ContinueStatement:
     cont="continue" ";";
 
-BreakStatement infers Statement:
+BreakStatement:
     brk="break" ";";
 
-IfElseStatement infers Statement:
+IfElseStatement:
     "if" "(" condition=Expression ")" truthy=Statement ("else" falsy=Statement)?;
 
-ReturnStatement infers Statement:
+ReturnStatement:
     "return" expression=Expression ";";
 
-VariableDeclarationStatement infers Statement:
+VariableDeclarationStatement:
     declarationType=("const" | "let") declarators+=VariableDeclarator ("," declarators+=VariableDeclarator)* ";";
 
 VariableDeclarator:
     name=ID (":" type=TypeExpression)? "=" expression=Expression;
 
-ExpressionStatement infers Statement:
+ExpressionStatement:
     expression=Expression ";";
 
 Expression: TupleExpression;
@@ -179,7 +178,7 @@ ArrayAccessPath:
     "[" expression=Expression "]";
 
 CallPath:
-    ("<" typeParameters+=TypeExpression ("," typeParameters+=TypeExpression)* ">")? "(" ")";
+    ("<" typeParameters+=TypeExpression ("," typeParameters+=TypeExpression)* ">")? "(" (parameters+=Expression ("," parameters+=Expression)*)? ")";
 
 PrimaryExpression: GroupLiteral | ID | FloatLiteral | IntegerLiteral | HexLiteral | BinaryLiteral | OctalLiteral | StringLiteral | FalseLiteral | TrueLiteral | NullLiteral | ThisLiteral | SuperLiteral | AsyncBlockLiteral;
 
@@ -220,7 +219,7 @@ SuperLiteral:
     super="super";
 
 AsyncBlockLiteral:
-    "async" ("<" type=TypeExpression ">")? "{" statements+=Statement* "}";
+    "async" ("<" type=TypeExpression ">")? block=BlockStatement;
 
 ID:
     name=Identifier;

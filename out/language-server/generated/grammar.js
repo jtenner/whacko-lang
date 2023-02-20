@@ -103,10 +103,6 @@ const WhackoGrammar = () => loadedWhackoGrammar ?? (loadedWhackoGrammar = (0, la
     {
       "$type": "ParserRule",
       "name": "DeclareDeclaration",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Declaration"
-      },
       "definition": {
         "$type": "Group",
         "elements": [
@@ -218,10 +214,6 @@ const WhackoGrammar = () => loadedWhackoGrammar ?? (loadedWhackoGrammar = (0, la
     {
       "$type": "ParserRule",
       "name": "ImportDeclaration",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Declaration"
-      },
       "definition": {
         "$type": "Group",
         "elements": [
@@ -358,10 +350,6 @@ const WhackoGrammar = () => loadedWhackoGrammar ?? (loadedWhackoGrammar = (0, la
     {
       "$type": "ParserRule",
       "name": "ExportDeclaration",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Declaration"
-      },
       "definition": {
         "$type": "Group",
         "elements": [
@@ -472,10 +460,6 @@ const WhackoGrammar = () => loadedWhackoGrammar ?? (loadedWhackoGrammar = (0, la
     {
       "$type": "ParserRule",
       "name": "FunctionDeclaration",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Declaration"
-      },
       "definition": {
         "$type": "Group",
         "elements": [
@@ -636,10 +620,6 @@ const WhackoGrammar = () => loadedWhackoGrammar ?? (loadedWhackoGrammar = (0, la
     {
       "$type": "ParserRule",
       "name": "TypeDeclaration",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Declaration"
-      },
       "definition": {
         "$type": "Group",
         "elements": [
@@ -687,10 +667,6 @@ const WhackoGrammar = () => loadedWhackoGrammar ?? (loadedWhackoGrammar = (0, la
     {
       "$type": "ParserRule",
       "name": "ClassDeclaration",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Declaration"
-      },
       "definition": {
         "$type": "Group",
         "elements": [
@@ -747,35 +723,17 @@ const WhackoGrammar = () => loadedWhackoGrammar ?? (loadedWhackoGrammar = (0, la
             "value": "{"
           },
           {
-            "$type": "Group",
-            "elements": [
-              {
-                "$type": "Assignment",
-                "feature": "members",
-                "operator": "+=",
-                "terminal": {
-                  "$type": "RuleCall",
-                  "rule": {
-                    "$ref": "#/rules@15"
-                  },
-                  "arguments": []
-                }
+            "$type": "Assignment",
+            "feature": "members",
+            "operator": "+=",
+            "terminal": {
+              "$type": "RuleCall",
+              "rule": {
+                "$ref": "#/rules@15"
               },
-              {
-                "$type": "Assignment",
-                "feature": "members",
-                "operator": "+=",
-                "terminal": {
-                  "$type": "RuleCall",
-                  "rule": {
-                    "$ref": "#/rules@15"
-                  },
-                  "arguments": []
-                },
-                "cardinality": "*"
-              }
-            ],
-            "cardinality": "?"
+              "arguments": []
+            },
+            "cardinality": "*"
           },
           {
             "$type": "Keyword",
@@ -1104,64 +1062,39 @@ const WhackoGrammar = () => loadedWhackoGrammar ?? (loadedWhackoGrammar = (0, la
         "$type": "Alternatives",
         "elements": [
           {
-            "$type": "Assignment",
-            "feature": "members",
-            "operator": "+=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@20"
-              },
-              "arguments": []
-            }
+            "$type": "RuleCall",
+            "rule": {
+              "$ref": "#/rules@20"
+            },
+            "arguments": []
           },
           {
-            "$type": "Assignment",
-            "feature": "members",
-            "operator": "+=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@16"
-              },
-              "arguments": []
-            }
+            "$type": "RuleCall",
+            "rule": {
+              "$ref": "#/rules@16"
+            },
+            "arguments": []
           },
           {
-            "$type": "Assignment",
-            "feature": "members",
-            "operator": "+=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@17"
-              },
-              "arguments": []
-            }
+            "$type": "RuleCall",
+            "rule": {
+              "$ref": "#/rules@17"
+            },
+            "arguments": []
           },
           {
-            "$type": "Assignment",
-            "feature": "members",
-            "operator": "+=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@18"
-              },
-              "arguments": []
-            }
+            "$type": "RuleCall",
+            "rule": {
+              "$ref": "#/rules@18"
+            },
+            "arguments": []
           },
           {
-            "$type": "Assignment",
-            "feature": "members",
-            "operator": "+=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@19"
-              },
-              "arguments": []
-            }
+            "$type": "RuleCall",
+            "rule": {
+              "$ref": "#/rules@19"
+            },
+            "arguments": []
           }
         ]
       },
@@ -1683,10 +1616,6 @@ const WhackoGrammar = () => loadedWhackoGrammar ?? (loadedWhackoGrammar = (0, la
     {
       "$type": "ParserRule",
       "name": "BlockStatement",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Statement"
-      },
       "definition": {
         "$type": "Group",
         "elements": [
@@ -1723,10 +1652,6 @@ const WhackoGrammar = () => loadedWhackoGrammar ?? (loadedWhackoGrammar = (0, la
     {
       "$type": "ParserRule",
       "name": "TypeDeclarationStatement",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Statement"
-      },
       "definition": {
         "$type": "Group",
         "elements": [
@@ -1778,10 +1703,6 @@ const WhackoGrammar = () => loadedWhackoGrammar ?? (loadedWhackoGrammar = (0, la
     {
       "$type": "ParserRule",
       "name": "GrabStatement",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Statement"
-      },
       "definition": {
         "$type": "Group",
         "elements": [
@@ -1833,10 +1754,6 @@ const WhackoGrammar = () => loadedWhackoGrammar ?? (loadedWhackoGrammar = (0, la
     {
       "$type": "ParserRule",
       "name": "WhileStatement",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Statement"
-      },
       "definition": {
         "$type": "Group",
         "elements": [
@@ -1888,10 +1805,6 @@ const WhackoGrammar = () => loadedWhackoGrammar ?? (loadedWhackoGrammar = (0, la
     {
       "$type": "ParserRule",
       "name": "ContinueStatement",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Statement"
-      },
       "definition": {
         "$type": "Group",
         "elements": [
@@ -1920,10 +1833,6 @@ const WhackoGrammar = () => loadedWhackoGrammar ?? (loadedWhackoGrammar = (0, la
     {
       "$type": "ParserRule",
       "name": "BreakStatement",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Statement"
-      },
       "definition": {
         "$type": "Group",
         "elements": [
@@ -1952,10 +1861,6 @@ const WhackoGrammar = () => loadedWhackoGrammar ?? (loadedWhackoGrammar = (0, la
     {
       "$type": "ParserRule",
       "name": "IfElseStatement",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Statement"
-      },
       "definition": {
         "$type": "Group",
         "elements": [
@@ -2029,10 +1934,6 @@ const WhackoGrammar = () => loadedWhackoGrammar ?? (loadedWhackoGrammar = (0, la
     {
       "$type": "ParserRule",
       "name": "ReturnStatement",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Statement"
-      },
       "definition": {
         "$type": "Group",
         "elements": [
@@ -2068,10 +1969,6 @@ const WhackoGrammar = () => loadedWhackoGrammar ?? (loadedWhackoGrammar = (0, la
     {
       "$type": "ParserRule",
       "name": "VariableDeclarationStatement",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Statement"
-      },
       "definition": {
         "$type": "Group",
         "elements": [
@@ -2208,10 +2105,6 @@ const WhackoGrammar = () => loadedWhackoGrammar ?? (loadedWhackoGrammar = (0, la
     {
       "$type": "ParserRule",
       "name": "ExpressionStatement",
-      "inferredType": {
-        "$type": "InferredType",
-        "name": "Statement"
-      },
       "definition": {
         "$type": "Group",
         "elements": [
@@ -3780,6 +3673,46 @@ const WhackoGrammar = () => loadedWhackoGrammar ?? (loadedWhackoGrammar = (0, la
             "value": "("
           },
           {
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Assignment",
+                "feature": "parameters",
+                "operator": "+=",
+                "terminal": {
+                  "$type": "RuleCall",
+                  "rule": {
+                    "$ref": "#/rules@33"
+                  },
+                  "arguments": []
+                }
+              },
+              {
+                "$type": "Group",
+                "elements": [
+                  {
+                    "$type": "Keyword",
+                    "value": ","
+                  },
+                  {
+                    "$type": "Assignment",
+                    "feature": "parameters",
+                    "operator": "+=",
+                    "terminal": {
+                      "$type": "RuleCall",
+                      "rule": {
+                        "$ref": "#/rules@33"
+                      },
+                      "arguments": []
+                    }
+                  }
+                ],
+                "cardinality": "*"
+              }
+            ],
+            "cardinality": "?"
+          },
+          {
             "$type": "Keyword",
             "value": ")"
           }
@@ -4204,25 +4137,16 @@ const WhackoGrammar = () => loadedWhackoGrammar ?? (loadedWhackoGrammar = (0, la
             "cardinality": "?"
           },
           {
-            "$type": "Keyword",
-            "value": "{"
-          },
-          {
             "$type": "Assignment",
-            "feature": "statements",
-            "operator": "+=",
+            "feature": "block",
+            "operator": "=",
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@21"
+                "$ref": "#/rules@22"
               },
               "arguments": []
-            },
-            "cardinality": "*"
-          },
-          {
-            "$type": "Keyword",
-            "value": "}"
+            }
           }
         ]
       },
