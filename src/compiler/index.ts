@@ -1,5 +1,3 @@
-import { Expression } from "../language-server/generated/ast";
-
 export const enum DefineExpressionResultType {
   Success,
   AlreadyExists,
@@ -15,6 +13,8 @@ export const enum DefineTypeResultType {
   Success,
   AlreadyExists,
 }
+
+export abstract class Node {}
 
 export class Scope {
   parent: Scope | null = null;
@@ -57,8 +57,21 @@ export class Scope {
   }
 }
 
-export class TypeNode {
-  constructor(public typeParameters: TypeParameter[]) {}
+export const enum TypeNodeType {
+  None,
+  Function,
+  Tuple,
+  Named,
+  Class,
+}
+
+export class TypeNode extends Node {
+  constructor(
+    public ty: TypeNodeType,
+    public typeParameters: TypeParameter[],
+  ) {
+    super();
+  }
 
   getConcreteType(typeParameters: ConcreteType[] | null): ConcreteType {
     if (typeParameters !== null) throw new Error("Not implemented.");
@@ -97,8 +110,10 @@ export class CompiledParameter {
   constructor(public name: string, public ty: ConcreteType) {}
 }
 
-export abstract class ExpressionNode {
-  constructor(public ty: ConcreteType) {};
+export abstract class ExpressionNode extends Node {
+  constructor(public ty: ConcreteType) {
+    super();
+  }
 }
 
 export class CompiledExpressionNode extends ExpressionNode {
@@ -150,4 +165,22 @@ export namespace PrimitiveTypes {
   export const f64 = new ConcreteType();
   export const isize = new ConcreteType();
   export const usize = new ConcreteType();
+}
+
+export class NamespaceNode extends Node {
+  exports = new Map<string, Node>();
+}
+
+
+export class WhackoModule {
+  exports = new Map<string, Node>();
+  constructor(
+    public location: string,
+  ) {}
+}
+
+export class WhackoProgram {
+  modules = new Map<string, WhackoModule>()
+
+  constructor() {}
 }

@@ -259,6 +259,9 @@ export class WhackoVisitor {
 
   visitTypeDeclaration(node: TypeDeclaration) {
     this.visit(node.name);
+    for (const typeParameter of node.typeParameters) {
+      this.visit(typeParameter);
+    }
     this.visit(node.type);
   }
 
@@ -336,6 +339,9 @@ export class WhackoVisitor {
 
   visitTypeDeclarationStatement(node: TypeDeclarationStatement) {
     this.visit(node.name);
+    for (const typeParameter of node.typeParameters) {
+      this.visit(typeParameter);
+    }
     this.visit(node.type);
   }
 

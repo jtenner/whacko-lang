@@ -30,7 +30,7 @@ Parameter:
     name=ID ":" type=ID;
 
 TypeDeclaration:
-    "type" name=ID "=" type=TypeExpression;
+    "type" name=ID ("<" typeParameters+=ID ("," typeParameters+=ID)* ">")? "=" type=TypeExpression;
 
 ClassDeclaration:
     (final="final")? "class" name=ID ("extends" extends=TypeExpression)? "{" members+=ClassMember* "}";
@@ -72,7 +72,7 @@ BlockStatement:
     "{" (statements+=Statement)* "}";
 
 TypeDeclarationStatement:
-    "type" name=ID "=" type=TypeExpression ";";
+    "type" name=ID ("<" typeParameters+=ID ("," typeParameters+=ID)* ">")? "=" type=TypeExpression ";";
 
 GrabStatement:
     "grab" "(" heldExpression=Expression ")" statement=Statement;
