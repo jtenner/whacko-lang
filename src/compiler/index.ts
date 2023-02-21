@@ -40,7 +40,7 @@ export class Scope {
   setExpression(name: string, assign: ExpressionNode): SetExpressionResultType {
     if (this.expressions.has(name)) {
       let expression = this.expressions.get(name);
-      if (assign.isAssignableTo(expression)) {
+      if (assign.type.isAssignableTo(expression.type)) {
         this.expressions.set(name, assign);
         return SetExpressionResultType.Success;
       }
@@ -97,17 +97,19 @@ export class CompiledParameter {
   constructor(public name: string, public ty: ConcreteType) {}
 }
 
-export abstract class ExpressionNode {}
+export abstract class ExpressionNode {
+  constructor(public ty: ConcreteType) {};
+}
 
 export class CompiledExpressionNode extends ExpressionNode {
-  constructor(public ref: LLVM.ValueRef, public ty: ConcreteType) {
-    super();
+  constructor(public ref: LLVM.ValueRef, ty: ConcreteType) {
+    super(ty);
   }
 }
 
 export class StaticExpressionNode extends ExpressionNode {
-  constructor(public value: StaticValue, public type: ConcreteType) {
-    super();
+  constructor(public value: StaticValue, ty: ConcreteType) {
+    super(ty);
   }
 }
 
