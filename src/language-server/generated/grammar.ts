@@ -3,10 +3,12 @@
  * DO NOT EDIT MANUALLY!
  ******************************************************************************/
 
-import { loadGrammarFromJson, Grammar } from 'langium';
+import { loadGrammarFromJson, Grammar } from "langium";
 
 let loadedWhackoGrammar: Grammar | undefined;
-export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhackoGrammar = loadGrammarFromJson(`{
+export const WhackoGrammar = (): Grammar =>
+  loadedWhackoGrammar ??
+  (loadedWhackoGrammar = loadGrammarFromJson(`{
   "$type": "Grammar",
   "isDeclared": true,
   "name": "Whacko",

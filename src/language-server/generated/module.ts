@@ -3,22 +3,35 @@
  * DO NOT EDIT MANUALLY!
  ******************************************************************************/
 
-import { LangiumGeneratedServices, LangiumGeneratedSharedServices, LangiumSharedServices, LangiumServices, LanguageMetaData, Module } from 'langium';
-import { WhackoAstReflection } from './ast';
-import { WhackoGrammar } from './grammar';
+import {
+  LangiumGeneratedServices,
+  LangiumGeneratedSharedServices,
+  LangiumSharedServices,
+  LangiumServices,
+  LanguageMetaData,
+  Module,
+} from "langium";
+import { WhackoAstReflection } from "./ast";
+import { WhackoGrammar } from "./grammar";
 
 export const WhackoLanguageMetaData: LanguageMetaData = {
-    languageId: 'whacko',
-    fileExtensions: ['.wo'],
-    caseInsensitive: false
+  languageId: "whacko",
+  fileExtensions: [".wo"],
+  caseInsensitive: false,
 };
 
-export const WhackoGeneratedSharedModule: Module<LangiumSharedServices, LangiumGeneratedSharedServices> = {
-    AstReflection: () => new WhackoAstReflection()
+export const WhackoGeneratedSharedModule: Module<
+  LangiumSharedServices,
+  LangiumGeneratedSharedServices
+> = {
+  AstReflection: () => new WhackoAstReflection(),
 };
 
-export const WhackoGeneratedModule: Module<LangiumServices, LangiumGeneratedServices> = {
-    Grammar: () => WhackoGrammar(),
-    LanguageMetaData: () => WhackoLanguageMetaData,
-    parser: {}
+export const WhackoGeneratedModule: Module<
+  LangiumServices,
+  LangiumGeneratedServices
+> = {
+  Grammar: () => WhackoGrammar(),
+  LanguageMetaData: () => WhackoLanguageMetaData,
+  parser: {},
 };

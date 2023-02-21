@@ -27,8 +27,12 @@ export class Scope {
     return scope;
   }
 
-  defineExpression(name: string, expression: ExpressionNode): DefineExpressionResultType {
-    if (this.expressions.has(name)) return DefineExpressionResultType.AlreadyExists;
+  defineExpression(
+    name: string,
+    expression: ExpressionNode
+  ): DefineExpressionResultType {
+    if (this.expressions.has(name))
+      return DefineExpressionResultType.AlreadyExists;
     this.expressions.set(name, expression);
     return DefineExpressionResultType.Success;
   }
@@ -46,7 +50,7 @@ export class Scope {
     return SetExpressionResultType.NotFound;
   }
 
-  defineType(name: string, type: TypeNode): DefineTypeResultType { 
+  defineType(name: string, type: TypeNode): DefineTypeResultType {
     if (this.types.has(name)) return DefineTypeResultType.AlreadyExists;
     this.types.set(name, type);
     return DefineTypeResultType.Success;
@@ -54,37 +58,24 @@ export class Scope {
 }
 
 export class TypeNode {
-  constructor(
-    public typeParameters: TypeParameter[],
-  ) {}
+  constructor(public typeParameters: TypeParameter[]) {}
 
   getConcreteType(typeParameters: ConcreteType[] | null): ConcreteType {
-    if (typeParameters !== null)  throw new Error("Not implemented.");
+    if (typeParameters !== null) throw new Error("Not implemented.");
     return new ConcreteType();
   }
 }
 
 export class TypeParameter {
-  constructor(
-    public name: string,
-    public defaultType: ConcreteType,
-  ) {
-
-  }
+  constructor(public name: string, public defaultType: ConcreteType) {}
 }
 
 export class SignatureParameter {
-  constructor(
-    public ty: ConcreteType,
-    public name: string,
-  ) {}
+  constructor(public ty: ConcreteType, public name: string) {}
 }
 
 export class Signature {
-  constructor(
-    parameters: SignatureParameter[],
-    returnType: ConcreteType,
-  ) {}
+  constructor(parameters: SignatureParameter[], returnType: ConcreteType) {}
 }
 
 export class ConcreteType {
@@ -95,42 +86,27 @@ export class ConcreteType {
 }
 
 export class CompiledField {
-  constructor(
-    public name: string,
-    public offset: number,
-  ) {}
+  constructor(public name: string, public offset: number) {}
 }
 
 export class CompiledMethod {
-  constructor (
-    public ref: LLVM.FuncRef,
-    public params: CompiledParameter[],
-  ) {}
+  constructor(public ref: LLVM.FuncRef, public params: CompiledParameter[]) {}
 }
 
 export class CompiledParameter {
-  constructor(
-    public name: string,
-    public ty: ConcreteType,
-  ) {}
+  constructor(public name: string, public ty: ConcreteType) {}
 }
 
 export abstract class ExpressionNode {}
 
 export class CompiledExpressionNode extends ExpressionNode {
-  constructor(
-    public ref: LLVM.ValueRef,
-    public ty: ConcreteType,
-  ) {
+  constructor(public ref: LLVM.ValueRef, public ty: ConcreteType) {
     super();
   }
 }
 
-export class StaticExpressionNode extends ExpressionNode  {
-  constructor(
-    public value: StaticValue,
-    public type: ConcreteType,
-  ) {
+export class StaticExpressionNode extends ExpressionNode {
+  constructor(public value: StaticValue, public type: ConcreteType) {
     super();
   }
 }
@@ -140,31 +116,22 @@ export abstract class StaticValue {
 }
 
 export class StaticStringValue extends StaticValue {
-  constructor(
-    public value: string,
-  ) {
+  constructor(public value: string) {
     super(PrimitiveTypes.String);
   }
 }
 
 export class StaticIntegerValue extends StaticValue {
-  constructor(
-    public value: BigInt,
-    ty: ConcreteType = PrimitiveTypes.i32,
-  ) {
+  constructor(public value: BigInt, ty: ConcreteType = PrimitiveTypes.i32) {
     super(ty);
   }
 }
 
 export class StaticFloatValue extends StaticValue {
-  constructor(
-    public value: number,
-    ty: ConcreteType = PrimitiveTypes.f64,
-  ) {
+  constructor(public value: number, ty: ConcreteType = PrimitiveTypes.f64) {
     super(ty);
   }
 }
-
 
 export namespace PrimitiveTypes {
   export const Void = new ConcreteType();
@@ -182,4 +149,3 @@ export namespace PrimitiveTypes {
   export const isize = new ConcreteType();
   export const usize = new ConcreteType();
 }
-

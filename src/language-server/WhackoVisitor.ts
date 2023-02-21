@@ -1,6 +1,66 @@
 import { AstNode, isAstNode } from "langium";
 import { NodeFileSystem } from "langium/node";
-import { isExpression, isStatement, Program, DeclareDeclaration, ImportDeclaration, ExportDeclaration, ExportDeclarator, ImportDeclarator, FunctionDeclaration, Parameter, TypeDeclaration, ClassDeclaration, TypeExpression, HeldTypeExpression, FunctionTypeExpression, TupleTypeExpression, NamedTypeExpression, FieldClassMember, MethodClassMember, GetterClassMember, SetterClassMember, ConstructorClassMember, BlockStatement, TypeDeclarationStatement, GrabStatement, WhileStatement, ContinueStatement, BreakStatement, IfElseStatement, ReturnStatement, VariableDeclarationStatement, VariableDeclarator, ExpressionStatement, TupleExpression, YieldExpression, TernaryExpression, BinaryExpression, LeftUnaryExpression, AwaitExpression, HoldExpression, PathExpression, NewPath, MemberAccessPath, ArrayAccessPath, CallPath, GroupLiteral, FloatLiteral, BinaryLiteral, HexLiteral, IntegerLiteral, OctalLiteral, StringLiteral, FalseLiteral, TrueLiteral, NullLiteral, ThisLiteral, SuperLiteral, AsyncBlockLiteral, ID } from "./generated/ast";
+import {
+  isExpression,
+  isStatement,
+  Program,
+  DeclareDeclaration,
+  ImportDeclaration,
+  ExportDeclaration,
+  ExportDeclarator,
+  ImportDeclarator,
+  FunctionDeclaration,
+  Parameter,
+  TypeDeclaration,
+  ClassDeclaration,
+  TypeExpression,
+  HeldTypeExpression,
+  FunctionTypeExpression,
+  TupleTypeExpression,
+  NamedTypeExpression,
+  FieldClassMember,
+  MethodClassMember,
+  GetterClassMember,
+  SetterClassMember,
+  ConstructorClassMember,
+  BlockStatement,
+  TypeDeclarationStatement,
+  GrabStatement,
+  WhileStatement,
+  ContinueStatement,
+  BreakStatement,
+  IfElseStatement,
+  ReturnStatement,
+  VariableDeclarationStatement,
+  VariableDeclarator,
+  ExpressionStatement,
+  TupleExpression,
+  YieldExpression,
+  TernaryExpression,
+  BinaryExpression,
+  LeftUnaryExpression,
+  AwaitExpression,
+  HoldExpression,
+  PathExpression,
+  NewPath,
+  MemberAccessPath,
+  ArrayAccessPath,
+  CallPath,
+  GroupLiteral,
+  FloatLiteral,
+  BinaryLiteral,
+  HexLiteral,
+  IntegerLiteral,
+  OctalLiteral,
+  StringLiteral,
+  FalseLiteral,
+  TrueLiteral,
+  NullLiteral,
+  ThisLiteral,
+  SuperLiteral,
+  AsyncBlockLiteral,
+  ID,
+} from "./generated/ast";
 import { createWhackoServices, WhackoServices } from "./whacko-module";
 
 const declarations = new Set([
@@ -19,66 +79,123 @@ function isDeclaration(node: any) {
 export class WhackoVisitor {
   private revisit: boolean = false;
   private currentNode: AstNode | null = null;
-  private services: WhackoServices = createWhackoServices(NodeFileSystem).Whacko;
+  private services: WhackoServices =
+    createWhackoServices(NodeFileSystem).Whacko;
 
   visit(node: any) {
-    switch(node.$type) {
-      case "Program": return this.visitProgram(node);
-      case "DeclareDeclaration": return this.visitDeclareDeclaration(node);
-      case "ImportDeclaration": return this.visitImportDeclaration(node);
-      case "ImportDeclarator": return this.visitImportDeclarator(node);
-      case "ExportDeclaration": return this.visitExportDeclaration(node);
-      case "ExportDeclarator": return this.visitExportDeclarator(node);
-      case "FunctionDeclaration": return this.visitFunctionDeclaration(node);
-      case "Parameter": return this.visitParameter(node);
-      case "TypeDeclaration": return this.visitTypeDeclaration(node);
-      case "ClassDeclaration": return this.visitClassDeclaration(node);
-      case "HeldTypeExpression": return this.visitHeldTypeExpression(node);
-      case "FunctionTypeExpression": return this.visitFunctionTypeExpression(node);
-      case "TupleTypeExpression": return this.visitTupleTypeExpression(node);
-      case "NamedTypeExpression": return this.visitNamedTypeExpression(node);
-      case "FieldClassMember": return this.visitFieldClassMember(node);
-      case "MethodClassMember": return this.visitMethodClassMember(node);
-      case "GetterClassMember": return this.visitGetterClassMember(node);
-      case "SetterClassMember": return this.visitSetterClassMember(node);
-      case "ConstructorClassMember": return this.visitConstructorClassMember(node);
-      case "BlockStatement": return this.visitBlockStatement(node);
-      case "TypeDeclarationStatement": return this.visitTypeDeclarationStatement(node);
-      case "GrabStatement": return this.visitGrabStatement(node);
-      case "WhileStatement": return this.visitWhileStatement(node);
-      case "ContinueStatement": return this.visitContinueStatement(node);
-      case "BreakStatement": return this.visitBreakStatement(node);
-      case "IfElseStatement": return this.visitIfElseStatement(node);
-      case "ReturnStatement": return this.visitReturnStatement(node);
-      case "VariableDeclarationStatement": return this.visitVariableDeclarationStatement(node);
-      case "VariableDeclarator": return this.visitVariableDeclarator(node);
-      case "ExpressionStatement": return this.visitExpressionStatement(node);
-      case "TupleExpression": return this.visitTupleExpression(node);
-      case "YieldExpression": return this.visitYieldExpression(node);
-      case "TernaryExpression": return this.visitTernaryExpression(node);
-      case "BinaryExpression": return this.visitBinaryExpression(node);
-      case "LeftUnaryExpression": return this.visitLeftUnaryExpression(node);
-      case "AwaitExpression": return this.visitAwaitExpression(node);
-      case "HoldExpression": return this.visitHoldExpression(node);
-      case "PathExpression": return this.visitPathExpression(node);
-      case "NewPath": return this.visitNewPath(node);
-      case "MemberAccessPath": return this.visitMemberAccessPath(node);
-      case "ArrayAccessPath": return this.visitArrayAccessPath(node);
-      case "CallPath": return this.visitCallPath(node);
-      case "GroupLiteral": return this.visitGroupLiteral(node);
-      case "FloatLiteral": return this.visitFloatLiteral(node);
-      case "IntegerLiteral": return this.visitIntegerLiteral(node);
-      case "HexLiteral": return this.visitHexLiteral(node);
-      case "BinaryLiteral": return this.visitBinaryLiteral(node);
-      case "OctalLiteral": return this.visitOctalLiteral(node);
-      case "StringLiteral": return this.visitStringLiteral(node);
-      case "FalseLiteral": return this.visitFalseLiteral(node);
-      case "TrueLiteral": return this.visitTrueLiteral(node);
-      case "NullLiteral": return this.visitNullLiteral(node);
-      case "ThisLiteral": return this.visitThisLiteral(node);
-      case "SuperLiteral": return this.visitSuperLiteral(node);
-      case "AsyncBlockLiteral": return this.visitAsyncBlockLiteral(node);
-      case "ID": return this.visitIdentifier(node);
+    switch (node.$type) {
+      case "Program":
+        return this.visitProgram(node);
+      case "DeclareDeclaration":
+        return this.visitDeclareDeclaration(node);
+      case "ImportDeclaration":
+        return this.visitImportDeclaration(node);
+      case "ImportDeclarator":
+        return this.visitImportDeclarator(node);
+      case "ExportDeclaration":
+        return this.visitExportDeclaration(node);
+      case "ExportDeclarator":
+        return this.visitExportDeclarator(node);
+      case "FunctionDeclaration":
+        return this.visitFunctionDeclaration(node);
+      case "Parameter":
+        return this.visitParameter(node);
+      case "TypeDeclaration":
+        return this.visitTypeDeclaration(node);
+      case "ClassDeclaration":
+        return this.visitClassDeclaration(node);
+      case "HeldTypeExpression":
+        return this.visitHeldTypeExpression(node);
+      case "FunctionTypeExpression":
+        return this.visitFunctionTypeExpression(node);
+      case "TupleTypeExpression":
+        return this.visitTupleTypeExpression(node);
+      case "NamedTypeExpression":
+        return this.visitNamedTypeExpression(node);
+      case "FieldClassMember":
+        return this.visitFieldClassMember(node);
+      case "MethodClassMember":
+        return this.visitMethodClassMember(node);
+      case "GetterClassMember":
+        return this.visitGetterClassMember(node);
+      case "SetterClassMember":
+        return this.visitSetterClassMember(node);
+      case "ConstructorClassMember":
+        return this.visitConstructorClassMember(node);
+      case "BlockStatement":
+        return this.visitBlockStatement(node);
+      case "TypeDeclarationStatement":
+        return this.visitTypeDeclarationStatement(node);
+      case "GrabStatement":
+        return this.visitGrabStatement(node);
+      case "WhileStatement":
+        return this.visitWhileStatement(node);
+      case "ContinueStatement":
+        return this.visitContinueStatement(node);
+      case "BreakStatement":
+        return this.visitBreakStatement(node);
+      case "IfElseStatement":
+        return this.visitIfElseStatement(node);
+      case "ReturnStatement":
+        return this.visitReturnStatement(node);
+      case "VariableDeclarationStatement":
+        return this.visitVariableDeclarationStatement(node);
+      case "VariableDeclarator":
+        return this.visitVariableDeclarator(node);
+      case "ExpressionStatement":
+        return this.visitExpressionStatement(node);
+      case "TupleExpression":
+        return this.visitTupleExpression(node);
+      case "YieldExpression":
+        return this.visitYieldExpression(node);
+      case "TernaryExpression":
+        return this.visitTernaryExpression(node);
+      case "BinaryExpression":
+        return this.visitBinaryExpression(node);
+      case "LeftUnaryExpression":
+        return this.visitLeftUnaryExpression(node);
+      case "AwaitExpression":
+        return this.visitAwaitExpression(node);
+      case "HoldExpression":
+        return this.visitHoldExpression(node);
+      case "PathExpression":
+        return this.visitPathExpression(node);
+      case "NewPath":
+        return this.visitNewPath(node);
+      case "MemberAccessPath":
+        return this.visitMemberAccessPath(node);
+      case "ArrayAccessPath":
+        return this.visitArrayAccessPath(node);
+      case "CallPath":
+        return this.visitCallPath(node);
+      case "GroupLiteral":
+        return this.visitGroupLiteral(node);
+      case "FloatLiteral":
+        return this.visitFloatLiteral(node);
+      case "IntegerLiteral":
+        return this.visitIntegerLiteral(node);
+      case "HexLiteral":
+        return this.visitHexLiteral(node);
+      case "BinaryLiteral":
+        return this.visitBinaryLiteral(node);
+      case "OctalLiteral":
+        return this.visitOctalLiteral(node);
+      case "StringLiteral":
+        return this.visitStringLiteral(node);
+      case "FalseLiteral":
+        return this.visitFalseLiteral(node);
+      case "TrueLiteral":
+        return this.visitTrueLiteral(node);
+      case "NullLiteral":
+        return this.visitNullLiteral(node);
+      case "ThisLiteral":
+        return this.visitThisLiteral(node);
+      case "SuperLiteral":
+        return this.visitSuperLiteral(node);
+      case "AsyncBlockLiteral":
+        return this.visitAsyncBlockLiteral(node);
+      case "ID":
+        return this.visitIdentifier(node);
     }
   }
 
@@ -144,7 +261,7 @@ export class WhackoVisitor {
     this.visit(node.name);
     this.visit(node.type);
   }
-  
+
   visitClassDeclaration(node: ClassDeclaration) {
     this.visit(node.name);
     if (node.extends) this.visit(node.extends);
@@ -257,7 +374,7 @@ export class WhackoVisitor {
     if (node.type) this.visit(node.type);
     this.visit(node.expression);
   }
-  
+
   visitExpressionStatement(node: ExpressionStatement) {
     this.visit(node.expression);
   }
@@ -282,7 +399,7 @@ export class WhackoVisitor {
     this.visit(node.lhs);
     this.visit(node.rhs);
   }
-  
+
   visitLeftUnaryExpression(node: LeftUnaryExpression) {
     this.visit(node.expression);
   }
@@ -363,21 +480,32 @@ export class WhackoVisitor {
 
   visitIdentifier(expression: ID) {}
 
-
   replace(node: AstNode, contents: string): void {
     let replacer: AstNode;
     if (isExpression(node)) {
-      const result = this.services.parser.LangiumParser.parse<Program>(`fn a(): void { ${contents}; });`);
-      const expression = ((result.value.declarations[0] as FunctionDeclaration).block!.statements[0] as ExpressionStatement).expression!;
+      const result = this.services.parser.LangiumParser.parse<Program>(
+        `fn a(): void { ${contents}; });`
+      );
+      const expression = (
+        (result.value.declarations[0] as FunctionDeclaration).block!
+          .statements[0] as ExpressionStatement
+      ).expression!;
       replacer = expression;
     } else if (isStatement(node)) {
-      const result = this.services.parser.LangiumParser.parse<Program>(`fn a(): void { ${contents} });`);
-      const statement = (result.value.declarations[0] as FunctionDeclaration).block!.statements[0];
+      const result = this.services.parser.LangiumParser.parse<Program>(
+        `fn a(): void { ${contents} });`
+      );
+      const statement = (result.value.declarations[0] as FunctionDeclaration)
+        .block!.statements[0];
       replacer = statement;
     } else if (isDeclaration(node)) {
-      const result = this.services.parser.LangiumParser.parse<Program>(contents);
-      const declaration = result.value.declarations[0] ?? result.value.exports[0] ?? result.value.imports[0];
-      replacer = declaration; 
+      const result =
+        this.services.parser.LangiumParser.parse<Program>(contents);
+      const declaration =
+        result.value.declarations[0] ??
+        result.value.exports[0] ??
+        result.value.imports[0];
+      replacer = declaration;
     } else {
       throw new Error("Something went wrong!");
     }
@@ -386,12 +514,13 @@ export class WhackoVisitor {
 
   replaceNode(node: AstNode, replacer: AstNode) {
     const parent = node.$container;
-    if (!isAstNode(node) || !isAstNode(replacer)) throw new Error("Node or Replacement Node parameter is not an ASTNode");
+    if (!isAstNode(node) || !isAstNode(replacer))
+      throw new Error("Node or Replacement Node parameter is not an ASTNode");
 
     if (
-      (isDeclaration(node) && isDeclaration(replacer))
-      || (isStatement(node) && isStatement(replacer))
-      || (isExpression(node) && isExpression(replacer))
+      (isDeclaration(node) && isDeclaration(replacer)) ||
+      (isStatement(node) && isStatement(replacer)) ||
+      (isExpression(node) && isExpression(replacer))
     ) {
       // @ts-ignore: this is safe I promise
       replacer.$container = node.$container;
@@ -399,7 +528,7 @@ export class WhackoVisitor {
       replacer.$containerIndex = node.$containerIndex;
       // @ts-ignore: this is safe I promise
       replacer.$containerProperty = node.$containerProperty;
-  
+
       if (typeof node.$containerIndex === "number") {
         // @ts-ignore: this is safe I promise
         parent[node.$containerProperty][node.$containerIndex] = replacer;

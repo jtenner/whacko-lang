@@ -30,16 +30,15 @@ async function main() {
     const jsonFile = path.join(dirname, basename + ".json");
 
     try {
-      await fs.access(jsonFile)
+      await fs.access(jsonFile);
       if (update) {
         await fs.writeFile(jsonFile, actual);
-
       } else {
         // perform diff
         const expected = await fs.readFile(jsonFile, "utf8");
         const diffs = diff.diffLines(expected, actual);
         stdout.write(`${colors.green("[File]")}: ${file}\n\n`);
-        
+
         // for each diff..
         for (const diff of diffs) {
           const lines = diff.value.split("\n");
@@ -58,7 +57,6 @@ async function main() {
             for (const line of lines) {
               stdout.write("  " + line + "\n");
             }
-            
           }
         }
         stdout.write("\n");
