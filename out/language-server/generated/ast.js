@@ -623,6 +623,22 @@ class WhackoAstReflection extends langium_1.AbstractAstReflection {
                     ]
                 };
             }
+            case 'TypeDeclaration': {
+                return {
+                    name: 'TypeDeclaration',
+                    mandatory: [
+                        { name: 'typeParameters', type: 'array' }
+                    ]
+                };
+            }
+            case 'TypeDeclarationStatement': {
+                return {
+                    name: 'TypeDeclarationStatement',
+                    mandatory: [
+                        { name: 'typeParameters', type: 'array' }
+                    ]
+                };
+            }
             case 'VariableDeclarationStatement': {
                 return {
                     name: 'VariableDeclarationStatement',

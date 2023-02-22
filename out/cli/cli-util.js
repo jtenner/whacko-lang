@@ -19,10 +19,12 @@ async function extractDocument(fileName, services) {
         process.exit(1);
     }
     const document = services.shared.workspace.LangiumDocuments.getOrCreateDocument(vscode_uri_1.URI.file(path_1.default.resolve(fileName)));
-    await services.shared.workspace.DocumentBuilder.build([document], { validationChecks: 'all' });
-    const validationErrors = (document.diagnostics ?? []).filter(e => e.severity === 1);
+    await services.shared.workspace.DocumentBuilder.build([document], {
+        validationChecks: "all",
+    });
+    const validationErrors = (document.diagnostics ?? []).filter((e) => e.severity === 1);
     if (validationErrors.length > 0) {
-        console.error(chalk_1.default.red('There are validation errors:'));
+        console.error(chalk_1.default.red("There are validation errors:"));
         for (const validationError of validationErrors) {
             console.error(chalk_1.default.red(`line ${validationError.range.start.line + 1}: ${validationError.message} [${document.textDocument.getText(validationError.range)}]`));
         }
@@ -36,10 +38,12 @@ async function extractAstNode(fileName, services) {
 }
 exports.extractAstNode = extractAstNode;
 function extractDestinationAndName(filePath, destination) {
-    filePath = path_1.default.basename(filePath, path_1.default.extname(filePath)).replace(/[.-]/g, '');
+    filePath = path_1.default
+        .basename(filePath, path_1.default.extname(filePath))
+        .replace(/[.-]/g, "");
     return {
-        destination: destination ?? path_1.default.join(path_1.default.dirname(filePath), 'generated'),
-        name: path_1.default.basename(filePath)
+        destination: destination ?? path_1.default.join(path_1.default.dirname(filePath), "generated"),
+        name: path_1.default.basename(filePath),
     };
 }
 exports.extractDestinationAndName = extractDestinationAndName;

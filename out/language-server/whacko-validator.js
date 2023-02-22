@@ -14,7 +14,23 @@ function registerValidationChecks(services) {
     registry.register(checks, validator);
 }
 exports.registerValidationChecks = registerValidationChecks;
-const assignmentnOperators = new Set(["=", "+=", "-=", "**=", "*=", "/=", "%=", "<<=", ">>=", "&=", "^=", "|=", "&&=", "||=", "??="]);
+const assignmentnOperators = new Set([
+    "=",
+    "+=",
+    "-=",
+    "**=",
+    "*=",
+    "/=",
+    "%=",
+    "<<=",
+    ">>=",
+    "&=",
+    "^=",
+    "|=",
+    "&&=",
+    "||=",
+    "??=",
+]);
 /**
  * Implementation of custom validations.
  */

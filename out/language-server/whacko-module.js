@@ -11,8 +11,8 @@ const whacko_validator_1 = require("./whacko-validator");
  */
 exports.WhackoModule = {
     validation: {
-        WhackoValidator: () => new whacko_validator_1.WhackoValidator()
-    }
+        WhackoValidator: () => new whacko_validator_1.WhackoValidator(),
+    },
 };
 /**
  * Create the full set of services required by Langium.

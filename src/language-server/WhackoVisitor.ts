@@ -60,6 +60,7 @@ import {
   SuperLiteral,
   AsyncBlockLiteral,
   ID,
+  FunctionLiteral,
 } from "./generated/ast";
 import { createWhackoServices, WhackoServices } from "./whacko-module";
 
@@ -451,6 +452,17 @@ export class WhackoVisitor {
     for (const param of node.parameters) {
       this.visit(param);
     }
+  }
+
+  visitFunctionLiteral(expression: FunctionLiteral) {
+    for (const typeParameter of expression.typeParameters) {
+      this.visit(typeParameter);
+    }
+    for (const parameter of expression.parameters) {
+      this.visit(parameter);
+    }
+    this.visit(expression.returnType);
+    this.visit(expression.block);
   }
 
   visitGroupLiteral(expression: GroupLiteral) {

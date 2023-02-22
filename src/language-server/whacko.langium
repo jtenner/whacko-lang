@@ -9,7 +9,7 @@ entry Program:
     | declarations+=TypeDeclaration)*;
 
 DeclareDeclaration:
-    "declare" namespace=String method=String "(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")" ":" returnType=TypeExpression ";";
+    (export="export")? "declare" namespace=String method=String name=ID "(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")" ":" returnType=TypeExpression ";";
 
 ImportDeclaration:
     "import" "{" (declarators+=ImportDeclarator ("," declarators+=ImportDeclarator)*)? "}" "from" path=String ";";
@@ -24,16 +24,16 @@ ExportDeclarator:
     name=ID ("as" alias=ID)?;
 
 FunctionDeclaration:
-    (async="async")? "fn" name=ID "(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")" ":" returnType=TypeExpression block=BlockStatement;
+    (export="export")? (async="async")? "fn" name=ID "(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")" ":" returnType=TypeExpression block=BlockStatement;
 
 Parameter:
     name=ID ":" type=ID;
 
 TypeDeclaration:
-    "type" name=ID ("<" typeParameters+=ID ("," typeParameters+=ID)* ">")? "=" type=TypeExpression;
+    (export="export")? "type" name=ID ("<" typeParameters+=ID ("," typeParameters+=ID)* ">")? "=" type=TypeExpression;
 
 ClassDeclaration:
-    (final="final")? "class" name=ID ("extends" extends=TypeExpression)? "{" members+=ClassMember* "}";
+    (export="export")? (final="final")? "class" name=ID ("extends" extends=TypeExpression)? "{" members+=ClassMember* "}";
 
 TypeExpression: HeldTypeExpression | FunctionTypeExpression | NamedTypeExpression | TupleTypeExpression;
 
@@ -180,7 +180,10 @@ ArrayAccessPath:
 CallPath:
     ("<" typeParameters+=TypeExpression ("," typeParameters+=TypeExpression)* ">")? "(" (parameters+=Expression ("," parameters+=Expression)*)? ")";
 
-PrimaryExpression: GroupLiteral | ID | FloatLiteral | IntegerLiteral | HexLiteral | BinaryLiteral | OctalLiteral | StringLiteral | FalseLiteral | TrueLiteral | NullLiteral | ThisLiteral | SuperLiteral | AsyncBlockLiteral;
+PrimaryExpression: FunctionLiteral | GroupLiteral | ID | FloatLiteral | IntegerLiteral | HexLiteral | BinaryLiteral | OctalLiteral | StringLiteral | FalseLiteral | TrueLiteral | NullLiteral | ThisLiteral | SuperLiteral | AsyncBlockLiteral;
+
+FunctionLiteral:
+    ("<" typeParameters+=TypeExpression ("," typeParameters+=TypeExpression)* ">")? "(" ( parameters+=Parameter ("," parameters+=Parameter)* )? ")" ":" returnType=TypeExpression "=>" block=BlockStatement;
 
 GroupLiteral:
     "(" expression=Expression ")";
