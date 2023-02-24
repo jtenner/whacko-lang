@@ -1,13 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-const node_1 = require("langium/node");
-const whacko_module_1 = require("../language-server/whacko-module");
-const node_fs_1 = require("node:fs");
-const Whacko = (0, whacko_module_1.createWhackoServices)(node_1.NodeFileSystem).Whacko;
-async function default_1() {
-    const program = await node_fs_1.promises.readFile("./myFile.wo", "utf-8");
-    const ast = Whacko.parser.LangiumParser.parse(program).value;
-    // visitor.visit(ast);
+// @ts-ignore
+const node_util_1 = require("node:util");
+const program_1 = require("../language-server/program");
+// import { WhackoProgram } from "../compiler";
+const options = {};
+async function main(args) {
+    const { values, positionals, } = (0, node_util_1.parseArgs)({ args, options, allowPositionals: true });
+    const program = new program_1.WhackoProgram();
+    for (const positional of positionals)
+        program.addModule(positional, process.cwd());
 }
-exports.default = default_1;
+exports.default = main;
 //# sourceMappingURL=index.js.map

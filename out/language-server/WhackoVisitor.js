@@ -352,6 +352,16 @@ class WhackoVisitor {
             this.visit(param);
         }
     }
+    visitFunctionLiteral(expression) {
+        for (const typeParameter of expression.typeParameters) {
+            this.visit(typeParameter);
+        }
+        for (const parameter of expression.parameters) {
+            this.visit(parameter);
+        }
+        this.visit(expression.returnType);
+        this.visit(expression.block);
+    }
     visitGroupLiteral(expression) {
         this.visit(expression.expression);
     }

@@ -6,9 +6,7 @@ import fs from "node:fs";
 
 const Whacko = createWhackoServices(NodeFileSystem).Whacko;
 
-export function parse(file: string): ParseResult<Program> | null {
-  if (!fs.existsSync(file)) return null;
-  const contents = fs.readFileSync(file, "utf-8");
+export function parse(contents: string): ParseResult<Program> | null {
   const ast = Whacko.parser.LangiumParser.parse<Program>(contents);
   return ast;
   // visitor.visit(ast);
