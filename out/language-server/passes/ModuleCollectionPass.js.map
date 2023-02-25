@@ -1,1 +1,0 @@
-{"version":3,"file":"ModuleCollectionPass.js","sourceRoot":"","sources":["../../../src/language-server/passes/ModuleCollectionPass.ts"],"names":[],"mappings":";;;AACA,6CAA0C;AAE1C,MAAa,oBAAqB,SAAQ,uBAAU;IAClD,YAAY,GAAa,EAAE,CAAC;IAE5B;QACE,KAAK,EAAE,CAAC;IACV,CAAC;IAEQ,sBAAsB,CAAC,IAAuB;QACrD,IAAI,CAAC,YAAY,CAAC,IAAI,CAAC,IAAI,CAAC,IAAI,CAAC,CAAC;IACpC,CAAC;CACF;AAVD,oDAUC"}
