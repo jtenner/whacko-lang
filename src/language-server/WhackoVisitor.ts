@@ -41,11 +41,7 @@ import {
   LeftUnaryExpression,
   AwaitExpression,
   HoldExpression,
-  PathExpression,
   NewExpression,
-  MemberAccessPath,
-  ArrayAccessPath,
-  CallPath,
   GroupLiteral,
   FloatLiteral,
   BinaryLiteral,
@@ -61,6 +57,9 @@ import {
   AsyncBlockLiteral,
   ID,
   FunctionLiteral,
+  CallExpression,
+  ArrayAccessExpression,
+  MemberAccessExpression,
 } from "./generated/ast";
 import { createWhackoServices, WhackoServices } from "./whacko-module";
 
@@ -159,16 +158,14 @@ export class WhackoVisitor {
         return this.visitAwaitExpression(node);
       case "HoldExpression":
         return this.visitHoldExpression(node);
-      case "PathExpression":
-        return this.visitPathExpression(node);
+      case "CallExpression":
+        return this.visitCallExpression(node);
       case "NewExpression":
         return this.visitNewExpression(node);
-      case "MemberAccessPath":
+      case "MemberAccess":
         return this.visitMemberAccessPath(node);
-      case "ArrayAccessPath":
-        return this.visitArrayAccessPath(node);
-      case "CallPath":
-        return this.visitCallPath(node);
+      case "ArrayAccessExpression":
+        return this.visitArrayAccessExpression(node);
       case "GroupLiteral":
         return this.visitGroupLiteral(node);
       case "FloatLiteral":
@@ -419,11 +416,10 @@ export class WhackoVisitor {
     this.visit(node.expression);
   }
 
-  visitPathExpression(node: PathExpression) {
-    this.visit(node.root);
-    for (const path of node.path) {
-      this.visit(path);
-    }
+  visitCallExpression(node: CallExpression) {
+    this.visit(node.callRoot);
+    for (const parameter of node.typeParameters) this.visit(parameter);
+    for (const parameter of node.parameters) this.visit(parameter);
   }
 
   visitNewExpression(node: NewExpression) {
@@ -437,22 +433,14 @@ export class WhackoVisitor {
     }
   }
 
-  visitMemberAccessPath(node: MemberAccessPath) {
+  visitMemberAccessPath(node: MemberAccessExpression) {
+    this.visit(node.memberRoot!);
     this.visit(node.member);
   }
 
-  visitArrayAccessPath(node: ArrayAccessPath) {
-    this.visit(node.expression);
-  }
-
-  visitCallPath(node: CallPath) {
-    for (const param of node.typeParameters) {
-      this.visit(param);
-    }
-
-    for (const param of node.parameters) {
-      this.visit(param);
-    }
+  visitArrayAccessExpression(node: ArrayAccessExpression) {
+    this.visit(node.arrayRoot);
+    this.visit(node.indexExpression);
   }
 
   visitFunctionLiteral(expression: FunctionLiteral) {

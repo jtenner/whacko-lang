@@ -126,7 +126,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@73"
+                "$ref": "#/rules@72"
               },
               "arguments": []
             }
@@ -138,7 +138,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@73"
+                "$ref": "#/rules@72"
               },
               "arguments": []
             }
@@ -150,7 +150,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@72"
+                "$ref": "#/rules@71"
               },
               "arguments": []
             }
@@ -301,7 +301,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@73"
+                "$ref": "#/rules@72"
               },
               "arguments": []
             }
@@ -332,7 +332,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@72"
+                "$ref": "#/rules@71"
               },
               "arguments": []
             }
@@ -351,7 +351,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
                 "terminal": {
                   "$type": "RuleCall",
                   "rule": {
-                    "$ref": "#/rules@72"
+                    "$ref": "#/rules@71"
                   },
                   "arguments": []
                 }
@@ -442,7 +442,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@72"
+                "$ref": "#/rules@71"
               },
               "arguments": []
             }
@@ -461,7 +461,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
                 "terminal": {
                   "$type": "RuleCall",
                   "rule": {
-                    "$ref": "#/rules@72"
+                    "$ref": "#/rules@71"
                   },
                   "arguments": []
                 }
@@ -515,7 +515,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@72"
+                "$ref": "#/rules@71"
               },
               "arguments": []
             }
@@ -618,7 +618,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@72"
+                "$ref": "#/rules@71"
               },
               "arguments": []
             }
@@ -634,7 +634,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@72"
+                "$ref": "#/rules@71"
               },
               "arguments": []
             }
@@ -675,7 +675,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@72"
+                "$ref": "#/rules@71"
               },
               "arguments": []
             }
@@ -694,7 +694,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
                 "terminal": {
                   "$type": "RuleCall",
                   "rule": {
-                    "$ref": "#/rules@72"
+                    "$ref": "#/rules@71"
                   },
                   "arguments": []
                 }
@@ -713,7 +713,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
                     "terminal": {
                       "$type": "RuleCall",
                       "rule": {
-                        "$ref": "#/rules@72"
+                        "$ref": "#/rules@71"
                       },
                       "arguments": []
                     }
@@ -790,7 +790,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@72"
+                "$ref": "#/rules@71"
               },
               "arguments": []
             }
@@ -1092,7 +1092,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@72"
+                "$ref": "#/rules@71"
               },
               "arguments": []
             }
@@ -1227,7 +1227,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@72"
+                "$ref": "#/rules@71"
               },
               "arguments": []
             }
@@ -1306,7 +1306,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@72"
+                "$ref": "#/rules@71"
               },
               "arguments": []
             }
@@ -1423,7 +1423,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@72"
+                "$ref": "#/rules@71"
               },
               "arguments": []
             }
@@ -1492,7 +1492,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@72"
+                "$ref": "#/rules@71"
               },
               "arguments": []
             }
@@ -1765,7 +1765,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@72"
+                "$ref": "#/rules@71"
               },
               "arguments": []
             }
@@ -1784,7 +1784,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
                 "terminal": {
                   "$type": "RuleCall",
                   "rule": {
-                    "$ref": "#/rules@72"
+                    "$ref": "#/rules@71"
                   },
                   "arguments": []
                 }
@@ -1803,7 +1803,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
                     "terminal": {
                       "$type": "RuleCall",
                       "rule": {
-                        "$ref": "#/rules@72"
+                        "$ref": "#/rules@71"
                       },
                       "arguments": []
                     }
@@ -2197,7 +2197,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@72"
+                "$ref": "#/rules@71"
               },
               "arguments": []
             }
@@ -2514,7 +2514,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
               {
                 "$type": "RuleCall",
                 "rule": {
-                  "$ref": "#/rules@53"
+                  "$ref": "#/rules@54"
                 },
                 "arguments": []
               },
@@ -3624,7 +3624,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
     },
     {
       "$type": "ParserRule",
-      "name": "PathExpression",
+      "name": "CallExpression",
       "definition": {
         "$type": "Alternatives",
         "elements": [
@@ -3633,64 +3633,124 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
             "elements": [
               {
                 "$type": "Assignment",
-                "feature": "root",
+                "feature": "callRoot",
                 "operator": "=",
                 "terminal": {
                   "$type": "RuleCall",
                   "rule": {
-                    "$ref": "#/rules@57"
+                    "$ref": "#/rules@54"
                   },
                   "arguments": []
                 }
               },
               {
-                "$type": "Alternatives",
+                "$type": "Group",
                 "elements": [
                   {
-                    "$type": "Assignment",
-                    "feature": "path",
-                    "operator": "+=",
-                    "terminal": {
-                      "$type": "RuleCall",
-                      "rule": {
-                        "$ref": "#/rules@54"
+                    "$type": "Group",
+                    "elements": [
+                      {
+                        "$type": "Keyword",
+                        "value": "<"
                       },
-                      "arguments": []
-                    }
+                      {
+                        "$type": "Assignment",
+                        "feature": "typeParameters",
+                        "operator": "+=",
+                        "terminal": {
+                          "$type": "RuleCall",
+                          "rule": {
+                            "$ref": "#/rules@10"
+                          },
+                          "arguments": []
+                        }
+                      },
+                      {
+                        "$type": "Group",
+                        "elements": [
+                          {
+                            "$type": "Keyword",
+                            "value": ","
+                          },
+                          {
+                            "$type": "Assignment",
+                            "feature": "typeParameters",
+                            "operator": "+=",
+                            "terminal": {
+                              "$type": "RuleCall",
+                              "rule": {
+                                "$ref": "#/rules@10"
+                              },
+                              "arguments": []
+                            }
+                          }
+                        ],
+                        "cardinality": "*"
+                      },
+                      {
+                        "$type": "Keyword",
+                        "value": ">"
+                      }
+                    ],
+                    "cardinality": "?"
                   },
                   {
-                    "$type": "Assignment",
-                    "feature": "path",
-                    "operator": "+=",
-                    "terminal": {
-                      "$type": "RuleCall",
-                      "rule": {
-                        "$ref": "#/rules@55"
-                      },
-                      "arguments": []
-                    }
+                    "$type": "Keyword",
+                    "value": "("
                   },
                   {
-                    "$type": "Assignment",
-                    "feature": "path",
-                    "operator": "+=",
-                    "terminal": {
-                      "$type": "RuleCall",
-                      "rule": {
-                        "$ref": "#/rules@56"
+                    "$type": "Group",
+                    "elements": [
+                      {
+                        "$type": "Assignment",
+                        "feature": "parameters",
+                        "operator": "+=",
+                        "terminal": {
+                          "$type": "RuleCall",
+                          "rule": {
+                            "$ref": "#/rules@33"
+                          },
+                          "arguments": []
+                        }
                       },
-                      "arguments": []
-                    }
+                      {
+                        "$type": "Group",
+                        "elements": [
+                          {
+                            "$type": "Keyword",
+                            "value": ","
+                          },
+                          {
+                            "$type": "Assignment",
+                            "feature": "parameters",
+                            "operator": "+=",
+                            "terminal": {
+                              "$type": "RuleCall",
+                              "rule": {
+                                "$ref": "#/rules@33"
+                              },
+                              "arguments": []
+                            }
+                          }
+                        ],
+                        "cardinality": "*"
+                      }
+                    ],
+                    "cardinality": "?"
+                  },
+                  {
+                    "$type": "Keyword",
+                    "value": ")"
                   }
                 ],
-                "cardinality": "+"
+                "cardinality": "*"
               }
             ]
           },
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@57"
+              "$ref": "#/rules@54"
             },
             "arguments": []
           }
@@ -3705,91 +3765,21 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
     },
     {
       "$type": "ParserRule",
-      "name": "MemberAccessPath",
+      "name": "MemberAccessExpression",
       "definition": {
-        "$type": "Group",
-        "elements": [
-          {
-            "$type": "Keyword",
-            "value": "."
-          },
-          {
-            "$type": "Assignment",
-            "feature": "member",
-            "operator": "=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@72"
-              },
-              "arguments": []
-            }
-          }
-        ]
-      },
-      "definesHiddenTokens": false,
-      "entry": false,
-      "fragment": false,
-      "hiddenTokens": [],
-      "parameters": [],
-      "wildcard": false
-    },
-    {
-      "$type": "ParserRule",
-      "name": "ArrayAccessPath",
-      "definition": {
-        "$type": "Group",
-        "elements": [
-          {
-            "$type": "Keyword",
-            "value": "["
-          },
-          {
-            "$type": "Assignment",
-            "feature": "expression",
-            "operator": "=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@33"
-              },
-              "arguments": []
-            }
-          },
-          {
-            "$type": "Keyword",
-            "value": "]"
-          }
-        ]
-      },
-      "definesHiddenTokens": false,
-      "entry": false,
-      "fragment": false,
-      "hiddenTokens": [],
-      "parameters": [],
-      "wildcard": false
-    },
-    {
-      "$type": "ParserRule",
-      "name": "CallPath",
-      "definition": {
-        "$type": "Group",
+        "$type": "Alternatives",
         "elements": [
           {
             "$type": "Group",
             "elements": [
               {
-                "$type": "Keyword",
-                "value": "<"
-              },
-              {
                 "$type": "Assignment",
-                "feature": "typeParameters",
-                "operator": "+=",
+                "feature": "memberRoot",
+                "operator": "=",
                 "terminal": {
                   "$type": "RuleCall",
                   "rule": {
-                    "$ref": "#/rules@10"
+                    "$ref": "#/rules@55"
                   },
                   "arguments": []
                 }
@@ -3799,41 +3789,70 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
                 "elements": [
                   {
                     "$type": "Keyword",
-                    "value": ","
+                    "value": "."
                   },
                   {
                     "$type": "Assignment",
-                    "feature": "typeParameters",
-                    "operator": "+=",
+                    "feature": "member",
+                    "operator": "=",
                     "terminal": {
                       "$type": "RuleCall",
                       "rule": {
-                        "$ref": "#/rules@10"
+                        "$ref": "#/rules@71"
                       },
                       "arguments": []
                     }
                   }
                 ],
                 "cardinality": "*"
-              },
-              {
-                "$type": "Keyword",
-                "value": ">"
               }
-            ],
-            "cardinality": "?"
+            ]
           },
           {
-            "$type": "Keyword",
-            "value": "("
+            "$type": "RuleCall",
+            "rule": {
+              "$ref": "#/rules@55"
+            },
+            "arguments": []
+          }
+        ]
+      },
+      "definesHiddenTokens": false,
+      "entry": false,
+      "fragment": false,
+      "hiddenTokens": [],
+      "parameters": [],
+      "wildcard": false
+    },
+    {
+      "$type": "ParserRule",
+      "name": "ArrayAccessExpression",
+      "definition": {
+        "$type": "Group",
+        "elements": [
+          {
+            "$type": "Assignment",
+            "feature": "arrayRoot",
+            "operator": "=",
+            "terminal": {
+              "$type": "RuleCall",
+              "rule": {
+                "$ref": "#/rules@56"
+              },
+              "arguments": []
+            }
           },
           {
             "$type": "Group",
             "elements": [
               {
+                "$type": "Keyword",
+                "value": "["
+              },
+              {
                 "$type": "Assignment",
-                "feature": "parameters",
-                "operator": "+=",
+                "feature": "indexExpression",
+                "operator": "=",
                 "terminal": {
                   "$type": "RuleCall",
                   "rule": {
@@ -3843,33 +3862,11 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
                 }
               },
               {
-                "$type": "Group",
-                "elements": [
-                  {
-                    "$type": "Keyword",
-                    "value": ","
-                  },
-                  {
-                    "$type": "Assignment",
-                    "feature": "parameters",
-                    "operator": "+=",
-                    "terminal": {
-                      "$type": "RuleCall",
-                      "rule": {
-                        "$ref": "#/rules@33"
-                      },
-                      "arguments": []
-                    }
-                  }
-                ],
-                "cardinality": "*"
+                "$type": "Keyword",
+                "value": "]"
               }
             ],
-            "cardinality": "?"
-          },
-          {
-            "$type": "Keyword",
-            "value": ")"
+            "cardinality": "*"
           }
         ]
       },
@@ -3889,6 +3886,13 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
           {
             "$type": "RuleCall",
             "rule": {
+              "$ref": "#/rules@57"
+            },
+            "arguments": []
+          },
+          {
+            "$type": "RuleCall",
+            "rule": {
               "$ref": "#/rules@58"
             },
             "arguments": []
@@ -3896,14 +3900,14 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@59"
+              "$ref": "#/rules@71"
             },
             "arguments": []
           },
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@72"
+              "$ref": "#/rules@59"
             },
             "arguments": []
           },
@@ -3981,13 +3985,6 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
             "$type": "RuleCall",
             "rule": {
               "$ref": "#/rules@70"
-            },
-            "arguments": []
-          },
-          {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@71"
             },
             "arguments": []
           }
@@ -4188,7 +4185,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
         "terminal": {
           "$type": "RuleCall",
           "rule": {
-            "$ref": "#/rules@78"
+            "$ref": "#/rules@77"
           },
           "arguments": []
         }
@@ -4210,7 +4207,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
         "terminal": {
           "$type": "RuleCall",
           "rule": {
-            "$ref": "#/rules@79"
+            "$ref": "#/rules@78"
           },
           "arguments": []
         }
@@ -4232,7 +4229,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
         "terminal": {
           "$type": "RuleCall",
           "rule": {
-            "$ref": "#/rules@76"
+            "$ref": "#/rules@75"
           },
           "arguments": []
         }
@@ -4254,7 +4251,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
         "terminal": {
           "$type": "RuleCall",
           "rule": {
-            "$ref": "#/rules@75"
+            "$ref": "#/rules@74"
           },
           "arguments": []
         }
@@ -4276,7 +4273,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
         "terminal": {
           "$type": "RuleCall",
           "rule": {
-            "$ref": "#/rules@77"
+            "$ref": "#/rules@76"
           },
           "arguments": []
         }
@@ -4298,7 +4295,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
         "terminal": {
           "$type": "RuleCall",
           "rule": {
-            "$ref": "#/rules@73"
+            "$ref": "#/rules@72"
           },
           "arguments": []
         }
@@ -4472,7 +4469,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
         "terminal": {
           "$type": "RuleCall",
           "rule": {
-            "$ref": "#/rules@74"
+            "$ref": "#/rules@73"
           },
           "arguments": []
         }

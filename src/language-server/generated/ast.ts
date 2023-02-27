@@ -6,7 +6,7 @@
 /* eslint-disable */
 import { AstNode, AbstractAstReflection, ReferenceInfo, TypeMetaData } from 'langium';
 
-export type AssignmentExpression = BinaryExpression | LogicalOrExpression | PathExpression;
+export type AssignmentExpression = BinaryExpression | LogicalOrExpression | MemberAccessExpression;
 
 export const AssignmentExpression = 'AssignmentExpression';
 
@@ -142,20 +142,8 @@ export function isTypeExpression(item: unknown): item is TypeExpression {
     return reflection.isInstance(item, TypeExpression);
 }
 
-export interface ArrayAccessPath extends AstNode {
-    readonly $container: PathExpression;
-    readonly $type: 'ArrayAccessPath';
-    expression: Expression
-}
-
-export const ArrayAccessPath = 'ArrayAccessPath';
-
-export function isArrayAccessPath(item: unknown): item is ArrayAccessPath {
-    return reflection.isInstance(item, ArrayAccessPath);
-}
-
 export interface AsyncBlockLiteral extends AstNode {
-    readonly $container: ArrayAccessPath | AwaitExpression | BinaryExpression | CallPath | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessPath | MethodClassMember | NamedTypeExpression | NewExpression | Parameter | PathExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
+    readonly $container: ArrayAccessExpression | ClassDeclaration | DeclareDeclaration | ExportDeclarator | FieldClassMember | FunctionDeclaration | GetterClassMember | ImportDeclarator | MemberAccessExpression | MethodClassMember | NamedTypeExpression | Parameter | SetterClassMember | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
     readonly $type: 'AsyncBlockLiteral';
     block: BlockStatement
     type?: TypeExpression
@@ -168,9 +156,9 @@ export function isAsyncBlockLiteral(item: unknown): item is AsyncBlockLiteral {
 }
 
 export interface BinaryExpression extends AstNode {
-    readonly $container: ArrayAccessPath | AwaitExpression | BinaryExpression | CallPath | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessPath | MethodClassMember | NamedTypeExpression | NewExpression | Parameter | PathExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
+    readonly $container: ArrayAccessExpression | AwaitExpression | BinaryExpression | CallExpression | ExpressionStatement | FieldClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | LeftUnaryExpression | MemberAccessExpression | NewExpression | ReturnStatement | TernaryExpression | TupleExpression | VariableDeclarator | WhileStatement | YieldExpression;
     readonly $type: 'BinaryExpression';
-    lhs: BitShiftExpression | BitwiseAndExpression | BitwiseOrExpression | BitwiseXOrExpression | ComaprisonExpression | EqualityExpression | ExponentiationExpression | LeftUnaryExpression | LogicalAndExpression | PathExpression | ProductExpression | SumExpression
+    lhs: BitShiftExpression | BitwiseAndExpression | BitwiseOrExpression | BitwiseXOrExpression | ComaprisonExpression | EqualityExpression | ExponentiationExpression | LeftUnaryExpression | LogicalAndExpression | MemberAccessExpression | ProductExpression | SumExpression
     op: '!=' | '%' | '%=' | '&&' | '&&=' | '&' | '&=' | '*' | '**' | '**=' | '*=' | '+' | '+=' | '-' | '-=' | '/' | '/=' | '<' | '<<' | '<<=' | '<=' | '=' | '==' | '>' | '>=' | '>>' | '>>=' | '>>>=' | '??=' | '^' | '^=' | '|' | '|=' | '||' | '||='
     rhs: BitShiftExpression | BitwiseAndExpression | BitwiseOrExpression | BitwiseXOrExpression | ComaprisonExpression | EqualityExpression | ExponentiationExpression | LeftUnaryExpression | LogicalAndExpression | LogicalOrExpression | ProductExpression | SumExpression
 }
@@ -182,7 +170,7 @@ export function isBinaryExpression(item: unknown): item is BinaryExpression {
 }
 
 export interface BinaryLiteral extends AstNode {
-    readonly $container: ArrayAccessPath | AwaitExpression | BinaryExpression | CallPath | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessPath | MethodClassMember | NamedTypeExpression | NewExpression | Parameter | PathExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
+    readonly $container: ArrayAccessExpression | ClassDeclaration | DeclareDeclaration | ExportDeclarator | FieldClassMember | FunctionDeclaration | GetterClassMember | ImportDeclarator | MemberAccessExpression | MethodClassMember | NamedTypeExpression | Parameter | SetterClassMember | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
     readonly $type: 'BinaryLiteral';
     value: string
 }
@@ -215,19 +203,6 @@ export const BreakStatement = 'BreakStatement';
 
 export function isBreakStatement(item: unknown): item is BreakStatement {
     return reflection.isInstance(item, BreakStatement);
-}
-
-export interface CallPath extends AstNode {
-    readonly $container: PathExpression;
-    readonly $type: 'CallPath';
-    parameters: Array<Expression>
-    typeParameters: Array<TypeExpression>
-}
-
-export const CallPath = 'CallPath';
-
-export function isCallPath(item: unknown): item is CallPath {
-    return reflection.isInstance(item, CallPath);
 }
 
 export interface ClassDeclaration extends AstNode {
@@ -327,7 +302,7 @@ export function isExpressionStatement(item: unknown): item is ExpressionStatemen
 }
 
 export interface FalseLiteral extends AstNode {
-    readonly $container: ArrayAccessPath | AwaitExpression | BinaryExpression | CallPath | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessPath | MethodClassMember | NamedTypeExpression | NewExpression | Parameter | PathExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
+    readonly $container: ArrayAccessExpression | ClassDeclaration | DeclareDeclaration | ExportDeclarator | FieldClassMember | FunctionDeclaration | GetterClassMember | ImportDeclarator | MemberAccessExpression | MethodClassMember | NamedTypeExpression | Parameter | SetterClassMember | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
     readonly $type: 'FalseLiteral';
     false: 'false'
 }
@@ -354,7 +329,7 @@ export function isFieldClassMember(item: unknown): item is FieldClassMember {
 }
 
 export interface FloatLiteral extends AstNode {
-    readonly $container: ArrayAccessPath | AwaitExpression | BinaryExpression | CallPath | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessPath | MethodClassMember | NamedTypeExpression | NewExpression | Parameter | PathExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
+    readonly $container: ArrayAccessExpression | ClassDeclaration | DeclareDeclaration | ExportDeclarator | FieldClassMember | FunctionDeclaration | GetterClassMember | ImportDeclarator | MemberAccessExpression | MethodClassMember | NamedTypeExpression | Parameter | SetterClassMember | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
     readonly $type: 'FloatLiteral';
     value: string
 }
@@ -383,7 +358,7 @@ export function isFunctionDeclaration(item: unknown): item is FunctionDeclaratio
 }
 
 export interface FunctionLiteral extends AstNode {
-    readonly $container: ArrayAccessPath | AwaitExpression | BinaryExpression | CallPath | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessPath | MethodClassMember | NamedTypeExpression | NewExpression | Parameter | PathExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
+    readonly $container: ArrayAccessExpression | ClassDeclaration | DeclareDeclaration | ExportDeclarator | FieldClassMember | FunctionDeclaration | GetterClassMember | ImportDeclarator | MemberAccessExpression | MethodClassMember | NamedTypeExpression | Parameter | SetterClassMember | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
     readonly $type: 'FunctionLiteral';
     block: BlockStatement
     parameters: Array<Parameter>
@@ -398,7 +373,7 @@ export function isFunctionLiteral(item: unknown): item is FunctionLiteral {
 }
 
 export interface FunctionTypeExpression extends AstNode {
-    readonly $container: AsyncBlockLiteral | CallPath | ClassDeclaration | DeclareDeclaration | FieldClassMember | FunctionDeclaration | FunctionLiteral | FunctionTypeExpression | GetterClassMember | HeldTypeExpression | MethodClassMember | NamedTypeExpression | NewExpression | TupleTypeExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
+    readonly $container: AsyncBlockLiteral | CallExpression | ClassDeclaration | DeclareDeclaration | FieldClassMember | FunctionDeclaration | FunctionLiteral | FunctionTypeExpression | GetterClassMember | HeldTypeExpression | MethodClassMember | NamedTypeExpression | NewExpression | TupleTypeExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
     readonly $type: 'FunctionTypeExpression';
     parameters: Array<TypeExpression>
     returnType: TypeExpression
@@ -439,7 +414,7 @@ export function isGrabStatement(item: unknown): item is GrabStatement {
 }
 
 export interface GroupLiteral extends AstNode {
-    readonly $container: ArrayAccessPath | AwaitExpression | BinaryExpression | CallPath | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessPath | MethodClassMember | NamedTypeExpression | NewExpression | Parameter | PathExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
+    readonly $container: ArrayAccessExpression | ClassDeclaration | DeclareDeclaration | ExportDeclarator | FieldClassMember | FunctionDeclaration | GetterClassMember | ImportDeclarator | MemberAccessExpression | MethodClassMember | NamedTypeExpression | Parameter | SetterClassMember | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
     readonly $type: 'GroupLiteral';
     expression: Expression
 }
@@ -451,7 +426,7 @@ export function isGroupLiteral(item: unknown): item is GroupLiteral {
 }
 
 export interface HeldTypeExpression extends AstNode {
-    readonly $container: AsyncBlockLiteral | CallPath | ClassDeclaration | DeclareDeclaration | FieldClassMember | FunctionDeclaration | FunctionLiteral | FunctionTypeExpression | GetterClassMember | HeldTypeExpression | MethodClassMember | NamedTypeExpression | NewExpression | TupleTypeExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
+    readonly $container: AsyncBlockLiteral | CallExpression | ClassDeclaration | DeclareDeclaration | FieldClassMember | FunctionDeclaration | FunctionLiteral | FunctionTypeExpression | GetterClassMember | HeldTypeExpression | MethodClassMember | NamedTypeExpression | NewExpression | TupleTypeExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
     readonly $type: 'HeldTypeExpression';
     type: TypeExpression
 }
@@ -463,7 +438,7 @@ export function isHeldTypeExpression(item: unknown): item is HeldTypeExpression 
 }
 
 export interface HexLiteral extends AstNode {
-    readonly $container: ArrayAccessPath | AwaitExpression | BinaryExpression | CallPath | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessPath | MethodClassMember | NamedTypeExpression | NewExpression | Parameter | PathExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
+    readonly $container: ArrayAccessExpression | ClassDeclaration | DeclareDeclaration | ExportDeclarator | FieldClassMember | FunctionDeclaration | GetterClassMember | ImportDeclarator | MemberAccessExpression | MethodClassMember | NamedTypeExpression | Parameter | SetterClassMember | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
     readonly $type: 'HexLiteral';
     value: string
 }
@@ -475,7 +450,7 @@ export function isHexLiteral(item: unknown): item is HexLiteral {
 }
 
 export interface ID extends AstNode {
-    readonly $container: ArrayAccessPath | AwaitExpression | BinaryExpression | CallPath | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessPath | MethodClassMember | NamedTypeExpression | NewExpression | Parameter | PathExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
+    readonly $container: ArrayAccessExpression | ClassDeclaration | DeclareDeclaration | ExportDeclarator | FieldClassMember | FunctionDeclaration | GetterClassMember | ImportDeclarator | MemberAccessExpression | MethodClassMember | NamedTypeExpression | Parameter | SetterClassMember | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
     readonly $type: 'ID';
     name: string
 }
@@ -527,7 +502,7 @@ export function isImportDeclarator(item: unknown): item is ImportDeclarator {
 }
 
 export interface IntegerLiteral extends AstNode {
-    readonly $container: ArrayAccessPath | AwaitExpression | BinaryExpression | CallPath | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessPath | MethodClassMember | NamedTypeExpression | NewExpression | Parameter | PathExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
+    readonly $container: ArrayAccessExpression | ClassDeclaration | DeclareDeclaration | ExportDeclarator | FieldClassMember | FunctionDeclaration | GetterClassMember | ImportDeclarator | MemberAccessExpression | MethodClassMember | NamedTypeExpression | Parameter | SetterClassMember | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
     readonly $type: 'IntegerLiteral';
     value: string
 }
@@ -539,8 +514,8 @@ export function isIntegerLiteral(item: unknown): item is IntegerLiteral {
 }
 
 export interface LeftUnaryExpression extends AstNode {
-    readonly $container: ArrayAccessPath | AwaitExpression | BinaryExpression | CallPath | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessPath | MethodClassMember | NamedTypeExpression | NewExpression | Parameter | PathExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
-    readonly $type: 'AsyncBlockLiteral' | 'AwaitExpression' | 'BinaryLiteral' | 'FalseLiteral' | 'FloatLiteral' | 'FunctionLiteral' | 'GroupLiteral' | 'HexLiteral' | 'HoldExpression' | 'ID' | 'IntegerLiteral' | 'LeftUnaryExpression' | 'NewExpression' | 'NullLiteral' | 'OctalLiteral' | 'PathExpression' | 'PrimaryExpression' | 'StringLiteral' | 'SuperLiteral' | 'ThisLiteral' | 'TrueLiteral';
+    readonly $container: ArrayAccessExpression | AwaitExpression | BinaryExpression | CallExpression | ExpressionStatement | FieldClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | LeftUnaryExpression | MemberAccessExpression | NewExpression | ReturnStatement | TernaryExpression | TupleExpression | VariableDeclarator | WhileStatement | YieldExpression;
+    readonly $type: 'ArrayAccessExpression' | 'AwaitExpression' | 'CallExpression' | 'HoldExpression' | 'LeftUnaryExpression' | 'MemberAccessExpression' | 'NewExpression';
     expression: LeftUnaryExpression
     op: '!' | '+' | '-' | '~'
 }
@@ -549,18 +524,6 @@ export const LeftUnaryExpression = 'LeftUnaryExpression';
 
 export function isLeftUnaryExpression(item: unknown): item is LeftUnaryExpression {
     return reflection.isInstance(item, LeftUnaryExpression);
-}
-
-export interface MemberAccessPath extends AstNode {
-    readonly $container: PathExpression;
-    readonly $type: 'MemberAccessPath';
-    member: ID
-}
-
-export const MemberAccessPath = 'MemberAccessPath';
-
-export function isMemberAccessPath(item: unknown): item is MemberAccessPath {
-    return reflection.isInstance(item, MemberAccessPath);
 }
 
 export interface MethodClassMember extends AstNode {
@@ -580,7 +543,7 @@ export function isMethodClassMember(item: unknown): item is MethodClassMember {
 }
 
 export interface NamedTypeExpression extends AstNode {
-    readonly $container: AsyncBlockLiteral | CallPath | ClassDeclaration | DeclareDeclaration | FieldClassMember | FunctionDeclaration | FunctionLiteral | FunctionTypeExpression | GetterClassMember | HeldTypeExpression | MethodClassMember | NamedTypeExpression | NewExpression | TupleTypeExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
+    readonly $container: AsyncBlockLiteral | CallExpression | ClassDeclaration | DeclareDeclaration | FieldClassMember | FunctionDeclaration | FunctionLiteral | FunctionTypeExpression | GetterClassMember | HeldTypeExpression | MethodClassMember | NamedTypeExpression | NewExpression | TupleTypeExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
     readonly $type: 'NamedTypeExpression';
     name: ID
     typeParameters: Array<TypeExpression>
@@ -593,7 +556,7 @@ export function isNamedTypeExpression(item: unknown): item is NamedTypeExpressio
 }
 
 export interface NullLiteral extends AstNode {
-    readonly $container: ArrayAccessPath | AwaitExpression | BinaryExpression | CallPath | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessPath | MethodClassMember | NamedTypeExpression | NewExpression | Parameter | PathExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
+    readonly $container: ArrayAccessExpression | ClassDeclaration | DeclareDeclaration | ExportDeclarator | FieldClassMember | FunctionDeclaration | GetterClassMember | ImportDeclarator | MemberAccessExpression | MethodClassMember | NamedTypeExpression | Parameter | SetterClassMember | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
     readonly $type: 'NullLiteral';
     null: 'null'
 }
@@ -605,7 +568,7 @@ export function isNullLiteral(item: unknown): item is NullLiteral {
 }
 
 export interface OctalLiteral extends AstNode {
-    readonly $container: ArrayAccessPath | AwaitExpression | BinaryExpression | CallPath | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessPath | MethodClassMember | NamedTypeExpression | NewExpression | Parameter | PathExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
+    readonly $container: ArrayAccessExpression | ClassDeclaration | DeclareDeclaration | ExportDeclarator | FieldClassMember | FunctionDeclaration | GetterClassMember | ImportDeclarator | MemberAccessExpression | MethodClassMember | NamedTypeExpression | Parameter | SetterClassMember | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
     readonly $type: 'OctalLiteral';
     value: string
 }
@@ -670,7 +633,7 @@ export function isSetterClassMember(item: unknown): item is SetterClassMember {
 }
 
 export interface StringLiteral extends AstNode {
-    readonly $container: ArrayAccessPath | AwaitExpression | BinaryExpression | CallPath | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessPath | MethodClassMember | NamedTypeExpression | NewExpression | Parameter | PathExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
+    readonly $container: ArrayAccessExpression | ClassDeclaration | DeclareDeclaration | ExportDeclarator | FieldClassMember | FunctionDeclaration | GetterClassMember | ImportDeclarator | MemberAccessExpression | MethodClassMember | NamedTypeExpression | Parameter | SetterClassMember | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
     readonly $type: 'StringLiteral';
     value: string
 }
@@ -682,7 +645,7 @@ export function isStringLiteral(item: unknown): item is StringLiteral {
 }
 
 export interface SuperLiteral extends AstNode {
-    readonly $container: ArrayAccessPath | AwaitExpression | BinaryExpression | CallPath | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessPath | MethodClassMember | NamedTypeExpression | NewExpression | Parameter | PathExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
+    readonly $container: ArrayAccessExpression | ClassDeclaration | DeclareDeclaration | ExportDeclarator | FieldClassMember | FunctionDeclaration | GetterClassMember | ImportDeclarator | MemberAccessExpression | MethodClassMember | NamedTypeExpression | Parameter | SetterClassMember | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
     readonly $type: 'SuperLiteral';
     super: 'super'
 }
@@ -694,7 +657,7 @@ export function isSuperLiteral(item: unknown): item is SuperLiteral {
 }
 
 export interface ThisLiteral extends AstNode {
-    readonly $container: ArrayAccessPath | AwaitExpression | BinaryExpression | CallPath | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessPath | MethodClassMember | NamedTypeExpression | NewExpression | Parameter | PathExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
+    readonly $container: ArrayAccessExpression | ClassDeclaration | DeclareDeclaration | ExportDeclarator | FieldClassMember | FunctionDeclaration | GetterClassMember | ImportDeclarator | MemberAccessExpression | MethodClassMember | NamedTypeExpression | Parameter | SetterClassMember | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
     readonly $type: 'ThisLiteral';
     this: 'this'
 }
@@ -706,7 +669,7 @@ export function isThisLiteral(item: unknown): item is ThisLiteral {
 }
 
 export interface TrueLiteral extends AstNode {
-    readonly $container: ArrayAccessPath | AwaitExpression | BinaryExpression | CallPath | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessPath | MethodClassMember | NamedTypeExpression | NewExpression | Parameter | PathExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
+    readonly $container: ArrayAccessExpression | ClassDeclaration | DeclareDeclaration | ExportDeclarator | FieldClassMember | FunctionDeclaration | GetterClassMember | ImportDeclarator | MemberAccessExpression | MethodClassMember | NamedTypeExpression | Parameter | SetterClassMember | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
     readonly $type: 'TrueLiteral';
     true: 'true'
 }
@@ -718,7 +681,7 @@ export function isTrueLiteral(item: unknown): item is TrueLiteral {
 }
 
 export interface TupleExpression extends AstNode {
-    readonly $container: ArrayAccessPath | AwaitExpression | BinaryExpression | CallPath | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessPath | MethodClassMember | NamedTypeExpression | NewExpression | Parameter | PathExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
+    readonly $container: ArrayAccessExpression | AwaitExpression | BinaryExpression | CallExpression | ExpressionStatement | FieldClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | LeftUnaryExpression | MemberAccessExpression | NewExpression | ReturnStatement | TernaryExpression | TupleExpression | VariableDeclarator | WhileStatement | YieldExpression;
     readonly $type: 'AssignmentExpression' | 'BinaryExpression' | 'TernaryExpression' | 'TupleExpression' | 'YieldExpression';
     expressions: Array<Expression>
 }
@@ -730,7 +693,7 @@ export function isTupleExpression(item: unknown): item is TupleExpression {
 }
 
 export interface TupleTypeExpression extends AstNode {
-    readonly $container: AsyncBlockLiteral | CallPath | ClassDeclaration | DeclareDeclaration | FieldClassMember | FunctionDeclaration | FunctionLiteral | FunctionTypeExpression | GetterClassMember | HeldTypeExpression | MethodClassMember | NamedTypeExpression | NewExpression | TupleTypeExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
+    readonly $container: AsyncBlockLiteral | CallExpression | ClassDeclaration | DeclareDeclaration | FieldClassMember | FunctionDeclaration | FunctionLiteral | FunctionTypeExpression | GetterClassMember | HeldTypeExpression | MethodClassMember | NamedTypeExpression | NewExpression | TupleTypeExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator;
     readonly $type: 'TupleTypeExpression';
     types: Array<TypeExpression>
 }
@@ -811,8 +774,8 @@ export function isWhileStatement(item: unknown): item is WhileStatement {
 }
 
 export interface AwaitExpression extends LeftUnaryExpression {
-    readonly $container: ArrayAccessPath | AwaitExpression | BinaryExpression | CallPath | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessPath | MethodClassMember | NamedTypeExpression | NewExpression | Parameter | PathExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
-    readonly $type: 'AsyncBlockLiteral' | 'AwaitExpression' | 'BinaryLiteral' | 'FalseLiteral' | 'FloatLiteral' | 'FunctionLiteral' | 'GroupLiteral' | 'HexLiteral' | 'HoldExpression' | 'ID' | 'IntegerLiteral' | 'NewExpression' | 'NullLiteral' | 'OctalLiteral' | 'PathExpression' | 'PrimaryExpression' | 'StringLiteral' | 'SuperLiteral' | 'ThisLiteral' | 'TrueLiteral';
+    readonly $container: ArrayAccessExpression | AwaitExpression | BinaryExpression | CallExpression | ExpressionStatement | FieldClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | LeftUnaryExpression | MemberAccessExpression | NewExpression | ReturnStatement | TernaryExpression | TupleExpression | VariableDeclarator | WhileStatement | YieldExpression;
+    readonly $type: 'ArrayAccessExpression' | 'AwaitExpression' | 'CallExpression' | 'HoldExpression' | 'MemberAccessExpression' | 'NewExpression';
     expression: LeftUnaryExpression
 }
 
@@ -823,7 +786,7 @@ export function isAwaitExpression(item: unknown): item is AwaitExpression {
 }
 
 export interface YieldExpression extends TupleExpression {
-    readonly $container: ArrayAccessPath | AwaitExpression | BinaryExpression | CallPath | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessPath | MethodClassMember | NamedTypeExpression | NewExpression | Parameter | PathExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
+    readonly $container: ArrayAccessExpression | AwaitExpression | BinaryExpression | CallExpression | ExpressionStatement | FieldClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | LeftUnaryExpression | MemberAccessExpression | NewExpression | ReturnStatement | TernaryExpression | TupleExpression | VariableDeclarator | WhileStatement | YieldExpression;
     readonly $type: 'AssignmentExpression' | 'BinaryExpression' | 'TernaryExpression' | 'YieldExpression';
     expression: YieldExpression
 }
@@ -835,8 +798,8 @@ export function isYieldExpression(item: unknown): item is YieldExpression {
 }
 
 export interface HoldExpression extends AwaitExpression {
-    readonly $container: ArrayAccessPath | AwaitExpression | BinaryExpression | CallPath | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessPath | MethodClassMember | NamedTypeExpression | NewExpression | Parameter | PathExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
-    readonly $type: 'AsyncBlockLiteral' | 'BinaryLiteral' | 'FalseLiteral' | 'FloatLiteral' | 'FunctionLiteral' | 'GroupLiteral' | 'HexLiteral' | 'HoldExpression' | 'ID' | 'IntegerLiteral' | 'NewExpression' | 'NullLiteral' | 'OctalLiteral' | 'PathExpression' | 'PrimaryExpression' | 'StringLiteral' | 'SuperLiteral' | 'ThisLiteral' | 'TrueLiteral';
+    readonly $container: ArrayAccessExpression | AwaitExpression | BinaryExpression | CallExpression | ExpressionStatement | FieldClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | LeftUnaryExpression | MemberAccessExpression | NewExpression | ReturnStatement | TernaryExpression | TupleExpression | VariableDeclarator | WhileStatement | YieldExpression;
+    readonly $type: 'ArrayAccessExpression' | 'CallExpression' | 'HoldExpression' | 'MemberAccessExpression' | 'NewExpression';
     expression: LeftUnaryExpression
 }
 
@@ -847,7 +810,7 @@ export function isHoldExpression(item: unknown): item is HoldExpression {
 }
 
 export interface TernaryExpression extends YieldExpression {
-    readonly $container: ArrayAccessPath | AwaitExpression | BinaryExpression | CallPath | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessPath | MethodClassMember | NamedTypeExpression | NewExpression | Parameter | PathExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
+    readonly $container: ArrayAccessExpression | AwaitExpression | BinaryExpression | CallExpression | ExpressionStatement | FieldClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | LeftUnaryExpression | MemberAccessExpression | NewExpression | ReturnStatement | TernaryExpression | TupleExpression | VariableDeclarator | WhileStatement | YieldExpression;
     readonly $type: 'AssignmentExpression' | 'BinaryExpression' | 'TernaryExpression';
     condition: AssignmentExpression
     falsy: TernaryExpression
@@ -861,8 +824,8 @@ export function isTernaryExpression(item: unknown): item is TernaryExpression {
 }
 
 export interface NewExpression extends HoldExpression {
-    readonly $container: ArrayAccessPath | AwaitExpression | BinaryExpression | CallPath | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessPath | MethodClassMember | NamedTypeExpression | NewExpression | Parameter | PathExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
-    readonly $type: 'AsyncBlockLiteral' | 'BinaryLiteral' | 'FalseLiteral' | 'FloatLiteral' | 'FunctionLiteral' | 'GroupLiteral' | 'HexLiteral' | 'ID' | 'IntegerLiteral' | 'NewExpression' | 'NullLiteral' | 'OctalLiteral' | 'PathExpression' | 'PrimaryExpression' | 'StringLiteral' | 'SuperLiteral' | 'ThisLiteral' | 'TrueLiteral';
+    readonly $container: ArrayAccessExpression | AwaitExpression | BinaryExpression | CallExpression | ExpressionStatement | FieldClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | LeftUnaryExpression | MemberAccessExpression | NewExpression | ReturnStatement | TernaryExpression | TupleExpression | VariableDeclarator | WhileStatement | YieldExpression;
+    readonly $type: 'ArrayAccessExpression' | 'CallExpression' | 'MemberAccessExpression' | 'NewExpression';
     expression: NewExpression
     parameters: Array<Expression>
     typeParameters: Array<TypeExpression>
@@ -874,21 +837,48 @@ export function isNewExpression(item: unknown): item is NewExpression {
     return reflection.isInstance(item, NewExpression);
 }
 
-export interface PathExpression extends NewExpression {
-    readonly $container: ArrayAccessPath | AwaitExpression | BinaryExpression | CallPath | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessPath | MethodClassMember | NamedTypeExpression | NewExpression | Parameter | PathExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
-    readonly $type: 'AsyncBlockLiteral' | 'BinaryLiteral' | 'FalseLiteral' | 'FloatLiteral' | 'FunctionLiteral' | 'GroupLiteral' | 'HexLiteral' | 'ID' | 'IntegerLiteral' | 'NullLiteral' | 'OctalLiteral' | 'PathExpression' | 'PrimaryExpression' | 'StringLiteral' | 'SuperLiteral' | 'ThisLiteral' | 'TrueLiteral';
-    path: Array<ArrayAccessPath> | Array<CallPath> | Array<MemberAccessPath>
-    root: PrimaryExpression
+export interface CallExpression extends NewExpression {
+    readonly $container: ArrayAccessExpression | AwaitExpression | BinaryExpression | CallExpression | ExpressionStatement | FieldClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | LeftUnaryExpression | MemberAccessExpression | NewExpression | ReturnStatement | TernaryExpression | TupleExpression | VariableDeclarator | WhileStatement | YieldExpression;
+    readonly $type: 'ArrayAccessExpression' | 'CallExpression' | 'MemberAccessExpression';
+    callRoot: MemberAccessExpression
+    parameters: Array<Expression>
+    typeParameters: Array<TypeExpression>
 }
 
-export const PathExpression = 'PathExpression';
+export const CallExpression = 'CallExpression';
 
-export function isPathExpression(item: unknown): item is PathExpression {
-    return reflection.isInstance(item, PathExpression);
+export function isCallExpression(item: unknown): item is CallExpression {
+    return reflection.isInstance(item, CallExpression);
+}
+
+export interface MemberAccessExpression extends CallExpression {
+    readonly $container: ArrayAccessExpression | AwaitExpression | BinaryExpression | CallExpression | ExpressionStatement | FieldClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | LeftUnaryExpression | MemberAccessExpression | NewExpression | ReturnStatement | TernaryExpression | TupleExpression | VariableDeclarator | WhileStatement | YieldExpression;
+    readonly $type: 'ArrayAccessExpression' | 'MemberAccessExpression';
+    member?: ID
+    memberRoot: ArrayAccessExpression
+}
+
+export const MemberAccessExpression = 'MemberAccessExpression';
+
+export function isMemberAccessExpression(item: unknown): item is MemberAccessExpression {
+    return reflection.isInstance(item, MemberAccessExpression);
+}
+
+export interface ArrayAccessExpression extends MemberAccessExpression {
+    readonly $container: ArrayAccessExpression | AwaitExpression | BinaryExpression | CallExpression | ExpressionStatement | FieldClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | LeftUnaryExpression | MemberAccessExpression | NewExpression | ReturnStatement | TernaryExpression | TupleExpression | VariableDeclarator | WhileStatement | YieldExpression;
+    readonly $type: 'ArrayAccessExpression';
+    arrayRoot: PrimaryExpression
+    indexExpression?: Expression
+}
+
+export const ArrayAccessExpression = 'ArrayAccessExpression';
+
+export function isArrayAccessExpression(item: unknown): item is ArrayAccessExpression {
+    return reflection.isInstance(item, ArrayAccessExpression);
 }
 
 export interface WhackoAstType {
-    ArrayAccessPath: ArrayAccessPath
+    ArrayAccessExpression: ArrayAccessExpression
     AssignmentExpression: AssignmentExpression
     AsyncBlockLiteral: AsyncBlockLiteral
     AwaitExpression: AwaitExpression
@@ -900,7 +890,7 @@ export interface WhackoAstType {
     BitwiseXOrExpression: BitwiseXOrExpression
     BlockStatement: BlockStatement
     BreakStatement: BreakStatement
-    CallPath: CallPath
+    CallExpression: CallExpression
     ClassDeclaration: ClassDeclaration
     ClassMember: ClassMember
     ComaprisonExpression: ComaprisonExpression
@@ -933,14 +923,13 @@ export interface WhackoAstType {
     LeftUnaryExpression: LeftUnaryExpression
     LogicalAndExpression: LogicalAndExpression
     LogicalOrExpression: LogicalOrExpression
-    MemberAccessPath: MemberAccessPath
+    MemberAccessExpression: MemberAccessExpression
     MethodClassMember: MethodClassMember
     NamedTypeExpression: NamedTypeExpression
     NewExpression: NewExpression
     NullLiteral: NullLiteral
     OctalLiteral: OctalLiteral
     Parameter: Parameter
-    PathExpression: PathExpression
     PrimaryExpression: PrimaryExpression
     ProductExpression: ProductExpression
     Program: Program
@@ -967,7 +956,7 @@ export interface WhackoAstType {
 export class WhackoAstReflection extends AbstractAstReflection {
 
     getAllTypes(): string[] {
-        return ['ArrayAccessPath', 'AssignmentExpression', 'AsyncBlockLiteral', 'AwaitExpression', 'BinaryExpression', 'BinaryLiteral', 'BitShiftExpression', 'BitwiseAndExpression', 'BitwiseOrExpression', 'BitwiseXOrExpression', 'BlockStatement', 'BreakStatement', 'CallPath', 'ClassDeclaration', 'ClassMember', 'ComaprisonExpression', 'ConstructorClassMember', 'ContinueStatement', 'DeclareDeclaration', 'EqualityExpression', 'ExponentiationExpression', 'ExportDeclaration', 'ExportDeclarator', 'Expression', 'ExpressionStatement', 'FalseLiteral', 'FieldClassMember', 'FloatLiteral', 'FunctionDeclaration', 'FunctionLiteral', 'FunctionTypeExpression', 'GetterClassMember', 'GrabStatement', 'GroupLiteral', 'HeldTypeExpression', 'HexLiteral', 'HoldExpression', 'ID', 'IfElseStatement', 'ImportDeclaration', 'ImportDeclarator', 'IntegerLiteral', 'LeftUnaryExpression', 'LogicalAndExpression', 'LogicalOrExpression', 'MemberAccessPath', 'MethodClassMember', 'NamedTypeExpression', 'NewExpression', 'NullLiteral', 'OctalLiteral', 'Parameter', 'PathExpression', 'PrimaryExpression', 'ProductExpression', 'Program', 'ReturnStatement', 'SetterClassMember', 'Statement', 'StringLiteral', 'SumExpression', 'SuperLiteral', 'TernaryExpression', 'ThisLiteral', 'TrueLiteral', 'TupleExpression', 'TupleTypeExpression', 'TypeDeclaration', 'TypeDeclarationStatement', 'TypeExpression', 'VariableDeclarationStatement', 'VariableDeclarator', 'WhileStatement', 'YieldExpression'];
+        return ['ArrayAccessExpression', 'AssignmentExpression', 'AsyncBlockLiteral', 'AwaitExpression', 'BinaryExpression', 'BinaryLiteral', 'BitShiftExpression', 'BitwiseAndExpression', 'BitwiseOrExpression', 'BitwiseXOrExpression', 'BlockStatement', 'BreakStatement', 'CallExpression', 'ClassDeclaration', 'ClassMember', 'ComaprisonExpression', 'ConstructorClassMember', 'ContinueStatement', 'DeclareDeclaration', 'EqualityExpression', 'ExponentiationExpression', 'ExportDeclaration', 'ExportDeclarator', 'Expression', 'ExpressionStatement', 'FalseLiteral', 'FieldClassMember', 'FloatLiteral', 'FunctionDeclaration', 'FunctionLiteral', 'FunctionTypeExpression', 'GetterClassMember', 'GrabStatement', 'GroupLiteral', 'HeldTypeExpression', 'HexLiteral', 'HoldExpression', 'ID', 'IfElseStatement', 'ImportDeclaration', 'ImportDeclarator', 'IntegerLiteral', 'LeftUnaryExpression', 'LogicalAndExpression', 'LogicalOrExpression', 'MemberAccessExpression', 'MethodClassMember', 'NamedTypeExpression', 'NewExpression', 'NullLiteral', 'OctalLiteral', 'Parameter', 'PrimaryExpression', 'ProductExpression', 'Program', 'ReturnStatement', 'SetterClassMember', 'Statement', 'StringLiteral', 'SumExpression', 'SuperLiteral', 'TernaryExpression', 'ThisLiteral', 'TrueLiteral', 'TupleExpression', 'TupleTypeExpression', 'TypeDeclaration', 'TypeDeclarationStatement', 'TypeExpression', 'VariableDeclarationStatement', 'VariableDeclarator', 'WhileStatement', 'YieldExpression'];
     }
 
     protected override computeIsSubtype(subtype: string, supertype: string): boolean {
@@ -1038,8 +1027,14 @@ export class WhackoAstReflection extends AbstractAstReflection {
             case NewExpression: {
                 return this.isSubtype(HoldExpression, supertype);
             }
-            case PathExpression: {
-                return this.isSubtype(AssignmentExpression, supertype) || this.isSubtype(NewExpression, supertype);
+            case CallExpression: {
+                return this.isSubtype(NewExpression, supertype);
+            }
+            case MemberAccessExpression: {
+                return this.isSubtype(AssignmentExpression, supertype) || this.isSubtype(CallExpression, supertype);
+            }
+            case ArrayAccessExpression: {
+                return this.isSubtype(MemberAccessExpression, supertype);
             }
             case AssignmentExpression: {
                 return this.isSubtype(TernaryExpression, supertype);
@@ -1071,9 +1066,6 @@ export class WhackoAstReflection extends AbstractAstReflection {
             case LogicalOrExpression: {
                 return this.isSubtype(AssignmentExpression, supertype);
             }
-            case PrimaryExpression: {
-                return this.isSubtype(PathExpression, supertype);
-            }
             case ProductExpression: {
                 return this.isSubtype(SumExpression, supertype);
             }
@@ -1102,15 +1094,6 @@ export class WhackoAstReflection extends AbstractAstReflection {
                     name: 'BlockStatement',
                     mandatory: [
                         { name: 'statements', type: 'array' }
-                    ]
-                };
-            }
-            case 'CallPath': {
-                return {
-                    name: 'CallPath',
-                    mandatory: [
-                        { name: 'parameters', type: 'array' },
-                        { name: 'typeParameters', type: 'array' }
                     ]
                 };
             }
@@ -1270,12 +1253,35 @@ export class WhackoAstReflection extends AbstractAstReflection {
                     ]
                 };
             }
-            case 'PathExpression': {
+            case 'CallExpression': {
                 return {
-                    name: 'PathExpression',
+                    name: 'CallExpression',
                     mandatory: [
                         { name: 'parameters', type: 'array' },
-                        { name: 'path', type: 'array' },
+                        { name: 'parameters', type: 'array' },
+                        { name: 'typeParameters', type: 'array' },
+                        { name: 'typeParameters', type: 'array' }
+                    ]
+                };
+            }
+            case 'MemberAccessExpression': {
+                return {
+                    name: 'MemberAccessExpression',
+                    mandatory: [
+                        { name: 'parameters', type: 'array' },
+                        { name: 'parameters', type: 'array' },
+                        { name: 'typeParameters', type: 'array' },
+                        { name: 'typeParameters', type: 'array' }
+                    ]
+                };
+            }
+            case 'ArrayAccessExpression': {
+                return {
+                    name: 'ArrayAccessExpression',
+                    mandatory: [
+                        { name: 'parameters', type: 'array' },
+                        { name: 'parameters', type: 'array' },
+                        { name: 'typeParameters', type: 'array' },
                         { name: 'typeParameters', type: 'array' }
                     ]
                 };

@@ -116,7 +116,7 @@ TernaryExpression:
     | AssignmentExpression;
 
 AssignmentExpression:
-    PathExpression ({infer BinaryExpression.lhs=current} op=("=" | "+=" | "-=" | "**=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | ">>>=" | "&=" | "^=" | "|=" | "&&=" | "||=" | "??=") rhs=LogicalOrExpression)*
+    MemberAccessExpression ({infer BinaryExpression.lhs=current} op=("=" | "+=" | "-=" | "**=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | ">>>=" | "&=" | "^=" | "|=" | "&&=" | "||=" | "??=") rhs=LogicalOrExpression)*
     | LogicalOrExpression;
 
 LogicalOrExpression:
@@ -166,24 +166,22 @@ HoldExpression:
 
 NewExpression:
     "new" expression=NewExpression ("<" typeParameters+=TypeExpression ("," typeParameters+=TypeExpression)* ">")? "(" (parameters+=Expression ("," parameters+=Expression)*)? ")"
-    | PathExpression;
+    | CallExpression;
 
-// <TODO> make this expression remove left recursion properly
+CallExpression:
+    callRoot=MemberAccessExpression (
+        ("<" typeParameters+=TypeExpression ("," typeParameters+=TypeExpression)* ">")? "(" (parameters+=Expression ("," parameters+=Expression)*)? ")"
+    )*
+    | MemberAccessExpression;
 
-PathExpression:
-    root=PrimaryExpression (path+=MemberAccessPath | path+=ArrayAccessPath | path+=CallPath)+
-    | PrimaryExpression;
+MemberAccessExpression:
+    memberRoot=ArrayAccessExpression (
+       "." member=ID
+    )*
+    | ArrayAccessExpression;
 
-MemberAccessPath:
-    "." member=ID;
-
-ArrayAccessPath:
-    "[" expression=Expression "]";
-
-CallPath:
-    ("<" typeParameters+=TypeExpression ("," typeParameters+=TypeExpression)* ">")? "(" (parameters+=Expression ("," parameters+=Expression)*)? ")";
-
-// </TODO>
+ArrayAccessExpression:
+    arrayRoot=PrimaryExpression ( "[" indexExpression=Expression "]")*;
 
 PrimaryExpression: FunctionLiteral | GroupLiteral | ID | FloatLiteral | IntegerLiteral | HexLiteral | BinaryLiteral | OctalLiteral | StringLiteral | FalseLiteral | TrueLiteral | NullLiteral | ThisLiteral | SuperLiteral | AsyncBlockLiteral;
 
