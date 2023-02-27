@@ -162,14 +162,17 @@ AwaitExpression:
 
 HoldExpression:
     "hold" expression=LeftUnaryExpression
+    | NewExpression;
+
+NewExpression:
+    "new" expression=NewExpression ("<" typeParameters+=TypeExpression ("," typeParameters+=TypeExpression)* ">")? "(" (parameters+=Expression ("," parameters+=Expression)*)? ")"
     | PathExpression;
 
-PathExpression:
-    root=PrimaryExpression (path+=NewPath | path+=MemberAccessPath | path+=ArrayAccessPath | path+=CallPath)+
-    | PrimaryExpression;
+// <TODO> make this expression remove left recursion properly
 
-NewPath:
-    "." "new" ("<" typeParameters+=TypeExpression ("," typeParameters+=TypeExpression)* ">")? "(" (parameters+=Expression ("," parameters+=Expression)*)? ")";
+PathExpression:
+    root=PrimaryExpression (path+=MemberAccessPath | path+=ArrayAccessPath | path+=CallPath)+
+    | PrimaryExpression;
 
 MemberAccessPath:
     "." member=ID;
@@ -179,6 +182,8 @@ ArrayAccessPath:
 
 CallPath:
     ("<" typeParameters+=TypeExpression ("," typeParameters+=TypeExpression)* ">")? "(" (parameters+=Expression ("," parameters+=Expression)*)? ")";
+
+// </TODO>
 
 PrimaryExpression: FunctionLiteral | GroupLiteral | ID | FloatLiteral | IntegerLiteral | HexLiteral | BinaryLiteral | OctalLiteral | StringLiteral | FalseLiteral | TrueLiteral | NullLiteral | ThisLiteral | SuperLiteral | AsyncBlockLiteral;
 

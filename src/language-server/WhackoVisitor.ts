@@ -42,7 +42,7 @@ import {
   AwaitExpression,
   HoldExpression,
   PathExpression,
-  NewPath,
+  NewExpression,
   MemberAccessPath,
   ArrayAccessPath,
   CallPath,
@@ -161,8 +161,8 @@ export class WhackoVisitor {
         return this.visitHoldExpression(node);
       case "PathExpression":
         return this.visitPathExpression(node);
-      case "NewPath":
-        return this.visitNewPath(node);
+      case "NewExpression":
+        return this.visitNewExpression(node);
       case "MemberAccessPath":
         return this.visitMemberAccessPath(node);
       case "ArrayAccessPath":
@@ -426,11 +426,12 @@ export class WhackoVisitor {
     }
   }
 
-  visitNewPath(node: NewPath) {
+  visitNewExpression(node: NewExpression) {
+    this.visit(node.expression);
+
     for (const param of node.typeParameters) {
       this.visit(param);
     }
-
     for (const param of node.parameters) {
       this.visit(param);
     }
@@ -540,11 +541,11 @@ export class WhackoVisitor {
       (isStatement(node) && isStatement(replacer)) ||
       (isExpression(node) && isExpression(replacer))
     ) {
-      // @ts-ignore: this is safe I promise
+      // @ts-ignore: this is safe I promise, $container is readonly
       replacer.$container = node.$container;
-      // @ts-ignore: this is safe I promise
+      // @ts-ignore: this is safe I promise, $container is readonly
       replacer.$containerIndex = node.$containerIndex;
-      // @ts-ignore: this is safe I promise
+      // @ts-ignore: this is safe I promise, $container is readonly
       replacer.$containerProperty = node.$containerProperty;
 
       if (typeof node.$containerIndex === "number") {

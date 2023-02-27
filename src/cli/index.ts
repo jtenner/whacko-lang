@@ -6,10 +6,11 @@ import { WhackoProgram } from "../language-server/program";
 const options = {};
 
 export default async function main(args: string[]): Promise<void> {
-  const {
-    values,
-    positionals,
-  } = parseArgs({ args, options, allowPositionals: true });
+  const { values, positionals } = parseArgs({
+    args,
+    options,
+    allowPositionals: true,
+  });
   const program = new WhackoProgram();
   for (const positional of positionals)
     program.addModule(positional, process.cwd());
