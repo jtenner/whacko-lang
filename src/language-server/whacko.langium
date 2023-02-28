@@ -66,7 +66,7 @@ SetterClassMember:
 ConstructorClassMember:
     (private="private")? "constructor" "(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")" block=BlockStatement;
 
-Statement: BlockStatement | TypeDeclarationStatement | GrabStatement | WhileStatement | ContinueStatement | BreakStatement | IfElseStatement | ReturnStatement | ExpressionStatement | VariableDeclarationStatement;
+Statement: BlockStatement | TypeDeclarationStatement | GrabStatement | WhileStatement | ContinueStatement | BreakStatement | IfElseStatement | ReturnStatement | VariableDeclarationStatement | ExpressionStatement;
 
 BlockStatement:
     "{" (statements+=Statement)* "}";
@@ -116,7 +116,7 @@ TernaryExpression:
     | AssignmentExpression;
 
 AssignmentExpression:
-    MemberAccessExpression ({infer BinaryExpression.lhs=current} op=("=" | "+=" | "-=" | "**=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | ">>>=" | "&=" | "^=" | "|=" | "&&=" | "||=" | "??=") rhs=LogicalOrExpression)*
+    LogicalOrExpression ({infer BinaryExpression.lhs=current} op=("=" | "+=" | "-=" | "**=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | ">>>=" | "&=" | "^=" | "|=" | "&&=" | "||=" | "??=") rhs=LogicalOrExpression)*
     | LogicalOrExpression;
 
 LogicalOrExpression:
@@ -166,23 +166,13 @@ HoldExpression:
 
 NewExpression:
     "new" expression=NewExpression ("<" typeParameters+=TypeExpression ("," typeParameters+=TypeExpression)* ">")? "(" (parameters+=Expression ("," parameters+=Expression)*)? ")"
-    | CallExpression;
+    | PathExpression;
 
-CallExpression:
-    callRoot=MemberAccessExpression (
+PathExpression:
+    PrimaryExpression (
         {infer CallExpression.callRoot=current} ("<" typeParameters+=TypeExpression ("," typeParameters+=TypeExpression)* ">")? "(" (parameters+=Expression ("," parameters+=Expression)*)? ")"
-    )+
-    | MemberAccessExpression;
-
-MemberAccessExpression:
-    memberRoot=ArrayAccessExpression (
-       {infer MemberAccessExpression.memberRoot=current} "." member=ID
-    )+
-    | ArrayAccessExpression;
-
-ArrayAccessExpression:
-    arrayRoot=PrimaryExpression (
-        {infer ArrayAccessExpression.arrayRoot=current} "[" indexExpression=Expression "]"
+        | {infer MemberAccessExpression.memberRoot=current} "." member=ID
+        | {infer ArrayAccessExpression.arrayRoot=current} "[" indexExpression=Expression "]"
     )+
     | PrimaryExpression;
 
@@ -240,7 +230,7 @@ terminal Identifier: /[a-zA-Z$_][a-zA-Z$_0-9]*/;
 
 terminal Binary: /0b[10]+/;
 terminal Hex: /0x[0-9a-fA-F]+/;
-terminal Octal: /0o[0-8]+/;
+terminal Octal: /0o[0-7]+/;
 terminal Float: /[-+]?[0-9]+[.][0-9]+([eE][-+]?[0-9]+)?/;
 terminal Integer: /[-+]?[0-9]+/;
 

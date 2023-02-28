@@ -1,3 +1,3 @@
 fn main(): void {
-  id().one.two.three[four].five();
+  id().whoops()[10].test;
 }
