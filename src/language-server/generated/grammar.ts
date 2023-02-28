@@ -3647,6 +3647,15 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
                 "$type": "Group",
                 "elements": [
                   {
+                    "$type": "Action",
+                    "inferredType": {
+                      "$type": "InferredType",
+                      "name": "CallExpression"
+                    },
+                    "feature": "callRoot",
+                    "operator": "="
+                  },
+                  {
                     "$type": "Group",
                     "elements": [
                       {
@@ -3743,7 +3752,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
                     "value": ")"
                   }
                 ],
-                "cardinality": "*"
+                "cardinality": "+"
               }
             ]
           },
@@ -3788,6 +3797,15 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
                 "$type": "Group",
                 "elements": [
                   {
+                    "$type": "Action",
+                    "inferredType": {
+                      "$type": "InferredType",
+                      "name": "MemberAccessExpression"
+                    },
+                    "feature": "memberRoot",
+                    "operator": "="
+                  },
+                  {
                     "$type": "Keyword",
                     "value": "."
                   },
@@ -3804,7 +3822,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
                     }
                   }
                 ],
-                "cardinality": "*"
+                "cardinality": "+"
               }
             ]
           },
@@ -3828,45 +3846,66 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
       "$type": "ParserRule",
       "name": "ArrayAccessExpression",
       "definition": {
-        "$type": "Group",
+        "$type": "Alternatives",
         "elements": [
-          {
-            "$type": "Assignment",
-            "feature": "arrayRoot",
-            "operator": "=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@56"
-              },
-              "arguments": []
-            }
-          },
           {
             "$type": "Group",
             "elements": [
               {
-                "$type": "Keyword",
-                "value": "["
-              },
-              {
                 "$type": "Assignment",
-                "feature": "indexExpression",
+                "feature": "arrayRoot",
                 "operator": "=",
                 "terminal": {
                   "$type": "RuleCall",
                   "rule": {
-                    "$ref": "#/rules@33"
+                    "$ref": "#/rules@56"
                   },
                   "arguments": []
                 }
               },
               {
-                "$type": "Keyword",
-                "value": "]"
+                "$type": "Group",
+                "elements": [
+                  {
+                    "$type": "Action",
+                    "inferredType": {
+                      "$type": "InferredType",
+                      "name": "ArrayAccessExpression"
+                    },
+                    "feature": "arrayRoot",
+                    "operator": "="
+                  },
+                  {
+                    "$type": "Keyword",
+                    "value": "["
+                  },
+                  {
+                    "$type": "Assignment",
+                    "feature": "indexExpression",
+                    "operator": "=",
+                    "terminal": {
+                      "$type": "RuleCall",
+                      "rule": {
+                        "$ref": "#/rules@33"
+                      },
+                      "arguments": []
+                    }
+                  },
+                  {
+                    "$type": "Keyword",
+                    "value": "]"
+                  }
+                ],
+                "cardinality": "+"
               }
-            ],
-            "cardinality": "*"
+            ]
+          },
+          {
+            "$type": "RuleCall",
+            "rule": {
+              "$ref": "#/rules@56"
+            },
+            "arguments": []
           }
         ]
       },

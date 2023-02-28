@@ -170,18 +170,21 @@ NewExpression:
 
 CallExpression:
     callRoot=MemberAccessExpression (
-        ("<" typeParameters+=TypeExpression ("," typeParameters+=TypeExpression)* ">")? "(" (parameters+=Expression ("," parameters+=Expression)*)? ")"
-    )*
+        {infer CallExpression.callRoot=current} ("<" typeParameters+=TypeExpression ("," typeParameters+=TypeExpression)* ">")? "(" (parameters+=Expression ("," parameters+=Expression)*)? ")"
+    )+
     | MemberAccessExpression;
 
 MemberAccessExpression:
     memberRoot=ArrayAccessExpression (
-       "." member=ID
-    )*
+       {infer MemberAccessExpression.memberRoot=current} "." member=ID
+    )+
     | ArrayAccessExpression;
 
 ArrayAccessExpression:
-    arrayRoot=PrimaryExpression ( "[" indexExpression=Expression "]")*;
+    arrayRoot=PrimaryExpression (
+        {infer ArrayAccessExpression.arrayRoot=current} "[" indexExpression=Expression "]"
+    )+
+    | PrimaryExpression;
 
 PrimaryExpression: FunctionLiteral | GroupLiteral | ID | FloatLiteral | IntegerLiteral | HexLiteral | BinaryLiteral | OctalLiteral | StringLiteral | FalseLiteral | TrueLiteral | NullLiteral | ThisLiteral | SuperLiteral | AsyncBlockLiteral;
 

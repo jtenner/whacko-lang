@@ -1,11 +1,3 @@
-type a = a;
-type b = b<Test>;
-type c = () => void;
-type d = (a, b, c) => i32;
-type e = held t;
-type f = (a,);
-type g = (h, i, j);
-
 fn main(): void {
-  id().test.some[a].b();
+  id().one.two.three[four].five();
 }

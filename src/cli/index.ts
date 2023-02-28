@@ -12,7 +12,8 @@ const options = {};
 
 class Pass extends WhackoPass {
   override visitBlockStatement(node: BlockStatement): void {
-    console.log(node);
+    // @ts-ignore
+    console.log(node.statements.length);
     super.visitBlockStatement(node);
   }
 }
