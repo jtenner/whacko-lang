@@ -163,7 +163,7 @@ export class WhackoVisitor {
       case "NewExpression":
         return this.visitNewExpression(node);
       case "MemberAccess":
-        return this.visitMemberAccessPath(node);
+        return this.visitMemberAccessExpression(node);
       case "ArrayAccessExpression":
         return this.visitArrayAccessExpression(node);
       case "GroupLiteral":
@@ -433,7 +433,7 @@ export class WhackoVisitor {
     }
   }
 
-  visitMemberAccessPath(node: MemberAccessExpression) {
+  visitMemberAccessExpression(node: MemberAccessExpression) {
     this.visit(node.memberRoot!);
     this.visit(node.member);
   }

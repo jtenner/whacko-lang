@@ -4,6 +4,7 @@ import fs from "node:fs";
 import { parse } from "./parser";
 import { DiagnosticLevel } from "./util";
 import { ModuleCollectionPass } from "./passes/ModuleCollectionPass";
+import { ScopeValidatorPass } from "./passes/ScopeValidatorPass";
 
 export class WhackoProgram {
   modules = new Map<string, WhackoModule>();
@@ -20,6 +21,8 @@ export class WhackoProgram {
       if (!parsedContents) return null;
       const mod = new WhackoModule(parsedContents.value);
       this.modules.set(absoluteModPath, mod);
+
+      // Diagnostics from the parser get added at the module level
       for (const lexerDiagnostic of parsedContents.lexerErrors) {
         mod.diagnostics.push({
           level: DiagnosticLevel.Error,
@@ -36,15 +39,25 @@ export class WhackoProgram {
           line: parserDiagnostic.token.startLine!,
         });
       }
+
+      // Module collection pass allows us to traverse imports as a first step
       const collectModules = new ModuleCollectionPass();
       mod.visit(collectModules);
       const dirname = path.dirname(absoluteModPath);
       for (const module of collectModules.modulesToAdd) {
+        // this is where the child modules are added
         this.addModule(module, dirname);
       }
       return mod;
     } catch (ex) {
       return null;
+    }
+  }
+
+  verifyScopes() {
+    for (const [modPath, mod] of this.modules) {
+      const pass = new ScopeValidatorPass();
+      mod.visit(pass);
     }
   }
 }
