@@ -9,7 +9,7 @@ entry Program:
     | declarations+=TypeDeclaration)*;
 
 DeclareDeclaration:
-    (export="export")? "declare" namespace=String method=String name=ID "(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")" ":" returnType=TypeExpression ";";
+    (export?="export")? "declare" namespace=String method=String name=ID "(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")" ":" returnType=TypeExpression ";";
 
 ImportDeclaration:
     "import" "{" (declarators+=ImportDeclarator ("," declarators+=ImportDeclarator)*)? "}" "from" path=String ";";
@@ -24,16 +24,20 @@ ExportDeclarator:
     name=ID ("as" alias=ID)?;
 
 FunctionDeclaration:
-    (export="export")? (async="async")? "fn" name=ID "(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")" ":" returnType=TypeExpression block=BlockStatement;
+    (export?="export")? (async="async")? "fn" name=ID  ("<" typeParameters+=ID ("," typeParameters+=ID)* ">")? "(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")" ":" returnType=TypeExpression block=BlockStatement;
 
 Parameter:
     name=ID ":" type=ID;
 
 TypeDeclaration:
-    (export="export")? "type" name=ID ("<" typeParameters+=ID ("," typeParameters+=ID)* ">")? "=" type=TypeExpression;
+    (export?="export")? "type" name=ID ("<" typeParameters+=ID ("," typeParameters+=ID)* ">")? "=" type=TypeExpression ";";
 
 ClassDeclaration:
-    (export="export")? (final="final")? "class" name=ID ("extends" extends=TypeExpression)? "{" members+=ClassMember* "}";
+    (export?="export")?
+    (final?="final")?
+    "class" name=ID ("<" typeParameters+=ID ("," typeParameters+=ID)* ">")?
+    ("extends" extends=TypeExpression)?
+    "{" members+=ClassMember* "}";
 
 TypeExpression: HeldTypeExpression | FunctionTypeExpression | NamedTypeExpression | TupleTypeExpression;
 
@@ -52,19 +56,19 @@ NamedTypeExpression:
 ClassMember: ConstructorClassMember | FieldClassMember | MethodClassMember | GetterClassMember | SetterClassMember;
 
 FieldClassMember:
-    (private="private")? name=ID ":" type=TypeExpression ("=" initializer=Expression)? ";";
+    (private?="private")? name=ID ":" type=TypeExpression ("=" initializer=Expression)? ";";
 
 MethodClassMember:
-    (private="private")? name=ID "(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")" ":" returnType=TypeExpression block=BlockStatement;
+    (private?="private")? name=ID "(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")" ":" returnType=TypeExpression block=BlockStatement;
 
 GetterClassMember:
-    (private="private")? "get" name=ID ":" returnType=TypeExpression block=BlockStatement;
+    (private?="private")? "get" name=ID ":" returnType=TypeExpression block=BlockStatement;
 
 SetterClassMember:
-    (private="private")? "set" name=ID "(" parameter=Parameter ")" block=BlockStatement;
+    (private?="private")? "set" name=ID "(" parameter=Parameter ")" block=BlockStatement;
 
 ConstructorClassMember:
-    (private="private")? "constructor" "(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")" block=BlockStatement;
+    (private?="private")? "constructor" "(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")" block=BlockStatement;
 
 Statement: BlockStatement | TypeDeclarationStatement | GrabStatement | WhileStatement | ContinueStatement | BreakStatement | IfElseStatement | ReturnStatement | VariableDeclarationStatement | ExpressionStatement;
 
@@ -81,10 +85,10 @@ WhileStatement:
     "while" "(" expression=Expression ")" statement=Statement;
 
 ContinueStatement:
-    cont="continue" ";";
+    cont?="continue" ";";
 
 BreakStatement:
-    brk="break" ";";
+    brk?="break" ";";
 
 IfElseStatement:
     "if" "(" condition=Expression ")" truthy=Statement ("else" falsy=Statement)?;
@@ -93,7 +97,7 @@ ReturnStatement:
     "return" expression=Expression ";";
 
 VariableDeclarationStatement:
-    declarationType=("const" | "let") declarators+=VariableDeclarator ("," declarators+=VariableDeclarator)* ";";
+    (immutable?="const" | "let") declarators+=VariableDeclarator ("," declarators+=VariableDeclarator)* ";";
 
 VariableDeclarator:
     name=ID (":" type=TypeExpression)? "=" expression=Expression;
@@ -116,8 +120,7 @@ TernaryExpression:
     | AssignmentExpression;
 
 AssignmentExpression:
-    LogicalOrExpression ({infer BinaryExpression.lhs=current} op=("=" | "+=" | "-=" | "**=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | ">>>=" | "&=" | "^=" | "|=" | "&&=" | "||=" | "??=") rhs=LogicalOrExpression)*
-    | LogicalOrExpression;
+    LogicalOrExpression ({infer BinaryExpression.lhs=current} op=("=" | "+=" | "-=" | "**=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | ">>>=" | "&=" | "^=" | "|=" | "&&=" | "||=" | "??=") rhs=LogicalOrExpression)*;
 
 LogicalOrExpression:
     LogicalAndExpression ({infer BinaryExpression.lhs=current} op=("||") rhs=LogicalAndExpression)*;
@@ -173,8 +176,7 @@ PathExpression:
         {infer CallExpression.callRoot=current} ("<" typeParameters+=TypeExpression ("," typeParameters+=TypeExpression)* ">")? "(" (parameters+=Expression ("," parameters+=Expression)*)? ")"
         | {infer MemberAccessExpression.memberRoot=current} "." member=ID
         | {infer ArrayAccessExpression.arrayRoot=current} "[" indexExpression=Expression "]"
-    )+
-    | PrimaryExpression;
+    )*;
 
 PrimaryExpression: FunctionLiteral | GroupLiteral | ID | FloatLiteral | IntegerLiteral | HexLiteral | BinaryLiteral | OctalLiteral | StringLiteral | FalseLiteral | TrueLiteral | NullLiteral | ThisLiteral | SuperLiteral | AsyncBlockLiteral;
 

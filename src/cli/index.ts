@@ -13,16 +13,6 @@ import { WhackoProgram } from "../language-server/program";
 
 const options = {};
 
-class Pass extends WhackoPass {
-  override visitBlockStatement(node: BlockStatement): void {
-    // @ts-ignore
-    console.log(node.statements.length);
-    // @ts-ignore
-    console.log(node.statements[0].expression);
-    super.visitBlockStatement(node);
-  }
-}
-
 export default async function main(args: string[]): Promise<void> {
   const { values, positionals } = parseArgs({
     args,
@@ -31,12 +21,9 @@ export default async function main(args: string[]): Promise<void> {
   });
   const program = new WhackoProgram();
   for (const positional of positionals) {
-    const file = await fs.readFile(positional, "utf-8");
-    const ast = parse(file);
-    console.log(ast?.lexerErrors);
-    console.log(ast?.parserErrors);
-    const pass = new Pass();
-    pass.visit(ast!.value);
+    program.addModule(positional, process.cwd());
   }
-  //program.addModule(positional, process.cwd());
+
+  program.compile();
+  console.log(program.modules);
 }

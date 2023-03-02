@@ -3,12 +3,10 @@
  * DO NOT EDIT MANUALLY!
  ******************************************************************************/
 
-import { loadGrammarFromJson, Grammar } from "langium";
+import { loadGrammarFromJson, Grammar } from 'langium';
 
 let loadedWhackoGrammar: Grammar | undefined;
-export const WhackoGrammar = (): Grammar =>
-  loadedWhackoGrammar ??
-  (loadedWhackoGrammar = loadGrammarFromJson(`{
+export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhackoGrammar = loadGrammarFromJson(`{
   "$type": "Grammar",
   "isDeclared": true,
   "name": "Whacko",
@@ -110,7 +108,7 @@ export const WhackoGrammar = (): Grammar =>
           {
             "$type": "Assignment",
             "feature": "export",
-            "operator": "=",
+            "operator": "?=",
             "terminal": {
               "$type": "Keyword",
               "value": "export"
@@ -489,7 +487,7 @@ export const WhackoGrammar = (): Grammar =>
           {
             "$type": "Assignment",
             "feature": "export",
-            "operator": "=",
+            "operator": "?=",
             "terminal": {
               "$type": "Keyword",
               "value": "export"
@@ -521,6 +519,54 @@ export const WhackoGrammar = (): Grammar =>
               },
               "arguments": []
             }
+          },
+          {
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Keyword",
+                "value": "<"
+              },
+              {
+                "$type": "Assignment",
+                "feature": "typeParameters",
+                "operator": "+=",
+                "terminal": {
+                  "$type": "RuleCall",
+                  "rule": {
+                    "$ref": "#/rules@69"
+                  },
+                  "arguments": []
+                }
+              },
+              {
+                "$type": "Group",
+                "elements": [
+                  {
+                    "$type": "Keyword",
+                    "value": ","
+                  },
+                  {
+                    "$type": "Assignment",
+                    "feature": "typeParameters",
+                    "operator": "+=",
+                    "terminal": {
+                      "$type": "RuleCall",
+                      "rule": {
+                        "$ref": "#/rules@69"
+                      },
+                      "arguments": []
+                    }
+                  }
+                ],
+                "cardinality": "*"
+              },
+              {
+                "$type": "Keyword",
+                "value": ">"
+              }
+            ],
+            "cardinality": "?"
           },
           {
             "$type": "Keyword",
@@ -659,7 +705,7 @@ export const WhackoGrammar = (): Grammar =>
           {
             "$type": "Assignment",
             "feature": "export",
-            "operator": "=",
+            "operator": "?=",
             "terminal": {
               "$type": "Keyword",
               "value": "export"
@@ -745,6 +791,10 @@ export const WhackoGrammar = (): Grammar =>
               },
               "arguments": []
             }
+          },
+          {
+            "$type": "Keyword",
+            "value": ";"
           }
         ]
       },
@@ -764,7 +814,7 @@ export const WhackoGrammar = (): Grammar =>
           {
             "$type": "Assignment",
             "feature": "export",
-            "operator": "=",
+            "operator": "?=",
             "terminal": {
               "$type": "Keyword",
               "value": "export"
@@ -774,7 +824,7 @@ export const WhackoGrammar = (): Grammar =>
           {
             "$type": "Assignment",
             "feature": "final",
-            "operator": "=",
+            "operator": "?=",
             "terminal": {
               "$type": "Keyword",
               "value": "final"
@@ -796,6 +846,54 @@ export const WhackoGrammar = (): Grammar =>
               },
               "arguments": []
             }
+          },
+          {
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Keyword",
+                "value": "<"
+              },
+              {
+                "$type": "Assignment",
+                "feature": "typeParameters",
+                "operator": "+=",
+                "terminal": {
+                  "$type": "RuleCall",
+                  "rule": {
+                    "$ref": "#/rules@69"
+                  },
+                  "arguments": []
+                }
+              },
+              {
+                "$type": "Group",
+                "elements": [
+                  {
+                    "$type": "Keyword",
+                    "value": ","
+                  },
+                  {
+                    "$type": "Assignment",
+                    "feature": "typeParameters",
+                    "operator": "+=",
+                    "terminal": {
+                      "$type": "RuleCall",
+                      "rule": {
+                        "$ref": "#/rules@69"
+                      },
+                      "arguments": []
+                    }
+                  }
+                ],
+                "cardinality": "*"
+              },
+              {
+                "$type": "Keyword",
+                "value": ">"
+              }
+            ],
+            "cardinality": "?"
           },
           {
             "$type": "Group",
@@ -1215,7 +1313,7 @@ export const WhackoGrammar = (): Grammar =>
           {
             "$type": "Assignment",
             "feature": "private",
-            "operator": "=",
+            "operator": "?=",
             "terminal": {
               "$type": "Keyword",
               "value": "private"
@@ -1294,7 +1392,7 @@ export const WhackoGrammar = (): Grammar =>
           {
             "$type": "Assignment",
             "feature": "private",
-            "operator": "=",
+            "operator": "?=",
             "terminal": {
               "$type": "Keyword",
               "value": "private"
@@ -1407,7 +1505,7 @@ export const WhackoGrammar = (): Grammar =>
           {
             "$type": "Assignment",
             "feature": "private",
-            "operator": "=",
+            "operator": "?=",
             "terminal": {
               "$type": "Keyword",
               "value": "private"
@@ -1476,7 +1574,7 @@ export const WhackoGrammar = (): Grammar =>
           {
             "$type": "Assignment",
             "feature": "private",
-            "operator": "=",
+            "operator": "?=",
             "terminal": {
               "$type": "Keyword",
               "value": "private"
@@ -1549,7 +1647,7 @@ export const WhackoGrammar = (): Grammar =>
           {
             "$type": "Assignment",
             "feature": "private",
-            "operator": "=",
+            "operator": "?=",
             "terminal": {
               "$type": "Keyword",
               "value": "private"
@@ -1960,7 +2058,7 @@ export const WhackoGrammar = (): Grammar =>
           {
             "$type": "Assignment",
             "feature": "cont",
-            "operator": "=",
+            "operator": "?=",
             "terminal": {
               "$type": "Keyword",
               "value": "continue"
@@ -1988,7 +2086,7 @@ export const WhackoGrammar = (): Grammar =>
           {
             "$type": "Assignment",
             "feature": "brk",
-            "operator": "=",
+            "operator": "?=",
             "terminal": {
               "$type": "Keyword",
               "value": "break"
@@ -2122,22 +2220,22 @@ export const WhackoGrammar = (): Grammar =>
         "$type": "Group",
         "elements": [
           {
-            "$type": "Assignment",
-            "feature": "declarationType",
-            "operator": "=",
-            "terminal": {
-              "$type": "Alternatives",
-              "elements": [
-                {
+            "$type": "Alternatives",
+            "elements": [
+              {
+                "$type": "Assignment",
+                "feature": "immutable",
+                "operator": "?=",
+                "terminal": {
                   "$type": "Keyword",
                   "value": "const"
-                },
-                {
-                  "$type": "Keyword",
-                  "value": "let"
                 }
-              ]
-            }
+              },
+              {
+                "$type": "Keyword",
+                "value": "let"
+              }
+            ]
           },
           {
             "$type": "Assignment",
@@ -2508,127 +2606,115 @@ export const WhackoGrammar = (): Grammar =>
       "$type": "ParserRule",
       "name": "AssignmentExpression",
       "definition": {
-        "$type": "Alternatives",
+        "$type": "Group",
         "elements": [
-          {
-            "$type": "Group",
-            "elements": [
-              {
-                "$type": "RuleCall",
-                "rule": {
-                  "$ref": "#/rules@38"
-                },
-                "arguments": []
-              },
-              {
-                "$type": "Group",
-                "elements": [
-                  {
-                    "$type": "Action",
-                    "inferredType": {
-                      "$type": "InferredType",
-                      "name": "BinaryExpression"
-                    },
-                    "feature": "lhs",
-                    "operator": "="
-                  },
-                  {
-                    "$type": "Assignment",
-                    "feature": "op",
-                    "operator": "=",
-                    "terminal": {
-                      "$type": "Alternatives",
-                      "elements": [
-                        {
-                          "$type": "Keyword",
-                          "value": "="
-                        },
-                        {
-                          "$type": "Keyword",
-                          "value": "+="
-                        },
-                        {
-                          "$type": "Keyword",
-                          "value": "-="
-                        },
-                        {
-                          "$type": "Keyword",
-                          "value": "**="
-                        },
-                        {
-                          "$type": "Keyword",
-                          "value": "*="
-                        },
-                        {
-                          "$type": "Keyword",
-                          "value": "/="
-                        },
-                        {
-                          "$type": "Keyword",
-                          "value": "%="
-                        },
-                        {
-                          "$type": "Keyword",
-                          "value": "<<="
-                        },
-                        {
-                          "$type": "Keyword",
-                          "value": ">>="
-                        },
-                        {
-                          "$type": "Keyword",
-                          "value": ">>>="
-                        },
-                        {
-                          "$type": "Keyword",
-                          "value": "&="
-                        },
-                        {
-                          "$type": "Keyword",
-                          "value": "^="
-                        },
-                        {
-                          "$type": "Keyword",
-                          "value": "|="
-                        },
-                        {
-                          "$type": "Keyword",
-                          "value": "&&="
-                        },
-                        {
-                          "$type": "Keyword",
-                          "value": "||="
-                        },
-                        {
-                          "$type": "Keyword",
-                          "value": "??="
-                        }
-                      ]
-                    }
-                  },
-                  {
-                    "$type": "Assignment",
-                    "feature": "rhs",
-                    "operator": "=",
-                    "terminal": {
-                      "$type": "RuleCall",
-                      "rule": {
-                        "$ref": "#/rules@38"
-                      },
-                      "arguments": []
-                    }
-                  }
-                ],
-                "cardinality": "*"
-              }
-            ]
-          },
           {
             "$type": "RuleCall",
             "rule": {
               "$ref": "#/rules@38"
             },
             "arguments": []
+          },
+          {
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Action",
+                "inferredType": {
+                  "$type": "InferredType",
+                  "name": "BinaryExpression"
+                },
+                "feature": "lhs",
+                "operator": "="
+              },
+              {
+                "$type": "Assignment",
+                "feature": "op",
+                "operator": "=",
+                "terminal": {
+                  "$type": "Alternatives",
+                  "elements": [
+                    {
+                      "$type": "Keyword",
+                      "value": "="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "+="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "-="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "**="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "*="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "/="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "%="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "<<="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": ">>="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": ">>>="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "&="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "^="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "|="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "&&="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "||="
+                    },
+                    {
+                      "$type": "Keyword",
+                      "value": "??="
+                    }
+                  ]
+                }
+              },
+              {
+                "$type": "Assignment",
+                "feature": "rhs",
+                "operator": "=",
+                "terminal": {
+                  "$type": "RuleCall",
+                  "rule": {
+                    "$ref": "#/rules@38"
+                  },
+                  "arguments": []
+                }
+              }
+            ],
+            "cardinality": "*"
           }
         ]
       },
@@ -3628,39 +3714,55 @@ export const WhackoGrammar = (): Grammar =>
       "$type": "ParserRule",
       "name": "PathExpression",
       "definition": {
-        "$type": "Alternatives",
+        "$type": "Group",
         "elements": [
           {
-            "$type": "Group",
+            "$type": "RuleCall",
+            "rule": {
+              "$ref": "#/rules@54"
+            },
+            "arguments": []
+          },
+          {
+            "$type": "Alternatives",
             "elements": [
               {
-                "$type": "RuleCall",
-                "rule": {
-                  "$ref": "#/rules@54"
-                },
-                "arguments": []
-              },
-              {
-                "$type": "Alternatives",
+                "$type": "Group",
                 "elements": [
+                  {
+                    "$type": "Action",
+                    "inferredType": {
+                      "$type": "InferredType",
+                      "name": "CallExpression"
+                    },
+                    "feature": "callRoot",
+                    "operator": "="
+                  },
                   {
                     "$type": "Group",
                     "elements": [
                       {
-                        "$type": "Action",
-                        "inferredType": {
-                          "$type": "InferredType",
-                          "name": "CallExpression"
-                        },
-                        "feature": "callRoot",
-                        "operator": "="
+                        "$type": "Keyword",
+                        "value": "<"
+                      },
+                      {
+                        "$type": "Assignment",
+                        "feature": "typeParameters",
+                        "operator": "+=",
+                        "terminal": {
+                          "$type": "RuleCall",
+                          "rule": {
+                            "$ref": "#/rules@10"
+                          },
+                          "arguments": []
+                        }
                       },
                       {
                         "$type": "Group",
                         "elements": [
                           {
                             "$type": "Keyword",
-                            "value": "<"
+                            "value": ","
                           },
                           {
                             "$type": "Assignment",
@@ -3673,43 +3775,43 @@ export const WhackoGrammar = (): Grammar =>
                               },
                               "arguments": []
                             }
-                          },
-                          {
-                            "$type": "Group",
-                            "elements": [
-                              {
-                                "$type": "Keyword",
-                                "value": ","
-                              },
-                              {
-                                "$type": "Assignment",
-                                "feature": "typeParameters",
-                                "operator": "+=",
-                                "terminal": {
-                                  "$type": "RuleCall",
-                                  "rule": {
-                                    "$ref": "#/rules@10"
-                                  },
-                                  "arguments": []
-                                }
-                              }
-                            ],
-                            "cardinality": "*"
-                          },
-                          {
-                            "$type": "Keyword",
-                            "value": ">"
                           }
                         ],
-                        "cardinality": "?"
+                        "cardinality": "*"
                       },
                       {
                         "$type": "Keyword",
-                        "value": "("
+                        "value": ">"
+                      }
+                    ],
+                    "cardinality": "?"
+                  },
+                  {
+                    "$type": "Keyword",
+                    "value": "("
+                  },
+                  {
+                    "$type": "Group",
+                    "elements": [
+                      {
+                        "$type": "Assignment",
+                        "feature": "parameters",
+                        "operator": "+=",
+                        "terminal": {
+                          "$type": "RuleCall",
+                          "rule": {
+                            "$ref": "#/rules@33"
+                          },
+                          "arguments": []
+                        }
                       },
                       {
                         "$type": "Group",
                         "elements": [
+                          {
+                            "$type": "Keyword",
+                            "value": ","
+                          },
                           {
                             "$type": "Assignment",
                             "feature": "parameters",
@@ -3721,113 +3823,85 @@ export const WhackoGrammar = (): Grammar =>
                               },
                               "arguments": []
                             }
-                          },
-                          {
-                            "$type": "Group",
-                            "elements": [
-                              {
-                                "$type": "Keyword",
-                                "value": ","
-                              },
-                              {
-                                "$type": "Assignment",
-                                "feature": "parameters",
-                                "operator": "+=",
-                                "terminal": {
-                                  "$type": "RuleCall",
-                                  "rule": {
-                                    "$ref": "#/rules@33"
-                                  },
-                                  "arguments": []
-                                }
-                              }
-                            ],
-                            "cardinality": "*"
                           }
                         ],
-                        "cardinality": "?"
-                      },
-                      {
-                        "$type": "Keyword",
-                        "value": ")"
+                        "cardinality": "*"
                       }
-                    ]
+                    ],
+                    "cardinality": "?"
                   },
                   {
-                    "$type": "Group",
-                    "elements": [
-                      {
-                        "$type": "Action",
-                        "inferredType": {
-                          "$type": "InferredType",
-                          "name": "MemberAccessExpression"
-                        },
-                        "feature": "memberRoot",
-                        "operator": "="
-                      },
-                      {
-                        "$type": "Keyword",
-                        "value": "."
-                      },
-                      {
-                        "$type": "Assignment",
-                        "feature": "member",
-                        "operator": "=",
-                        "terminal": {
-                          "$type": "RuleCall",
-                          "rule": {
-                            "$ref": "#/rules@69"
-                          },
-                          "arguments": []
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "$type": "Group",
-                    "elements": [
-                      {
-                        "$type": "Action",
-                        "inferredType": {
-                          "$type": "InferredType",
-                          "name": "ArrayAccessExpression"
-                        },
-                        "feature": "arrayRoot",
-                        "operator": "="
-                      },
-                      {
-                        "$type": "Keyword",
-                        "value": "["
-                      },
-                      {
-                        "$type": "Assignment",
-                        "feature": "indexExpression",
-                        "operator": "=",
-                        "terminal": {
-                          "$type": "RuleCall",
-                          "rule": {
-                            "$ref": "#/rules@33"
-                          },
-                          "arguments": []
-                        }
-                      },
-                      {
-                        "$type": "Keyword",
-                        "value": "]"
-                      }
-                    ]
+                    "$type": "Keyword",
+                    "value": ")"
                   }
-                ],
-                "cardinality": "+"
+                ]
+              },
+              {
+                "$type": "Group",
+                "elements": [
+                  {
+                    "$type": "Action",
+                    "inferredType": {
+                      "$type": "InferredType",
+                      "name": "MemberAccessExpression"
+                    },
+                    "feature": "memberRoot",
+                    "operator": "="
+                  },
+                  {
+                    "$type": "Keyword",
+                    "value": "."
+                  },
+                  {
+                    "$type": "Assignment",
+                    "feature": "member",
+                    "operator": "=",
+                    "terminal": {
+                      "$type": "RuleCall",
+                      "rule": {
+                        "$ref": "#/rules@69"
+                      },
+                      "arguments": []
+                    }
+                  }
+                ]
+              },
+              {
+                "$type": "Group",
+                "elements": [
+                  {
+                    "$type": "Action",
+                    "inferredType": {
+                      "$type": "InferredType",
+                      "name": "ArrayAccessExpression"
+                    },
+                    "feature": "arrayRoot",
+                    "operator": "="
+                  },
+                  {
+                    "$type": "Keyword",
+                    "value": "["
+                  },
+                  {
+                    "$type": "Assignment",
+                    "feature": "indexExpression",
+                    "operator": "=",
+                    "terminal": {
+                      "$type": "RuleCall",
+                      "rule": {
+                        "$ref": "#/rules@33"
+                      },
+                      "arguments": []
+                    }
+                  },
+                  {
+                    "$type": "Keyword",
+                    "value": "]"
+                  }
+                ]
               }
-            ]
-          },
-          {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@54"
-            },
-            "arguments": []
+            ],
+            "cardinality": "*"
           }
         ]
       },

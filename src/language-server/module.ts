@@ -1,16 +1,41 @@
+import { AstNode } from "langium";
 import { Program } from "./generated/ast";
-import { WhackoPass } from "./passes/WhackoPass";
-import { IDiagnostic } from "./util";
+import { Scope, ScopeElement } from "./types";
+import { DiagnosticLevel, IDiagnostic } from "./util";
 
 export class WhackoModule {
+  exports = new Map<string, ScopeElement>();
   constructor(public ast: Program) {}
+  scope = new Scope();
   diagnostics: IDiagnostic[] = [];
 
-  visit(pass: WhackoPass) {
-    pass.visit(this.ast);
+  error(type: string, node: AstNode, message: string) {
+    const range = node.$cstNode!.range.start;
+    this.diagnostics.push({
+      col: range.character,
+      level: DiagnosticLevel.Error,
+      line: range.character,
+      message: `[${type}] ${message}`,
+    });
+  }
 
-    for (const diagnostic of pass.diagnostics) {
-      this.diagnostics.push(diagnostic);
-    }
+  info(type: string, node: AstNode, message: string) {
+    const range = node.$cstNode!.range.start;
+    this.diagnostics.push({
+      col: range.character,
+      level: DiagnosticLevel.Info,
+      line: range.character,
+      message: `[${type}] ${message}`,
+    });
+  }
+
+  warning(type: string, node: AstNode, message: string) {
+    const range = node.$cstNode!.range.start;
+    this.diagnostics.push({
+      col: range.character,
+      level: DiagnosticLevel.Warning,
+      line: range.character,
+      message: `[${type}] ${message}`,
+    });
   }
 }

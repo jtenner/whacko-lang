@@ -1,3 +1,5 @@
-fn main(): void {
+export fn main(): void {
   id().whoops()[10].test;
 }
+
+export type a<b> = Array<b>;

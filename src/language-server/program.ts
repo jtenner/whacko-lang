@@ -4,7 +4,7 @@ import fs from "node:fs";
 import { parse } from "./parser";
 import { DiagnosticLevel } from "./util";
 import { ModuleCollectionPass } from "./passes/ModuleCollectionPass";
-import { ScopeValidatorPass } from "./passes/ScopeValidatorPass";
+import { ExportsPass } from "./passes/ExportsPass";
 
 export class WhackoProgram {
   modules = new Map<string, WhackoModule>();
@@ -41,8 +41,8 @@ export class WhackoProgram {
       }
 
       // Module collection pass allows us to traverse imports as a first step
-      const collectModules = new ModuleCollectionPass();
-      mod.visit(collectModules);
+      const collectModules = new ModuleCollectionPass(this);
+      collectModules.visitModule(mod);
       const dirname = path.dirname(absoluteModPath);
       for (const module of collectModules.modulesToAdd) {
         // this is where the child modules are added
@@ -54,10 +54,12 @@ export class WhackoProgram {
     }
   }
 
-  verifyScopes() {
-    for (const [modPath, mod] of this.modules) {
-      const pass = new ScopeValidatorPass();
-      mod.visit(pass);
+  compile(): Map<string, Buffer> {
+    const exportsPass = new ExportsPass(this);
+    for (const [, module] of this.modules) {
+      exportsPass.visitModule(module);
     }
+
+    return new Map();
   }
 }
