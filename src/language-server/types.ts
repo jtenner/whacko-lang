@@ -1,9 +1,35 @@
 import assert from "assert";
 import { AstNode } from "langium";
+import { VariableDeclarator } from "./generated/ast";
 
 export abstract class ScopeElement {}
 
+export class VariableScopeElement extends ScopeElement {
+  constructor(
+    public declarator: VariableDeclarator,
+    public immutable: boolean
+  ) {
+    super();
+  }
+
+  resolve(
+    typeParameters: ConcreteType,
+    ctx: ExecutionContext
+  ): ConcreteType | null {
+    return null;
+  }
+}
+
 export abstract class ScopeTypeElement extends ScopeElement {}
+
+export class NamespaceTypeScopeElement extends ScopeTypeElement {
+  exports = new Map<string, ScopeElement>();
+  scope: Scope;
+  constructor(public node: AstNode, parentScope: Scope) {
+    super();
+    this.scope = parentScope.forkTypes();
+  }
+}
 
 export class StaticTypeScopeElement extends ScopeTypeElement {
   private cachedConcreteType: ConcreteType | null = null;
@@ -337,4 +363,16 @@ export class SIMDType extends ConcreteType {
   constructor() {
     super(Type.v128);
   }
+}
+
+export abstract class ExecutionContextElement {
+  constructor(public ty: ConcreteType) {}
+}
+
+export class TypeExecutionContextElement {}
+
+export class ValueExecutionContextElement {}
+
+export class ExecutionContext {
+  values = new Map<string, ExecutionContextElement>();
 }

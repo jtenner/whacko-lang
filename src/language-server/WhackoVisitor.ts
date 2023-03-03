@@ -60,6 +60,8 @@ import {
   CallExpression,
   ArrayAccessExpression,
   MemberAccessExpression,
+  NamespaceDeclaration,
+  PathTypeExpression,
 } from "./generated/ast";
 import { createWhackoServices, WhackoServices } from "./whacko-module";
 
@@ -209,6 +211,15 @@ export class WhackoVisitor {
     }
   }
 
+  visitNamespaceDeclaration(node: NamespaceDeclaration) {
+    for (const declaration of node.declarations) {
+      this.visit(declaration);
+    }
+    for (const exports of node.exports) {
+      this.visit(exports);
+    }
+  }
+
   visitDeclareDeclaration(node: DeclareDeclaration) {
     this.visit(node.namespace);
     this.visit(node.method);
@@ -243,6 +254,9 @@ export class WhackoVisitor {
 
   visitFunctionDeclaration(node: FunctionDeclaration) {
     this.visit(node.name);
+    for (const typeParameter of node.typeParameters) {
+      this.visit(typeParameter);
+    }
     for (const parameter of node.parameters) {
       this.visit(parameter);
     }
@@ -286,6 +300,11 @@ export class WhackoVisitor {
     for (const type of node.types) {
       this.visit(type);
     }
+  }
+
+  visitPathTypeExpression(node: PathTypeExpression) {
+    this.visit(node.namespace);
+    this.visit(node.element);
   }
 
   visitNamedTypeExpression(node: NamedTypeExpression) {

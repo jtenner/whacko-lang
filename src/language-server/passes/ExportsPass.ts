@@ -1,14 +1,23 @@
+import assert from "assert";
 import { AstNode } from "langium";
 import {
   ClassDeclaration,
   DeclareDeclaration,
-  ExportDeclaration,
   ExportDeclarator,
   FunctionDeclaration,
   ID,
+  NamespaceDeclaration,
+  Program,
   TypeDeclaration,
 } from "../generated/ast";
-import { DynamicTypeScopeElement, StaticTypeScopeElement } from "../types";
+import {
+  DynamicTypeScopeElement,
+  NamespaceTypeScopeElement,
+  ScopeTypeElement,
+  ScopeElement,
+  StaticTypeScopeElement,
+  Scope,
+} from "../types";
 import { WhackoPass } from "./WhackoPass";
 
 interface Declaration extends AstNode {
@@ -17,11 +26,25 @@ interface Declaration extends AstNode {
   typeParameters?: ID[];
 }
 
+interface Exportable {
+  exports: Map<string, ScopeElement>;
+  scope: Scope;
+}
+
 export class ExportsPass extends WhackoPass {
+  stack: Exportable[] = [];
+  override visitProgram(node: Program): void {
+    this.stack.push(this.currentMod!);
+    super.visitProgram(node);
+    this.stack.pop();
+    assert(this.stack.length === 0, "Stack must be zero by this point.");
+  }
+
   override visitClassDeclaration(node: ClassDeclaration): void {
     this.defineExportableType(node);
   }
 
+  // declare "module" "method" (...params): returnType;
   override visitDeclareDeclaration(node: DeclareDeclaration): void {
     this.defineExportableType(node);
   }
@@ -30,8 +53,17 @@ export class ExportsPass extends WhackoPass {
     this.defineExportableType(node);
   }
 
+  // type A<b> = Map<string, b>;
   override visitTypeDeclaration(node: TypeDeclaration): void {
     this.defineExportableType(node);
+  }
+
+  override visitNamespaceDeclaration(node: NamespaceDeclaration): void {
+    const element = this.defineExportableType(node);
+
+    this.stack.push(element as NamespaceTypeScopeElement);
+    super.visitNamespaceDeclaration(node);
+    this.stack.pop();
   }
 
   override visitExportDeclarator(node: ExportDeclarator): void {
@@ -63,20 +95,33 @@ export class ExportsPass extends WhackoPass {
   }
 
   defineExportableType(node: Declaration) {
-    const element = node.typeParameters?.length
-      ? new DynamicTypeScopeElement(
-          node,
-          node.typeParameters.map((e) => e.name)
-        )
-      : new StaticTypeScopeElement(node);
-    const scope = this.currentMod!.scope;
+    let element: ScopeTypeElement;
+    const scope = this.stack.at(-1)!.scope;
+
+    if (node.$type === "NamespaceDeclaration") {
+      element = new NamespaceTypeScopeElement(node, scope);
+      const newScope = (element as NamespaceTypeScopeElement).scope;
+      this.currentMod!.scopes.set(node, newScope);
+    } else {
+      element = node.typeParameters?.length
+        ? new DynamicTypeScopeElement(
+            node,
+            node.typeParameters.map((e) => e.name)
+          )
+        : new StaticTypeScopeElement(node);
+    }
+
     const name = node.name.name;
     if (scope.has(name)) {
-      this.error(`Semantic`, node.name, `Element ${name} already defined.`);
+      this.error(
+        `Semantic`,
+        node.name,
+        `Element ${name} already defined in this scope.`
+      );
     } else {
       scope.add(name, element);
       if (node.export) {
-        const exports = this.currentMod!.exports;
+        const exports = this.stack.at(-1)!.exports;
         if (exports.has(name)) {
           this.error(
             `Semantic`,
@@ -88,5 +133,6 @@ export class ExportsPass extends WhackoPass {
         }
       }
     }
+    return element;
   }
 }

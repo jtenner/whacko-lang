@@ -5,7 +5,12 @@ import { DiagnosticLevel, IDiagnostic } from "./util";
 
 export class WhackoModule {
   exports = new Map<string, ScopeElement>();
-  constructor(public ast: Program) {}
+  scopes = new Map<AstNode, Scope>();
+  constructor(
+    public ast: Program,
+    public path: string,
+    public entry: boolean = false
+  ) {}
   scope = new Scope();
   diagnostics: IDiagnostic[] = [];
 
@@ -37,5 +42,19 @@ export class WhackoModule {
       line: range.character,
       message: `[${type}] ${message}`,
     });
+  }
+
+  getScope(node: AstNode): Scope | null {
+    while (true) {
+      const scope = this.scopes.get(node);
+      if (scope) return scope;
+
+      // we need to go up the tree
+      if (node.$container) {
+        node = node.$container;
+        continue;
+      }
+      return null;
+    }
   }
 }

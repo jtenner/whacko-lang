@@ -1,13 +1,5 @@
-import assert from "node:assert";
-import fs from "node:fs/promises";
 // @ts-ignore
 import { parseArgs } from "node:util";
-import {
-  ArrayAccessExpression,
-  BlockStatement,
-} from "../language-server/generated/ast";
-import { parse } from "../language-server/parser";
-import { WhackoPass } from "../language-server/passes/WhackoPass";
 import { WhackoProgram } from "../language-server/program";
 // import { WhackoProgram } from "../compiler";
 
@@ -21,9 +13,11 @@ export default async function main(args: string[]): Promise<void> {
   });
   const program = new WhackoProgram();
   for (const positional of positionals) {
-    program.addModule(positional, process.cwd());
+    program.addModule(positional, process.cwd(), true);
   }
 
   program.compile();
-  console.log(program.modules);
+  for (const [name, module] of program.modules) {
+    console.log(name, module);
+  }
 }

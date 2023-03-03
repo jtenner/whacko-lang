@@ -5,11 +5,17 @@ import { parse } from "./parser";
 import { DiagnosticLevel } from "./util";
 import { ModuleCollectionPass } from "./passes/ModuleCollectionPass";
 import { ExportsPass } from "./passes/ExportsPass";
+import { ImportsPass } from "./passes/ImportsPass";
+import { ScopeCreationPass } from "./passes/ScopeCreationPass";
 
 export class WhackoProgram {
   modules = new Map<string, WhackoModule>();
 
-  addModule(modPath: string, from: string): WhackoModule | null {
+  addModule(
+    modPath: string,
+    from: string,
+    entry: boolean
+  ): WhackoModule | null {
     const absoluteModPath = path.join(from, modPath);
     if (this.modules.has(absoluteModPath)) {
       return this.modules.get(absoluteModPath)!;
@@ -19,7 +25,11 @@ export class WhackoProgram {
       const contents = fs.readFileSync(absoluteModPath, "utf-8");
       const parsedContents = parse(contents);
       if (!parsedContents) return null;
-      const mod = new WhackoModule(parsedContents.value);
+      const mod = new WhackoModule(
+        parsedContents.value,
+        absoluteModPath,
+        entry
+      );
       this.modules.set(absoluteModPath, mod);
 
       // Diagnostics from the parser get added at the module level
@@ -46,7 +56,7 @@ export class WhackoProgram {
       const dirname = path.dirname(absoluteModPath);
       for (const module of collectModules.modulesToAdd) {
         // this is where the child modules are added
-        this.addModule(module, dirname);
+        this.addModule(module, dirname, false);
       }
       return mod;
     } catch (ex) {
@@ -58,6 +68,16 @@ export class WhackoProgram {
     const exportsPass = new ExportsPass(this);
     for (const [, module] of this.modules) {
       exportsPass.visitModule(module);
+    }
+
+    const importsPass = new ImportsPass(this);
+    for (const [, module] of this.modules) {
+      importsPass.visitModule(module);
+    }
+
+    const scopeCreationPass = new ScopeCreationPass(this);
+    for (const [, module] of this.modules) {
+      scopeCreationPass.visitModule(module);
     }
 
     return new Map();
