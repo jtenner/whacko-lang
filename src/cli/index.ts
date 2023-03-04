@@ -1,9 +1,23 @@
 // @ts-ignore
 import { parseArgs } from "node:util";
-import { WhackoProgram } from "../compiler";
+import { WhackoProgram } from "../language-server/program";
+// import { WhackoProgram } from "../compiler";
 
+const options = {};
 
-export default async function (): Promise<void> {
-  const prg = new WhackoProgram();
-  // visitor.visit(ast);
+export default async function main(args: string[]): Promise<void> {
+  const { values, positionals } = parseArgs({
+    args,
+    options,
+    allowPositionals: true,
+  });
+  const program = new WhackoProgram();
+  for (const positional of positionals) {
+    program.addModule(positional, process.cwd(), true);
+  }
+
+  program.compile();
+  for (const [name, module] of program.modules) {
+    console.log(name, module);
+  }
 }

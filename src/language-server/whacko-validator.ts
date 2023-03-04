@@ -43,18 +43,16 @@ export class WhackoValidator {
   ): void {
     if (assignmentnOperators.has(path.op)) {
       let lhs = path.lhs;
-      if (lhs.$type === "PathExpression") {
-        const lastItem = (lhs as AST.PathExpression).path.at(-1)!;
-        if (lastItem!.$type !== "MemberAccessPath") {
-          accept(
-            "error",
-            "Left hand side of assignment operation must be valid.",
-            {
-              node: path,
-              property: "lhs",
-            }
-          );
-        }
+      // @ts-expect-error
+      if (lhs.$type !== "MemberAccessExpression" || lhs.$type !== "ID") {
+        accept(
+          "error",
+          "Left hand side of assignment operation must be valid.",
+          {
+            node: path,
+            property: "lhs",
+          }
+        );
       }
     }
   }

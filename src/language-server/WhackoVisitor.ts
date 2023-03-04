@@ -41,11 +41,7 @@ import {
   LeftUnaryExpression,
   AwaitExpression,
   HoldExpression,
-  PathExpression,
-  NewPath,
-  MemberAccessPath,
-  ArrayAccessPath,
-  CallPath,
+  NewExpression,
   GroupLiteral,
   FloatLiteral,
   BinaryLiteral,
@@ -61,6 +57,11 @@ import {
   AsyncBlockLiteral,
   ID,
   FunctionLiteral,
+  CallExpression,
+  ArrayAccessExpression,
+  MemberAccessExpression,
+  NamespaceDeclaration,
+  PathTypeExpression,
 } from "./generated/ast";
 import { createWhackoServices, WhackoServices } from "./whacko-module";
 
@@ -159,16 +160,14 @@ export class WhackoVisitor {
         return this.visitAwaitExpression(node);
       case "HoldExpression":
         return this.visitHoldExpression(node);
-      case "PathExpression":
-        return this.visitPathExpression(node);
-      case "NewPath":
-        return this.visitNewPath(node);
-      case "MemberAccessPath":
-        return this.visitMemberAccessPath(node);
-      case "ArrayAccessPath":
-        return this.visitArrayAccessPath(node);
-      case "CallPath":
-        return this.visitCallPath(node);
+      case "CallExpression":
+        return this.visitCallExpression(node);
+      case "NewExpression":
+        return this.visitNewExpression(node);
+      case "MemberAccess":
+        return this.visitMemberAccessExpression(node);
+      case "ArrayAccessExpression":
+        return this.visitArrayAccessExpression(node);
       case "GroupLiteral":
         return this.visitGroupLiteral(node);
       case "FloatLiteral":
@@ -212,6 +211,15 @@ export class WhackoVisitor {
     }
   }
 
+  visitNamespaceDeclaration(node: NamespaceDeclaration) {
+    for (const declaration of node.declarations) {
+      this.visit(declaration);
+    }
+    for (const exports of node.exports) {
+      this.visit(exports);
+    }
+  }
+
   visitDeclareDeclaration(node: DeclareDeclaration) {
     this.visit(node.namespace);
     this.visit(node.method);
@@ -246,6 +254,9 @@ export class WhackoVisitor {
 
   visitFunctionDeclaration(node: FunctionDeclaration) {
     this.visit(node.name);
+    for (const typeParameter of node.typeParameters) {
+      this.visit(typeParameter);
+    }
     for (const parameter of node.parameters) {
       this.visit(parameter);
     }
@@ -289,6 +300,11 @@ export class WhackoVisitor {
     for (const type of node.types) {
       this.visit(type);
     }
+  }
+
+  visitPathTypeExpression(node: PathTypeExpression) {
+    this.visit(node.namespace);
+    this.visit(node.element);
   }
 
   visitNamedTypeExpression(node: NamedTypeExpression) {
@@ -419,39 +435,31 @@ export class WhackoVisitor {
     this.visit(node.expression);
   }
 
-  visitPathExpression(node: PathExpression) {
-    this.visit(node.root);
-    for (const path of node.path) {
-      this.visit(path);
-    }
+  visitCallExpression(node: CallExpression) {
+    this.visit(node.callRoot);
+    for (const parameter of node.typeParameters) this.visit(parameter);
+    for (const parameter of node.parameters) this.visit(parameter);
   }
 
-  visitNewPath(node: NewPath) {
+  visitNewExpression(node: NewExpression) {
+    this.visit(node.expression);
+
     for (const param of node.typeParameters) {
       this.visit(param);
     }
-
     for (const param of node.parameters) {
       this.visit(param);
     }
   }
 
-  visitMemberAccessPath(node: MemberAccessPath) {
+  visitMemberAccessExpression(node: MemberAccessExpression) {
+    this.visit(node.memberRoot!);
     this.visit(node.member);
   }
 
-  visitArrayAccessPath(node: ArrayAccessPath) {
-    this.visit(node.expression);
-  }
-
-  visitCallPath(node: CallPath) {
-    for (const param of node.typeParameters) {
-      this.visit(param);
-    }
-
-    for (const param of node.parameters) {
-      this.visit(param);
-    }
+  visitArrayAccessExpression(node: ArrayAccessExpression) {
+    this.visit(node.arrayRoot);
+    this.visit(node.indexExpression);
   }
 
   visitFunctionLiteral(expression: FunctionLiteral) {
@@ -540,11 +548,11 @@ export class WhackoVisitor {
       (isStatement(node) && isStatement(replacer)) ||
       (isExpression(node) && isExpression(replacer))
     ) {
-      // @ts-ignore: this is safe I promise
+      // @ts-ignore: this is safe I promise, $container is readonly
       replacer.$container = node.$container;
-      // @ts-ignore: this is safe I promise
+      // @ts-ignore: this is safe I promise, $container is readonly
       replacer.$containerIndex = node.$containerIndex;
-      // @ts-ignore: this is safe I promise
+      // @ts-ignore: this is safe I promise, $container is readonly
       replacer.$containerProperty = node.$containerProperty;
 
       if (typeof node.$containerIndex === "number") {
