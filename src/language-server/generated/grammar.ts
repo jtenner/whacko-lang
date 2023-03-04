@@ -4151,7 +4151,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
       "definition": {
         "$type": "Assignment",
         "feature": "false",
-        "operator": "=",
+        "operator": "?=",
         "terminal": {
           "$type": "Keyword",
           "value": "false"
@@ -4170,7 +4170,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
       "definition": {
         "$type": "Assignment",
         "feature": "true",
-        "operator": "=",
+        "operator": "?=",
         "terminal": {
           "$type": "Keyword",
           "value": "true"
@@ -4189,7 +4189,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
       "definition": {
         "$type": "Assignment",
         "feature": "null",
-        "operator": "=",
+        "operator": "?=",
         "terminal": {
           "$type": "Keyword",
           "value": "null"
@@ -4208,7 +4208,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
       "definition": {
         "$type": "Assignment",
         "feature": "this",
-        "operator": "=",
+        "operator": "?=",
         "terminal": {
           "$type": "Keyword",
           "value": "this"
@@ -4227,7 +4227,7 @@ export const WhackoGrammar = (): Grammar => loadedWhackoGrammar ?? (loadedWhacko
       "definition": {
         "$type": "Assignment",
         "feature": "super",
-        "operator": "=",
+        "operator": "?=",
         "terminal": {
           "$type": "Keyword",
           "value": "super"

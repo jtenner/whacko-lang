@@ -340,7 +340,7 @@ export function isExpressionStatement(item: unknown): item is ExpressionStatemen
 export interface FalseLiteral extends AstNode {
     readonly $container: ArrayAccessExpression | AwaitExpression | BinaryExpression | CallExpression | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessExpression | MethodClassMember | NamedTypeExpression | NamespaceDeclaration | NewExpression | Parameter | PathTypeExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
     readonly $type: 'FalseLiteral';
-    false: 'false'
+    false: boolean
 }
 
 export const FalseLiteral = 'FalseLiteral';
@@ -611,7 +611,7 @@ export function isNamespaceDeclaration(item: unknown): item is NamespaceDeclarat
 export interface NullLiteral extends AstNode {
     readonly $container: ArrayAccessExpression | AwaitExpression | BinaryExpression | CallExpression | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessExpression | MethodClassMember | NamedTypeExpression | NamespaceDeclaration | NewExpression | Parameter | PathTypeExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
     readonly $type: 'NullLiteral';
-    null: 'null'
+    null: boolean
 }
 
 export const NullLiteral = 'NullLiteral';
@@ -713,7 +713,7 @@ export function isStringLiteral(item: unknown): item is StringLiteral {
 export interface SuperLiteral extends AstNode {
     readonly $container: ArrayAccessExpression | AwaitExpression | BinaryExpression | CallExpression | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessExpression | MethodClassMember | NamedTypeExpression | NamespaceDeclaration | NewExpression | Parameter | PathTypeExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
     readonly $type: 'SuperLiteral';
-    super: 'super'
+    super: boolean
 }
 
 export const SuperLiteral = 'SuperLiteral';
@@ -725,7 +725,7 @@ export function isSuperLiteral(item: unknown): item is SuperLiteral {
 export interface ThisLiteral extends AstNode {
     readonly $container: ArrayAccessExpression | AwaitExpression | BinaryExpression | CallExpression | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessExpression | MethodClassMember | NamedTypeExpression | NamespaceDeclaration | NewExpression | Parameter | PathTypeExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
     readonly $type: 'ThisLiteral';
-    this: 'this'
+    this: boolean
 }
 
 export const ThisLiteral = 'ThisLiteral';
@@ -737,7 +737,7 @@ export function isThisLiteral(item: unknown): item is ThisLiteral {
 export interface TrueLiteral extends AstNode {
     readonly $container: ArrayAccessExpression | AwaitExpression | BinaryExpression | CallExpression | ClassDeclaration | DeclareDeclaration | ExportDeclarator | ExpressionStatement | FieldClassMember | FunctionDeclaration | GetterClassMember | GrabStatement | GroupLiteral | HoldExpression | IfElseStatement | ImportDeclarator | LeftUnaryExpression | MemberAccessExpression | MethodClassMember | NamedTypeExpression | NamespaceDeclaration | NewExpression | Parameter | PathTypeExpression | ReturnStatement | SetterClassMember | TernaryExpression | TupleExpression | TypeDeclaration | TypeDeclarationStatement | VariableDeclarator | WhileStatement | YieldExpression;
     readonly $type: 'TrueLiteral';
-    true: 'true'
+    true: boolean
 }
 
 export const TrueLiteral = 'TrueLiteral';
@@ -1202,6 +1202,14 @@ export class WhackoAstReflection extends AbstractAstReflection {
                     ]
                 };
             }
+            case 'FalseLiteral': {
+                return {
+                    name: 'FalseLiteral',
+                    mandatory: [
+                        { name: 'false', type: 'boolean' }
+                    ]
+                };
+            }
             case 'FieldClassMember': {
                 return {
                     name: 'FieldClassMember',
@@ -1280,6 +1288,14 @@ export class WhackoAstReflection extends AbstractAstReflection {
                     ]
                 };
             }
+            case 'NullLiteral': {
+                return {
+                    name: 'NullLiteral',
+                    mandatory: [
+                        { name: 'null', type: 'boolean' }
+                    ]
+                };
+            }
             case 'Program': {
                 return {
                     name: 'Program',
@@ -1295,6 +1311,30 @@ export class WhackoAstReflection extends AbstractAstReflection {
                     name: 'SetterClassMember',
                     mandatory: [
                         { name: 'private', type: 'boolean' }
+                    ]
+                };
+            }
+            case 'SuperLiteral': {
+                return {
+                    name: 'SuperLiteral',
+                    mandatory: [
+                        { name: 'super', type: 'boolean' }
+                    ]
+                };
+            }
+            case 'ThisLiteral': {
+                return {
+                    name: 'ThisLiteral',
+                    mandatory: [
+                        { name: 'this', type: 'boolean' }
+                    ]
+                };
+            }
+            case 'TrueLiteral': {
+                return {
+                    name: 'TrueLiteral',
+                    mandatory: [
+                        { name: 'true', type: 'boolean' }
                     ]
                 };
             }
