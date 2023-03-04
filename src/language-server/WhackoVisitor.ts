@@ -446,12 +446,8 @@ export class WhackoVisitor {
   }
 
   visitFunctionLiteral(expression: FunctionLiteral) {
-    for (const typeParameter of expression.typeParameters) {
-      this.visit(typeParameter);
-    }
-    for (const parameter of expression.parameters) {
-      this.visit(parameter);
-    }
+    this.visitAll(expression.typeParameters);
+    this.visitAll(expression.parameters);
     this.visit(expression.returnType);
     this.visit(expression.block);
   }

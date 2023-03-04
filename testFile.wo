@@ -1,1 +1,3 @@
-type A = Namespace.Test;
+declare lunatic {
+  fn connect()
+} from "lunatic::tcp";
