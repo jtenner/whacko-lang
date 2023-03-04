@@ -62,6 +62,8 @@ import {
   MemberAccessExpression,
   NamespaceDeclaration,
   PathTypeExpression,
+  Decorator,
+  DeclareFunction,
 } from "./generated/ast";
 import { createWhackoServices, WhackoServices } from "./whacko-module";
 
@@ -84,8 +86,16 @@ export class WhackoVisitor {
   private services: WhackoServices =
     createWhackoServices(NodeFileSystem).Whacko;
 
+  visitAll(nodes: any[]) {
+    for (const node of nodes) this.visit(node);
+  }
+
   visit(node: any) {
     switch (node.$type) {
+      case "Decorator":
+        return this.visitDecorator(node);
+      case "DeclareFunction":
+        return this.visitDeclareFunction(node);
       case "Program":
         return this.visitProgram(node);
       case "DeclareDeclaration":
@@ -200,46 +210,42 @@ export class WhackoVisitor {
   }
 
   visitProgram(node: Program) {
-    for (const imports of node.imports) {
-      this.visit(imports);
-    }
-    for (const declaration of node.declarations) {
-      this.visit(declaration);
-    }
-    for (const exports of node.exports) {
-      this.visit(exports);
-    }
+    this.visitAll(node.imports);
+    this.visitAll(node.declarations);
+    this.visitAll(node.exports);
   }
 
   visitNamespaceDeclaration(node: NamespaceDeclaration) {
-    for (const declaration of node.declarations) {
-      this.visit(declaration);
-    }
-    for (const exports of node.exports) {
-      this.visit(exports);
-    }
+    this.visitAll(node.declarations);
+    this.visitAll(node.exports);
   }
 
   visitDeclareDeclaration(node: DeclareDeclaration) {
+    this.visitAll(node.decorators);
+    this.visit(node.name);
+    this.visitAll(node.functions);
     this.visit(node.namespace);
-    this.visit(node.method);
-    for (const parameter of node.parameters) {
-      this.visit(parameter);
-    }
+  }
+
+  visitDeclareFunction(node: DeclareFunction) {
+    this.visitAll(node.decorators);
+    this.visit(node.name);
+    this.visitAll(node.parameters);
     this.visit(node.returnType);
   }
 
+  visitDecorator(node: Decorator) {
+    this.visit(node.name);
+    this.visitAll(node.parameters);
+  }
+
   visitImportDeclaration(node: ImportDeclaration) {
-    for (const declarator of node.declarators) {
-      this.visit(declarator);
-    }
+    this.visitAll(node.declarators);
     this.visit(node.path);
   }
 
   visitExportDeclaration(node: ExportDeclaration) {
-    for (const declarator of node.declarators) {
-      this.visit(declarator);
-    }
+    this.visitAll(node.declarators);
   }
 
   visitExportDeclarator(node: ExportDeclarator) {
@@ -254,12 +260,8 @@ export class WhackoVisitor {
 
   visitFunctionDeclaration(node: FunctionDeclaration) {
     this.visit(node.name);
-    for (const typeParameter of node.typeParameters) {
-      this.visit(typeParameter);
-    }
-    for (const parameter of node.parameters) {
-      this.visit(parameter);
-    }
+    this.visitAll(node.typeParameters);
+    this.visitAll(node.parameters);
     this.visit(node.returnType);
     this.visit(node.block);
   }
@@ -271,18 +273,14 @@ export class WhackoVisitor {
 
   visitTypeDeclaration(node: TypeDeclaration) {
     this.visit(node.name);
-    for (const typeParameter of node.typeParameters) {
-      this.visit(typeParameter);
-    }
+    this.visitAll(node.typeParameters);
     this.visit(node.type);
   }
 
   visitClassDeclaration(node: ClassDeclaration) {
     this.visit(node.name);
     if (node.extends) this.visit(node.extends);
-    for (const member of node.members) {
-      this.visit(member);
-    }
+    this.visitAll(node.members);
   }
 
   visitHeldTypeExpression(node: HeldTypeExpression) {
@@ -290,16 +288,12 @@ export class WhackoVisitor {
   }
 
   visitFunctionTypeExpression(node: FunctionTypeExpression) {
-    for (const parameter of node.parameters) {
-      this.visit(parameter);
-    }
+    this.visitAll(node.parameters);
     this.visit(node.returnType);
   }
 
   visitTupleTypeExpression(node: TupleTypeExpression) {
-    for (const type of node.types) {
-      this.visit(type);
-    }
+    this.visitAll(node.types);
   }
 
   visitPathTypeExpression(node: PathTypeExpression) {
@@ -349,16 +343,12 @@ export class WhackoVisitor {
   }
 
   visitBlockStatement(node: BlockStatement) {
-    for (const statement of node.statements) {
-      this.visit(statement);
-    }
+    this.visitAll(node.statements);
   }
 
   visitTypeDeclarationStatement(node: TypeDeclarationStatement) {
     this.visit(node.name);
-    for (const typeParameter of node.typeParameters) {
-      this.visit(typeParameter);
-    }
+    this.visitAll(node.typeParameters);
     this.visit(node.type);
   }
 
@@ -387,9 +377,7 @@ export class WhackoVisitor {
   }
 
   visitVariableDeclarationStatement(node: VariableDeclarationStatement) {
-    for (const declarator of node.declarators) {
-      this.visit(declarator);
-    }
+    this.visitAll(node.declarators);
   }
 
   visitVariableDeclarator(node: VariableDeclarator) {
@@ -437,19 +425,14 @@ export class WhackoVisitor {
 
   visitCallExpression(node: CallExpression) {
     this.visit(node.callRoot);
-    for (const parameter of node.typeParameters) this.visit(parameter);
-    for (const parameter of node.parameters) this.visit(parameter);
+    this.visitAll(node.typeParameters);
+    this.visitAll(node.parameters);
   }
 
   visitNewExpression(node: NewExpression) {
     this.visit(node.expression);
-
-    for (const param of node.typeParameters) {
-      this.visit(param);
-    }
-    for (const param of node.parameters) {
-      this.visit(param);
-    }
+    this.visitAll(node.typeParameters);
+    this.visitAll(node.parameters);
   }
 
   visitMemberAccessExpression(node: MemberAccessExpression) {
