@@ -231,19 +231,19 @@ StringLiteral:
     value=String;
 
 FalseLiteral:
-    false="false";
+    false?="false";
 
 TrueLiteral:
-    true="true";
+    true?="true";
 
 NullLiteral:
-    null="null";
+    null?="null";
 
 ThisLiteral:
-    this="this";
+    this?="this";
 
 SuperLiteral:
-    super="super";
+    super?="super";
 
 AsyncBlockLiteral:
     "async" ("<" type=TypeExpression ">")? block=BlockStatement;
