@@ -1,5 +1,14 @@
 import { AstNode } from "langium";
-import { ConcreteType, IntegerType, FloatType, StringType, BoolType, InvalidType, Type, IntegerEnumType } from "./types";
+import {
+  ConcreteType,
+  IntegerType,
+  FloatType,
+  StringType,
+  BoolType,
+  InvalidType,
+  Type,
+  IntegerEnumType,
+} from "./types";
 
 export namespace LLVM {
   export type ValueRef = number;
@@ -13,9 +22,7 @@ export class ExecutionContext {
 }
 
 export abstract class ExecutionContextValue {
-  constructor(
-    public ty: ConcreteType,
-  ) {} 
+  constructor(public ty: ConcreteType) {}
 
   get valid() {
     return true;
@@ -23,10 +30,7 @@ export abstract class ExecutionContextValue {
 }
 
 export abstract class RuntimeValue extends ExecutionContextValue {
-  constructor(
-    public ref: LLVM.ValueRef,
-    ty: ConcreteType,
-  ) {
+  constructor(public ref: LLVM.ValueRef, ty: ConcreteType) {
     super(ty);
   }
 }
@@ -73,7 +77,7 @@ export class CompileTimeFloat extends CompileTimeValue<number> {
 
 export class RuntimeFloat extends RuntimeValue {
   constructor(ref: LLVM.ValueRef, ty: ConcreteType) {
-    super(ref, ty)
+    super(ref, ty);
   }
 }
 
@@ -100,10 +104,7 @@ export class RuntimeBool extends RuntimeValue {
 }
 
 export class RuntimeString extends RuntimeValue {
-  constructor(
-    ref: LLVM.ValueRef,
-    ty: ConcreteType,
-  ) {
+  constructor(ref: LLVM.ValueRef, ty: ConcreteType) {
     super(ref, ty);
   }
 }

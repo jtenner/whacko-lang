@@ -18,7 +18,7 @@ export default async function main(args: string[]): Promise<void> {
   // first step in any program is registering the builtins
   const stdLibs = glob.sync("std/*.wo", {
     absolute: true,
-    root: __dirname
+    root: __dirname,
   });
 
   for (const stdLib of stdLibs) {
@@ -28,7 +28,12 @@ export default async function main(args: string[]): Promise<void> {
   }
 
   for (const positional of positionals) {
-    program.addModule(positional, process.cwd(), true, program.globalScope.fork());
+    program.addModule(
+      positional,
+      process.cwd(),
+      true,
+      program.globalScope.fork()
+    );
   }
 
   program.compile();

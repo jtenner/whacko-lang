@@ -1,8 +1,12 @@
 import assert from "assert";
 import { AstNode } from "langium";
-import {  } from "./types";
+import {} from "./types";
 import { ExecutionContext } from "./execution-context";
-import { Decorator, FunctionDeclaration, VariableDeclarator } from "./generated/ast";
+import {
+  Decorator,
+  FunctionDeclaration,
+  VariableDeclarator,
+} from "./generated/ast";
 import { CompilationPass } from "./passes/CompilationPass";
 import { WhackoProgram } from "./program";
 
@@ -32,9 +36,7 @@ export class VariableScopeElement extends ScopeElement {
 export abstract class ScopeTypeElement extends ScopeElement {
   builtin: BuiltinFunction | null = null;
 
-  constructor(
-    public node: AstNode,
-  ) {
+  constructor(public node: AstNode) {
     super();
   }
 }
@@ -150,7 +152,7 @@ export abstract class ConcreteType {
   constructor(
     public ty: Type, // contains size info
     public node: AstNode,
-    public name: string,
+    public name: string
   ) {}
 
   isEqual(other: ConcreteType) {
@@ -202,7 +204,7 @@ export class ArrayType extends ConcreteType {
     public childType: ConcreteType,
     public initialLength: number,
     node: AstNode,
-    name: string,
+    name: string
   ) {
     super(Type.array, node, name);
   }
@@ -228,7 +230,7 @@ export class FunctionType extends ConcreteType {
     public parameters: Parameter[],
     public returnType: ConcreteType,
     node: AstNode,
-    name: string,
+    name: string
   ) {
     super(Type.method, node, name);
   }
@@ -247,11 +249,13 @@ export class FunctionType extends ConcreteType {
 
   override getName() {
     const typeParameters = this.typeParameters.length
-      ? `<${this.typeParameters.map(e => e.name).join(",")}>`
+      ? `<${this.typeParameters.map((e) => e.name).join(",")}>`
       : "";
 
     const filename = getPath(this.node) as string;
-    return `${filename}~${(this.node as FunctionDeclaration).name.name}${typeParameters}`;
+    return `${filename}~${
+      (this.node as FunctionDeclaration).name.name
+    }${typeParameters}`;
   }
 }
 
@@ -262,7 +266,7 @@ export class ConcreteMethodType extends ConcreteType {
     public parameters: Parameter[],
     public returnType: ConcreteType,
     node: AstNode,
-    name: string,
+    name: string
   ) {
     super(Type.method, node, name);
   }
@@ -282,8 +286,14 @@ export class ConcreteMethodType extends ConcreteType {
 
   override getName(): string {
     return this.typeParameters.length
-      ? `${this.name}<${this.typeParameters.map(e => e.getName()).join(",")}>(${this.thisType.getName()}, ${this.parameters.map(e => e.fieldType.getName())}): ${this.returnType.getName()}`
-      : `${this.name}(${this.thisType.getName()}, ${this.parameters.map(e => e.fieldType.getName())}): ${this.returnType.getName()}`
+      ? `${this.name}<${this.typeParameters
+          .map((e) => e.getName())
+          .join(",")}>(${this.thisType.getName()}, ${this.parameters.map((e) =>
+          e.fieldType.getName()
+        )}): ${this.returnType.getName()}`
+      : `${this.name}(${this.thisType.getName()}, ${this.parameters.map((e) =>
+          e.fieldType.getName()
+        )}): ${this.returnType.getName()}`;
   }
 }
 
@@ -299,7 +309,7 @@ export class ClassType extends ConcreteType {
     public extendsClass: ClassType | null = null,
     public typeParameters: ConcreteType[],
     node: AstNode,
-    name: string,
+    name: string
   ) {
     super(Type.usize, node, name);
   }
@@ -315,7 +325,10 @@ export class ClassType extends ConcreteType {
   }
 
   get offset() {
-    return Array.from(this.fields.values()).reduce((left, right) => left + right.ty.size!, 0);
+    return Array.from(this.fields.values()).reduce(
+      (left, right) => left + right.ty.size!,
+      0
+    );
   }
 
   override isEqual(other: ConcreteType): boolean {
@@ -336,7 +349,7 @@ export class ClassType extends ConcreteType {
 
   override getName(): string {
     return this.typeParameters.length
-      ? `${this.name}<${this.typeParameters.map(e => e.getName()).join(",")}>`
+      ? `${this.name}<${this.typeParameters.map((e) => e.getName()).join(",")}>`
       : this.name;
   }
 }
@@ -367,23 +380,33 @@ export class IntegerType extends ConcreteType {
   constructor(
     ty: IntegerEnumType,
     public value: bigint | null = null,
-    node: AstNode,
+    node: AstNode
   ) {
     super(ty, node, "");
   }
 
   override getName(): string {
     switch (this.ty) {
-      case Type.i8: return "i8";
-      case Type.u8: return "u8";
-      case Type.i16: return "i16";
-      case Type.u16: return "u16";
-      case Type.i32: return "i32";
-      case Type.u32: return "u32";
-      case Type.i64: return "i64";
-      case Type.u64: return "u64";
-      case Type.isize: return "isize";
-      case Type.usize: return "usize";
+      case Type.i8:
+        return "i8";
+      case Type.u8:
+        return "u8";
+      case Type.i16:
+        return "i16";
+      case Type.u16:
+        return "u16";
+      case Type.i32:
+        return "i32";
+      case Type.u32:
+        return "u32";
+      case Type.i64:
+        return "i64";
+      case Type.u64:
+        return "u64";
+      case Type.isize:
+        return "isize";
+      case Type.usize:
+        return "usize";
     }
     throw new Error("Invalid number type.");
   }
@@ -400,14 +423,20 @@ export class BoolType extends ConcreteType {
 }
 
 export class FloatType extends ConcreteType {
-  constructor(ty: Type.f64 | Type.f32, public value: number | null = null, node: AstNode) {
+  constructor(
+    ty: Type.f64 | Type.f32,
+    public value: number | null = null,
+    node: AstNode
+  ) {
     super(ty, node, "");
   }
-  
+
   override getName(): string {
     switch (this.ty) {
-      case Type.f64: return "f64";
-      case Type.f32: return "f32";
+      case Type.f64:
+        return "f64";
+      case Type.f32:
+        return "f32";
     }
     throw new Error("Invalid number type.");
   }
@@ -419,7 +448,7 @@ export class AsyncType extends ConcreteType {
   }
 
   override getName(): string {
-    return `async<${this.genericType.getName()}>`
+    return `async<${this.genericType.getName()}>`;
   }
 }
 
@@ -429,7 +458,7 @@ export class TupleType extends ConcreteType {
   }
 
   override getName(): string {
-    return `(${this.types.map(e => e.getName()).join(",")})`;
+    return `(${this.types.map((e) => e.getName()).join(",")})`;
   }
 
   override isEqual(other: ConcreteType): boolean {
@@ -504,8 +533,11 @@ export class InvalidType extends ConcreteType {
   }
 }
 
-export function consumeDecorator(name: string, decorators: Decorator[]): Decorator | null {
-  const index = decorators.findIndex(e => e.name.name === name);
+export function consumeDecorator(
+  name: string,
+  decorators: Decorator[]
+): Decorator | null {
+  const index = decorators.findIndex((e) => e.name.name === name);
   if (index === -1) return null;
   const [decorator] = decorators.splice(index, 1);
 

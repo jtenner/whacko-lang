@@ -23,12 +23,12 @@ export class WhackoProgram {
     }
     this.builtins.set(name, func);
   }
-  
+
   addModule(
     modPath: string,
     from: string,
     entry: boolean,
-    scope: Scope,
+    scope: Scope
   ): WhackoModule | null {
     const absoluteModPath = path.join(from, modPath);
     if (this.modules.has(absoluteModPath)) {
@@ -44,7 +44,7 @@ export class WhackoProgram {
         parsedContents.value,
         absoluteModPath,
         entry,
-        scope,
+        scope
       );
 
       if (absoluteModPath.startsWith(stdlibFolder)) {

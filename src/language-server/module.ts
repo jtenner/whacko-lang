@@ -10,7 +10,7 @@ export class WhackoModule {
     public ast: Program,
     public path: string,
     public entry: boolean = false,
-    public scope: Scope,
+    public scope: Scope
   ) {}
   diagnostics: IDiagnostic[] = [];
 

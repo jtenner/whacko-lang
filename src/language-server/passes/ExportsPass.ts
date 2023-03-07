@@ -55,19 +55,32 @@ export class ExportsPass extends WhackoPass {
     const element = this.defineExportableType(node);
     const name = consumeDecorator("name", node.decorators);
     if (!name) {
-      this.error("Semantic", node.name, `Invalid builtin, must have a name defined.`);
+      this.error(
+        "Semantic",
+        node.name,
+        `Invalid builtin, must have a name defined.`
+      );
     } else {
-      const valid = name.parameters.length === 1 && isStringLiteral(name.parameters[0])
+      const valid =
+        name.parameters.length === 1 && isStringLiteral(name.parameters[0]);
       if (valid) {
         const builtinName = (name.parameters[0] as any).value as string;
         const builtin = this.program.builtins.get(builtinName);
         if (builtin) {
           element.builtin = builtin;
         } else {
-          this.error("Semantic", name.parameters[0], `Invalid builtin name, must be already be defined in the program.`);
+          this.error(
+            "Semantic",
+            name.parameters[0],
+            `Invalid builtin name, must be already be defined in the program.`
+          );
         }
       } else {
-        this.error("Semantic", node.name, `Invalid decorator for builtin, must have a single parameter string to define the name of the builtin.`);
+        this.error(
+          "Semantic",
+          node.name,
+          `Invalid decorator for builtin, must have a single parameter string to define the name of the builtin.`
+        );
       }
     }
   }
@@ -85,7 +98,7 @@ export class ExportsPass extends WhackoPass {
     const element = this.defineExportableType(node);
     this.stack.push(element);
     const saveName = this.nameStack;
-    this.nameStack = saveName + "." +  node.name.name;
+    this.nameStack = saveName + "." + node.name.name;
     super.visitNamespaceDeclaration(node);
     this.nameStack = saveName;
     this.stack.pop();
@@ -158,7 +171,10 @@ export class ExportsPass extends WhackoPass {
     }
 
     const name = node.name.name;
-    this.program.names.set(node, this.currentMod!.path + "~" + this.nameStack + name);
+    this.program.names.set(
+      node,
+      this.currentMod!.path + "~" + this.nameStack + name
+    );
     if (scope.has(name)) {
       this.error(
         `Semantic`,
