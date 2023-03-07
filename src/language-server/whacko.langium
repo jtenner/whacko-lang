@@ -7,15 +7,20 @@ entry Program:
     | declarations+=FunctionDeclaration
     | declarations+=ClassDeclaration
     | declarations+=TypeDeclaration
-    | declarations+=NamespaceDeclaration)*;
+    | declarations+=NamespaceDeclaration
+    | declarations+=BuiltinDeclaration)*;
 
 NamespaceDeclaration:
-    (export?="export") "namespace" Name "{" ( declarations+=DeclareDeclaration
+    Decorators (export?="export") "namespace" Name "{" ( declarations+=DeclareDeclaration
     | exports+=ExportDeclaration
     | declarations+=FunctionDeclaration
     | declarations+=ClassDeclaration
     | declarations+=TypeDeclaration
-    | declarations+=NamespaceDeclaration)* "}";
+    | declarations+=NamespaceDeclaration
+    | declarations+=BuiltinDeclaration)* "}";
+
+BuiltinDeclaration:
+    Decorators (export?="export") "builtin" Name TypeParameters "(" Parameters ")" ReturnType ";";
 
 DeclareDeclaration:
     Decorators (export?="export") "declare" Name "{" functions+=DeclareFunction "}" "from" namespace=StringLiteral ";";
@@ -23,11 +28,11 @@ DeclareDeclaration:
 DeclareFunction:
     Decorators "fn" Name "(" Parameters ")" ":" ReturnType ";";
 
-// DeclareDeclaration:
-//     (export?="export")? "declare" namespace=String method=String Name Parameters ":" ReturnType ";";
+EnumDeclaration:
+    Decorators (export?="export") "enum" Name "{"  "}";
 
 ImportDeclaration:
-    Decorators "import" "{" (declarators+=ImportDeclarator ("," declarators+=ImportDeclarator)*)? "}" "from" path=String ";";
+    "import" "{" (declarators+=ImportDeclarator ("," declarators+=ImportDeclarator)*)? "}" "from" path=String ";";
 
 ImportDeclarator:
     Name ("as" alias=ID)?;
@@ -160,10 +165,10 @@ ComaprisonExpression:
 BitShiftExpression:
     SumExpression ({infer BinaryExpression.lhs=current} op=("<<" | ">>") rhs=SumExpression)*;
 
-SumExpression: 
+SumExpression:
     ProductExpression ({infer BinaryExpression.lhs=current} op=("+" | "-") rhs=ProductExpression)*;
 
-ProductExpression: 
+ProductExpression:
     ExponentiationExpression ({infer BinaryExpression.lhs=current} op=("*" | "/" | "%") rhs=ExponentiationExpression)*;
 
 ExponentiationExpression: 

@@ -9,9 +9,9 @@ export class WhackoModule {
   constructor(
     public ast: Program,
     public path: string,
-    public entry: boolean = false
+    public entry: boolean = false,
+    public scope: Scope,
   ) {}
-  scope = new Scope();
   diagnostics: IDiagnostic[] = [];
 
   error(type: string, node: AstNode, message: string) {

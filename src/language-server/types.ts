@@ -1,6 +1,15 @@
 import assert from "assert";
 import { AstNode } from "langium";
-import { VariableDeclarator } from "./generated/ast";
+import {  } from "./types";
+import { ExecutionContext } from "./execution-context";
+import { Decorator, FunctionDeclaration, VariableDeclarator } from "./generated/ast";
+import { CompilationPass } from "./passes/CompilationPass";
+import { WhackoProgram } from "./program";
+
+function getPath(node: AstNode): string {
+  // @ts-ignore the `parse` function sets this symbol for later use
+  return node.$document!.parseResult.value[Symbol.for("fullPath")] as string;
+}
 
 export abstract class ScopeElement {}
 
@@ -20,13 +29,21 @@ export class VariableScopeElement extends ScopeElement {
   }
 }
 
-export abstract class ScopeTypeElement extends ScopeElement {}
+export abstract class ScopeTypeElement extends ScopeElement {
+  builtin: BuiltinFunction | null = null;
+
+  constructor(
+    public node: AstNode,
+  ) {
+    super();
+  }
+}
 
 export class NamespaceTypeScopeElement extends ScopeTypeElement {
   exports = new Map<string, ScopeElement>();
   scope: Scope;
-  constructor(public node: AstNode, parentScope: Scope) {
-    super();
+  constructor(node: AstNode, parentScope: Scope) {
+    super(node);
     this.scope = parentScope.forkTypes();
   }
 }
@@ -34,8 +51,8 @@ export class NamespaceTypeScopeElement extends ScopeTypeElement {
 export class StaticTypeScopeElement extends ScopeTypeElement {
   private cachedConcreteType: ConcreteType | null = null;
 
-  constructor(public node: AstNode) {
-    super();
+  constructor(node: AstNode) {
+    super(node);
   }
   resolve(): ConcreteType | null {
     // TODO: Actually resolve the type
@@ -43,15 +60,24 @@ export class StaticTypeScopeElement extends ScopeTypeElement {
   }
 }
 
+interface BuiltinFunctionParameters {
+  program: WhackoProgram;
+  ctx: ExecutionContext;
+  ast: AstNode;
+  pass: CompilationPass;
+}
+
+export type BuiltinFunction = () => void;
+
 export class DynamicTypeScopeElement extends ScopeTypeElement {
   cachedConcreteTypes = new Map<string, ConcreteType>();
-  constructor(public node: AstNode, public typeParameters: string[]) {
-    super();
+  constructor(node: AstNode, public typeParameters: string[]) {
+    super(node);
   }
 
   resolve(typeParameters: ConcreteType[]): ConcreteType | null {
     // TODO: Actually resolve type with type parameters
-    return voidType;
+    return new VoidType(this.node);
   }
 }
 
@@ -120,9 +146,11 @@ export const enum Type {
   held,
 }
 
-export class ConcreteType {
+export abstract class ConcreteType {
   constructor(
-    public ty: Type // contains size info
+    public ty: Type, // contains size info
+    public node: AstNode,
+    public name: string,
   ) {}
 
   isEqual(other: ConcreteType) {
@@ -165,17 +193,28 @@ export class ConcreteType {
   isAssignableTo(other: ConcreteType) {
     return this.isEqual(other);
   }
+
+  abstract getName(): string;
 }
 
 export class ArrayType extends ConcreteType {
-  constructor(public childType: ConcreteType, public initialLength: number) {
-    super(Type.array);
+  constructor(
+    public childType: ConcreteType,
+    public initialLength: number,
+    node: AstNode,
+    name: string,
+  ) {
+    super(Type.array, node, name);
   }
 
   override isEqual(other: ConcreteType) {
     return (
       other instanceof ArrayType && this.childType.isEqual(other.childType)
     );
+  }
+
+  override getName(): string {
+    return `Array<${this.childType.name}>`;
   }
 }
 
@@ -184,8 +223,14 @@ export class Parameter {
 }
 
 export class FunctionType extends ConcreteType {
-  constructor(public parameters: Parameter[], public returnType: ConcreteType) {
-    super(Type.method);
+  constructor(
+    public typeParameters: ConcreteType[],
+    public parameters: Parameter[],
+    public returnType: ConcreteType,
+    node: AstNode,
+    name: string,
+  ) {
+    super(Type.method, node, name);
   }
 
   override isEqual(other: ConcreteType) {
@@ -199,15 +244,27 @@ export class FunctionType extends ConcreteType {
       this.returnType.isEqual(this.returnType)
     );
   }
+
+  override getName() {
+    const typeParameters = this.typeParameters.length
+      ? `<${this.typeParameters.map(e => e.name).join(",")}>`
+      : "";
+
+    const filename = getPath(this.node) as string;
+    return `${filename}~${(this.node as FunctionDeclaration).name.name}${typeParameters}`;
+  }
 }
 
 export class ConcreteMethodType extends ConcreteType {
   constructor(
     public thisType: ClassType,
+    public typeParameters: ConcreteType[],
     public parameters: Parameter[],
-    public returnType: ConcreteType
+    public returnType: ConcreteType,
+    node: AstNode,
+    name: string,
   ) {
-    super(Type.method);
+    super(Type.method, node, name);
   }
 
   override isEqual(other: ConcreteType) {
@@ -222,6 +279,12 @@ export class ConcreteMethodType extends ConcreteType {
       this.returnType.isEqual(this.returnType)
     );
   }
+
+  override getName(): string {
+    return this.typeParameters.length
+      ? `${this.name}<${this.typeParameters.map(e => e.getName()).join(",")}>(${this.thisType.getName()}, ${this.parameters.map(e => e.fieldType.getName())}): ${this.returnType.getName()}`
+      : `${this.name}(${this.thisType.getName()}, ${this.parameters.map(e => e.fieldType.getName())}): ${this.returnType.getName()}`
+  }
 }
 
 export class Field {
@@ -230,10 +293,15 @@ export class Field {
 
 export class ClassType extends ConcreteType {
   public methods = new Map<string, ConcreteMethodType>();
-  public fields = new Array<Field>();
+  public fields = new Map<string, Field>();
 
-  constructor(public extendsClass: ClassType | null = null) {
-    super(Type.usize);
+  constructor(
+    public extendsClass: ClassType | null = null,
+    public typeParameters: ConcreteType[],
+    node: AstNode,
+    name: string,
+  ) {
+    super(Type.usize, node, name);
   }
 
   addMethod(name: string, method: ConcreteMethodType) {
@@ -242,11 +310,12 @@ export class ClassType extends ConcreteType {
   }
 
   addField(field: Field) {
-    this.fields.push(field);
+    assert(!this.fields.has(field.name));
+    this.fields.set(field.name, field);
   }
 
   get offset() {
-    return this.fields.reduce((left, right) => left + right.ty.size!, 0);
+    return Array.from(this.fields.values()).reduce((left, right) => left + right.ty.size!, 0);
   }
 
   override isEqual(other: ConcreteType): boolean {
@@ -264,56 +333,103 @@ export class ClassType extends ConcreteType {
       return false;
     }
   }
-}
 
-export class StringType extends ConcreteType {
-  constructor(public value: string | null = null) {
-    super(Type.string);
+  override getName(): string {
+    return this.typeParameters.length
+      ? `${this.name}<${this.typeParameters.map(e => e.getName()).join(",")}>`
+      : this.name;
   }
 }
 
+export class StringType extends ConcreteType {
+  constructor(public value: string | null = null, node: AstNode) {
+    super(Type.string, node, "");
+  }
+
+  override getName(): string {
+    return "string";
+  }
+}
+
+export type IntegerEnumType =
+  | Type.i8
+  | Type.u8
+  | Type.i16
+  | Type.u16
+  | Type.i32
+  | Type.u32
+  | Type.i64
+  | Type.u64
+  | Type.isize
+  | Type.usize;
+
 export class IntegerType extends ConcreteType {
   constructor(
-    ty:
-      | Type.i8
-      | Type.u8
-      | Type.i16
-      | Type.u16
-      | Type.i32
-      | Type.u32
-      | Type.i64
-      | Type.u64
-      | Type.isize
-      | Type.usize,
-    public value: bigint | null = null
+    ty: IntegerEnumType,
+    public value: bigint | null = null,
+    node: AstNode,
   ) {
-    super(ty);
+    super(ty, node, "");
+  }
+
+  override getName(): string {
+    switch (this.ty) {
+      case Type.i8: return "i8";
+      case Type.u8: return "u8";
+      case Type.i16: return "i16";
+      case Type.u16: return "u16";
+      case Type.i32: return "i32";
+      case Type.u32: return "u32";
+      case Type.i64: return "i64";
+      case Type.u64: return "u64";
+      case Type.isize: return "isize";
+      case Type.usize: return "usize";
+    }
+    throw new Error("Invalid number type.");
   }
 }
 
 export class BoolType extends ConcreteType {
-  constructor(public value: boolean | null = null) {
-    super(Type.bool);
+  constructor(public value: boolean | null = null, node: AstNode) {
+    super(Type.bool, node, "");
+  }
+
+  override getName(): string {
+    return "bool";
   }
 }
 
 export class FloatType extends ConcreteType {
-  constructor(ty: Type.f64 | Type.f32, public value: number | null = null) {
-    super(ty);
+  constructor(ty: Type.f64 | Type.f32, public value: number | null = null, node: AstNode) {
+    super(ty, node, "");
+  }
+  
+  override getName(): string {
+    switch (this.ty) {
+      case Type.f64: return "f64";
+      case Type.f32: return "f32";
+    }
+    throw new Error("Invalid number type.");
   }
 }
 
 export class AsyncType extends ConcreteType {
-  constructor(public genericType: ConcreteType) {
-    super(Type.async);
+  constructor(public genericType: ConcreteType, node: AstNode) {
+    super(Type.async, node, "");
+  }
+
+  override getName(): string {
+    return `async<${this.genericType.getName()}>`
   }
 }
 
-export const voidType = new ConcreteType(Type.void);
-
 export class TupleType extends ConcreteType {
-  constructor(public types: ConcreteType[]) {
-    super(Type.tuple);
+  constructor(public types: ConcreteType[], node: AstNode) {
+    super(Type.tuple, node, "");
+  }
+
+  override getName(): string {
+    return `(${this.types.map(e => e.getName()).join(",")})`;
   }
 
   override isEqual(other: ConcreteType): boolean {
@@ -348,8 +464,8 @@ export class TupleType extends ConcreteType {
 }
 
 export class HeldType extends ConcreteType {
-  constructor(public genericType: ConcreteType) {
-    super(Type.held);
+  constructor(public genericType: ConcreteType, node: AstNode) {
+    super(Type.held, node, "");
   }
 
   override isEqual(other: ConcreteType): boolean {
@@ -357,22 +473,56 @@ export class HeldType extends ConcreteType {
       other instanceof HeldType && this.genericType.isEqual(other.genericType)
     );
   }
-}
 
-export class SIMDType extends ConcreteType {
-  constructor() {
-    super(Type.v128);
+  override getName(): string {
+    return `held<${this.genericType.getName()}>`;
   }
 }
 
-export abstract class ExecutionContextElement {
-  constructor(public ty: ConcreteType) {}
+export class SIMDType extends ConcreteType {
+  constructor(node: AstNode) {
+    super(Type.v128, node, "");
+  }
+
+  override getName(): string {
+    return "v128";
+  }
 }
 
-export class TypeExecutionContextElement {}
+export class InvalidType extends ConcreteType {
+  constructor(node: AstNode) {
+    super(Type.void, node, "");
+  }
+  override isEqual(_: ConcreteType): boolean {
+    return false;
+  }
+  override isAssignableTo(_: ConcreteType): boolean {
+    return false;
+  }
+  override getName(): string {
+    return "invalid";
+  }
+}
 
-export class ValueExecutionContextElement {}
+export function consumeDecorator(name: string, decorators: Decorator[]): Decorator | null {
+  const index = decorators.findIndex(e => e.name.name === name);
+  if (index === -1) return null;
+  const [decorator] = decorators.splice(index, 1);
 
-export class ExecutionContext {
-  values = new Map<string, ExecutionContextElement>();
+  // indexes need to be updated
+  for (let i = 0; i < decorators.length; i++) {
+    // @ts-ignore: $containerIndex is readonly, but this is fine
+    decorators[i].$containerIndex = i;
+  }
+  return decorator;
+}
+
+export class VoidType extends ConcreteType {
+  constructor(node: AstNode) {
+    super(Type.void, node, "");
+  }
+
+  override getName(): string {
+    return "void";
+  }
 }

@@ -1,3 +1,5 @@
+import { glob } from "glob";
+import path from "node:path";
 // @ts-ignore
 import { parseArgs } from "node:util";
 import { WhackoProgram } from "../language-server/program";
@@ -12,8 +14,21 @@ export default async function main(args: string[]): Promise<void> {
     allowPositionals: true,
   });
   const program = new WhackoProgram();
+
+  // first step in any program is registering the builtins
+  const stdLibs = glob.sync("std/*.wo", {
+    absolute: true,
+    root: __dirname
+  });
+
+  for (const stdLib of stdLibs) {
+    const dirname = path.dirname(stdLib);
+    const basename = path.basename(stdLib);
+    program.addModule(basename, dirname, false, program.globalScope);
+  }
+
   for (const positional of positionals) {
-    program.addModule(positional, process.cwd(), true);
+    program.addModule(positional, process.cwd(), true, program.globalScope.fork());
   }
 
   program.compile();

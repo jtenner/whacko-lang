@@ -64,6 +64,7 @@ import {
   PathTypeExpression,
   Decorator,
   DeclareFunction,
+  BuiltinDeclaration,
 } from "./generated/ast";
 import { createWhackoServices, WhackoServices } from "./whacko-module";
 
@@ -216,6 +217,7 @@ export class WhackoVisitor {
   }
 
   visitNamespaceDeclaration(node: NamespaceDeclaration) {
+    this.visitAll(node.decorators);
     this.visitAll(node.declarations);
     this.visitAll(node.exports);
   }
@@ -225,6 +227,14 @@ export class WhackoVisitor {
     this.visit(node.name);
     this.visitAll(node.functions);
     this.visit(node.namespace);
+  }
+
+  visitBuiltinDeclaration(node: BuiltinDeclaration) {
+    this.visitAll(node.decorators);
+    this.visit(node.name);
+    this.visitAll(node.typeParameters);
+    this.visitAll(node.parameters);
+    this.visit(node.returnType);
   }
 
   visitDeclareFunction(node: DeclareFunction) {
@@ -259,6 +269,7 @@ export class WhackoVisitor {
   }
 
   visitFunctionDeclaration(node: FunctionDeclaration) {
+    this.visitAll(node.decorators);
     this.visit(node.name);
     this.visitAll(node.typeParameters);
     this.visitAll(node.parameters);
@@ -272,12 +283,14 @@ export class WhackoVisitor {
   }
 
   visitTypeDeclaration(node: TypeDeclaration) {
+    this.visitAll(node.decorators);
     this.visit(node.name);
     this.visitAll(node.typeParameters);
     this.visit(node.type);
   }
 
   visitClassDeclaration(node: ClassDeclaration) {
+    this.visitAll(node.decorators);
     this.visit(node.name);
     if (node.extends) this.visit(node.extends);
     this.visitAll(node.members);
@@ -309,36 +322,37 @@ export class WhackoVisitor {
   }
 
   visitFieldClassMember(node: FieldClassMember) {
+    this.visit(node.decorators);
     this.visit(node.name);
     this.visit(node.type);
     if (node.initializer) this.visit(node.initializer);
   }
 
   visitMethodClassMember(node: MethodClassMember) {
+    this.visitAll(node.decorators);
     this.visit(node.name);
-    for (const parameter of node.parameters) {
-      this.visit(parameter);
-    }
+    this.visitAll(node.parameters);
     this.visit(node.returnType);
     this.visit(node.block);
   }
 
   visitGetterClassMember(node: GetterClassMember) {
+    this.visitAll(node.decorators);
     this.visit(node.name);
     this.visit(node.returnType);
     this.visit(node.block);
   }
 
   visitSetterClassMember(node: SetterClassMember) {
+    this.visitAll(node.decorators);
     this.visit(node.name);
     this.visit(node.parameter);
     this.visit(node.block);
   }
 
   visitConstructorClassMember(node: ConstructorClassMember) {
-    for (const parameter of node.parameters) {
-      this.visit(parameter);
-    }
+    this.visitAll(node.decorators);
+    this.visitAll(node.parameters);
     this.visit(node.block);
   }
 
@@ -519,28 +533,22 @@ export class WhackoVisitor {
 
   replaceNode(node: AstNode, replacer: AstNode) {
     const parent = node.$container;
-    if (!isAstNode(node) || !isAstNode(replacer))
-      throw new Error("Node or Replacement Node parameter is not an ASTNode");
 
-    if (
-      (isDeclaration(node) && isDeclaration(replacer)) ||
-      (isStatement(node) && isStatement(replacer)) ||
-      (isExpression(node) && isExpression(replacer))
-    ) {
-      // @ts-ignore: this is safe I promise, $container is readonly
-      replacer.$container = node.$container;
-      // @ts-ignore: this is safe I promise, $container is readonly
-      replacer.$containerIndex = node.$containerIndex;
-      // @ts-ignore: this is safe I promise, $container is readonly
-      replacer.$containerProperty = node.$containerProperty;
+    // TODO: Add some validation statements that check container types
 
-      if (typeof node.$containerIndex === "number") {
-        // @ts-ignore: this is safe I promise
-        parent[node.$containerProperty][node.$containerIndex] = replacer;
-      } else {
-        // @ts-ignore: this is safe I promise
-        parent[node.$containerProperty] = replacer;
-      }
+    // @ts-ignore: this is safe I promise, $container is readonly
+    replacer.$container = node.$container;
+    // @ts-ignore: this is safe I promise, $container is readonly
+    replacer.$containerIndex = node.$containerIndex;
+    // @ts-ignore: this is safe I promise, $container is readonly
+    replacer.$containerProperty = node.$containerProperty;
+
+    if (typeof node.$containerIndex === "number") {
+      // @ts-ignore: this is safe I promise
+      parent[node.$containerProperty][node.$containerIndex] = replacer;
+    } else {
+      // @ts-ignore: this is safe I promise
+      parent[node.$containerProperty] = replacer;
     }
   }
 }
