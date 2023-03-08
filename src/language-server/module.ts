@@ -1,5 +1,6 @@
 import { AstNode } from "langium";
 import { Program } from "./generated/ast";
+import { WhackoProgram } from "./program";
 import { Scope, ScopeElement } from "./types";
 import { DiagnosticLevel, IDiagnostic } from "./util";
 

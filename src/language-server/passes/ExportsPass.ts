@@ -1,4 +1,6 @@
-import assert from "assert";
+import {
+  assert,
+} from "../util";
 import { AstNode } from "langium";
 import {
   BuiltinDeclaration,
@@ -11,8 +13,8 @@ import {
   isStringLiteral,
   NamespaceDeclaration,
   Program,
-  StringLiteral,
   TypeDeclaration,
+  TypeDeclarationStatement,
 } from "../generated/ast";
 import {
   DynamicTypeScopeElement,
@@ -50,6 +52,7 @@ export class ExportsPass extends WhackoPass {
 
   override visitClassDeclaration(node: ClassDeclaration): void {
     this.defineExportableType(node);
+    super.visitClassDeclaration(node);
   }
 
   override visitBuiltinDeclaration(node: BuiltinDeclaration): void {
@@ -88,6 +91,7 @@ export class ExportsPass extends WhackoPass {
 
   override visitFunctionDeclaration(node: FunctionDeclaration): void {
     this.defineExportableType(node);
+    super.visitFunctionDeclaration(node);
   }
 
   // type A<b> = Map<string, b>;
@@ -158,16 +162,17 @@ export class ExportsPass extends WhackoPass {
       node.$type === "NamespaceDeclaration" ||
       node.$type === "DeclareDeclaration"
     ) {
-      element = new NamespaceTypeScopeElement(node, scope);
+      element = new NamespaceTypeScopeElement(node, scope, this.currentMod!);
       const newScope = (element as NamespaceTypeScopeElement).scope;
       setScope(node, newScope);
     } else {
       element = node.typeParameters?.length
         ? new DynamicTypeScopeElement(
             node,
-            node.typeParameters.map((e: any) => e.name)
+            node.typeParameters.map((e: any) => e.name),
+            this.currentMod!
           )
-        : new StaticTypeScopeElement(node);
+        : new StaticTypeScopeElement(node, this.currentMod!);
       setScope(node, scope);
     }
 
@@ -195,8 +200,30 @@ export class ExportsPass extends WhackoPass {
         } else {
           exports.set(name, element);
         }
+        // @ts-expect-error
+        if (element.node.decorators) {
+          // @ts-expect-error
+          if (consumeDecorator("global", element.node.decorators)) {
+            this.program.globalScope.add(name, element);
+          }
+        }
       }
     }
+
     return element;
+  }
+
+  override visitTypeDeclarationStatement(node: TypeDeclarationStatement): void {
+    const scope = this.stack.at(-1)!.scope;
+    const name = node.name.name;
+    if (scope.has(name)) {
+      this.error("Semantic", node, `${name} is already defined in this scope.`);
+    } else {
+      scope.add(name, 
+        node.typeParameters.length
+          ? new DynamicTypeScopeElement(node.type, node.typeParameters.map(e => e.name), this.currentMod!)
+          : new StaticTypeScopeElement(node.type, this.currentMod!)
+      );
+    }
   }
 }

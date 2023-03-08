@@ -19,6 +19,10 @@ import { CompilationPass } from "./passes/CompilationPass";
 const stdlibFolder = path.join(__dirname, "../std");
 
 export class WhackoProgram {
+  constructor() {
+    registerDefaultBuiltins(this);
+  }
+
   modules = new Map<string, WhackoModule>();
   globalScope = new Scope();
   builtins = new Map<string, BuiltinFunction>();
@@ -46,7 +50,6 @@ export class WhackoProgram {
       const contents = fs.readFileSync(absoluteModPath, "utf-8");
       const parsedContents = parse(contents, absoluteModPath);
       if (!parsedContents) return null;
-
       const mod = new WhackoModule(
         parsedContents.value,
         absoluteModPath,
@@ -94,8 +97,6 @@ export class WhackoProgram {
   }
 
   compile(): Map<string, Buffer> {
-    registerDefaultBuiltins(this);
-
     const exportsPass = new ExportsPass(this);
     for (const [, module] of this.modules) {
       exportsPass.visitModule(module);

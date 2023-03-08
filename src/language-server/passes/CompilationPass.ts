@@ -1,5 +1,6 @@
-import { assert } from "console";
-import { AstNode } from "langium";
+import {
+  assert,
+} from "../util";
 import {
   CompileTimeBool,
   CompileTimeValue,
@@ -27,13 +28,16 @@ import {
   IntegerLiteral,
   isFunctionDeclaration,
   StringLiteral,
-  isID,
   isMemberAccessExpression,
   MemberAccessExpression,
   VariableDeclarationStatement,
-  ID,
   isRootIdentifier,
   RootIdentifier,
+  CallExpression,
+  Parameter,
+  TypeExpression,
+  Expression,
+  isBuiltinDeclaration,
 } from "../generated/ast";
 import { WhackoModule } from "../module";
 import {
@@ -41,9 +45,11 @@ import {
   ConcreteType,
   DynamicTypeScopeElement,
   FloatType,
+  FunctionType,
   getScope,
   IntegerType,
   InvalidType,
+  Scope,
   ScopeTypeElement,
   StaticTypeScopeElement,
   Type,
@@ -67,6 +73,11 @@ const assignmentOps = new Set<string>([
   "||=",
 ]);
 
+interface QueuedCompileElement {
+  func: ScopeTypeElement;
+  typeParameters: ConcreteType[] | null;
+}
+
 export class CompilationPass extends WhackoPass {
   executionStack: ExecutionContext[] = [];
   func!: FunctionDeclaration;
@@ -75,6 +86,16 @@ export class CompilationPass extends WhackoPass {
     const last = this.executionStack.at(-1)!;
     assert(last, `Expected context to exist.`);
     return last;
+  }
+
+  queue: QueuedCompileElement[] = [];
+  queueCompileElement(
+    func: ScopeTypeElement,
+    typeParameters: ConcreteType[] | null,
+  ): FunctionType {
+    this.queue.push({ func, typeParameters });
+    // TODO: Ensure that it returns a valid function type, even if the function body isn't compiled yet
+    throw new Error("Not implemented.");
   }
 
   compileElement(
@@ -426,8 +447,8 @@ export class CompilationPass extends WhackoPass {
       // compile the expression
       super.visit(expression);
       // the stack should have a single item at this point
-      assert(ctx.stack.length === 1, "Stack must have one item on it.");
-      const value = ctx.stack.pop()!;
+      const value = assert(ctx.stack.pop(), "Stack must have one item on it.");
+      assert(ctx.stack.length === 0, "Stack is not empty after evaluating a variable declarator.");
 
       // if the typeguard exists, we must do type checking
       if (type) {
@@ -478,7 +499,6 @@ export class CompilationPass extends WhackoPass {
   override visitRootIdentifier(expression: RootIdentifier): void {
     const ctx = this.currentCtx;
     const variable = ctx.vars.get(expression.root.name);
-    console.log(variable);
     if (variable) {
       ctx.stack.push(variable.value);
     } else {
@@ -489,5 +509,260 @@ export class CompilationPass extends WhackoPass {
       );
       ctx.stack.push(new CompileTimeInvalid(expression));
     }
+  }
+
+  override visitCallExpression(node: CallExpression): void {
+    const ctx = this.currentCtx;
+    if (isRootIdentifier(node.callRoot)) {
+      const scope = getScope(node)!;
+      const funcName = node.callRoot.root.name;
+      assert(scope, "Scope must exist already.");
+      const scopeElement = scope.get(funcName)!;
+      if (scopeElement) {
+        if (scopeElement instanceof ScopeTypeElement) {
+          if(isFunctionDeclaration(scopeElement.node)) {
+            const nodeTypeParameters = node.typeParameters;
+            // normalize the type parameters, there are none on StaticTypeScopeElements
+            const scopeTypeParameters = scopeElement instanceof DynamicTypeScopeElement
+              ? scopeElement.typeParameters
+              : [];
+  
+            if (nodeTypeParameters.length === scopeTypeParameters.length) {
+              if (node.parameters.length === scopeElement.node.parameters.length) {
+                this.compileFunctionCall(ctx, funcName, scopeElement, node.parameters, nodeTypeParameters);
+              } else {
+                this.error("Type", node.callRoot, "Function parameters does not match signature");
+              }
+            } else {
+              this.error("Type", node.callRoot, "Function type parameters does not match signature.");
+            }
+          } else if (isBuiltinDeclaration(scopeElement.node)) {
+            const builtinNode = scopeElement.node;
+            const builtin = scopeElement.builtin;
+            if (builtin) {
+              const concreteTypeParameters = [] as ConcreteType[];
+              for (const typeParameter of node.typeParameters) {
+                const concreteType = ctx.resolve(typeParameter);
+                if (concreteType) {
+                  // it resolved
+                  concreteTypeParameters.push(concreteType);
+                } else {
+                  this.error("Type", typeParameter, `Cannot resolve type parameter.`);
+                  concreteTypeParameters.push(new InvalidType(typeParameter));
+                }
+              }
+  
+              if (concreteTypeParameters.length !== builtinNode.typeParameters.length) {
+                this.error("Type", node.callRoot, `Invalid call to builtin ${builtinNode.name.name}, invalid type parameters.`);
+              }
+  
+              // name all the parameter types with their concrete alias
+              const concreteTypesAlias = new Map(ctx.types);
+              for (let i = 0; i < builtinNode.typeParameters.length; i++) {
+                const builtinNodeTypeParameterName = builtinNode.typeParameters[i].name;
+                const concreteTypeParameter = concreteTypeParameters[i];
+                concreteTypesAlias.set(builtinNodeTypeParameterName, concreteTypeParameter);
+              }
+  
+              const parameters = [] as ExecutionContextValue[];
+              for (let i = 0; i < builtinNode.parameters.length; i++) {
+                const builtinNodeParameter = builtinNode.parameters[i];
+                const builtinNodeParameterType = builtinNodeParameter.type;
+                const builtinNodeScope = assert(getScope(builtinNodeParameter), "Scope must exist at this point.");
+                
+                // visit this expression
+                this.visit(node.parameters[i]);
+                const value = assert(ctx.stack.pop(), "Stack must have a value at this point.");
+                const concreteValueType = ctx.resolve(builtinNodeParameterType, concreteTypesAlias, builtinNodeScope);
+                if (!concreteValueType) {
+                  this.error("Type", builtinNodeParameterType, `Cannot resolve type for call expression.`);
+                  parameters.push(new CompileTimeInvalid(builtinNodeParameter));
+                } else if (!value.ty.isAssignableTo(concreteValueType)) {
+                  this.error("Type", node.parameters[i], `Type does not match type parameter in function signature.`);
+                  parameters.push(new CompileTimeInvalid(node.parameters[i]));
+                } else {
+                  parameters.push(value);
+                }
+              }
+  
+              builtin({
+                ast: builtinNode,
+                ctx,
+                module: this.currentMod!,
+                pass: this,
+                program: this.program,
+                parameters,
+                typeParameters: concreteTypeParameters,
+              });
+            } else {
+              this.error("Builtin", builtinNode, "Builtin not defined");
+            }
+          } else {
+            this.error("Type", node.callRoot, `${funcName} is not a function.`);
+          }
+        } else if (ctx.vars.has(funcName)) {
+          // we need to check vars because this could be a variable with a function expression
+          const variable = ctx.vars.get(funcName)!;
+          if (variable.type instanceof FunctionType) {
+            // TODO: make call indirect
+          } else {
+            this.error("Type", node, "Invalid type, expression is not a function expression.");
+          }
+        }
+      } else {
+        this.error("Semantic", node.callRoot, "Element does not exist.");
+      }
+      if (scopeElement instanceof ScopeTypeElement) {
+        if(isFunctionDeclaration(scopeElement.node)) {
+          const nodeTypeParameters = node.typeParameters;
+          // normalize the type parameters, there are none on StaticTypeScopeElements
+          const scopeTypeParameters = scopeElement instanceof DynamicTypeScopeElement
+            ? scopeElement.typeParameters
+            : [];
+
+          if (nodeTypeParameters.length === scopeTypeParameters.length) {
+            if (node.parameters.length === scopeElement.node.parameters.length) {
+              this.compileFunctionCall(ctx, funcName, scopeElement, node.parameters, nodeTypeParameters);
+            } else {
+              this.error("Type", node.callRoot, "Function parameters does not match signature");
+            }
+          } else {
+            this.error("Type", node.callRoot, "Function type parameters does not match signature.");
+          }
+        } else if (isBuiltinDeclaration(scopeElement.node)) {
+          const builtinNode = scopeElement.node;
+          const builtin = scopeElement.builtin;
+          if (builtin) {
+            const concreteTypeParameters = [] as ConcreteType[];
+            for (const typeParameter of node.typeParameters) {
+              const concreteType = ctx.resolve(typeParameter);
+              if (concreteType) {
+                // it resolved
+                concreteTypeParameters.push(concreteType);
+              } else {
+                this.error("Type", typeParameter, `Cannot resolve type parameter.`);
+                concreteTypeParameters.push(new InvalidType(typeParameter));
+              }
+            }
+
+            if (concreteTypeParameters.length !== builtinNode.typeParameters.length) {
+              this.error("Type", node.callRoot, `Invalid call to builtin ${builtinNode.name.name}, invalid type parameters.`);
+            }
+
+            // name all the parameter types with their concrete alias
+            const concreteTypesAlias = new Map(ctx.types);
+            for (let i = 0; i < builtinNode.typeParameters.length; i++) {
+              const builtinNodeTypeParameterName = builtinNode.typeParameters[i].name;
+              const concreteTypeParameter = concreteTypeParameters[i];
+              concreteTypesAlias.set(builtinNodeTypeParameterName, concreteTypeParameter);
+            }
+
+            const parameters = [] as ExecutionContextValue[];
+            for (let i = 0; i < builtinNode.parameters.length; i++) {
+              const builtinNodeParameter = builtinNode.parameters[i];
+              const builtinNodeParameterType = builtinNodeParameter.type;
+              const builtinNodeScope = assert(getScope(builtinNodeParameter), "Scope must exist at this point.");
+              
+              // visit this expression
+              this.visit(node.parameters[i]);
+              const value = assert(ctx.stack.pop(), "Stack must have a value at this point.");
+              const concreteValueType = ctx.resolve(builtinNodeParameterType, concreteTypesAlias, builtinNodeScope);
+              if (!concreteValueType) {
+                this.error("Type", builtinNodeParameterType, `Cannot resolve type for call expression.`);
+                parameters.push(new CompileTimeInvalid(builtinNodeParameter));
+              } else if (!value.ty.isAssignableTo(concreteValueType)) {
+                this.error("Type", node.parameters[i], `Type does not match type parameter in function signature.`);
+                parameters.push(new CompileTimeInvalid(node.parameters[i]));
+              } else {
+                parameters.push(value);
+              }
+            }
+
+            builtin({
+              ast: builtinNode,
+              ctx,
+              module: this.currentMod!,
+              pass: this,
+              program: this.program,
+              parameters,
+              typeParameters: concreteTypeParameters,
+            });
+          } else {
+            this.error("Builtin", builtinNode, "Builtin not defined");
+          }
+        } else {
+          this.error("Type", node.callRoot, `${funcName} is not a function.`);
+        }
+      } else if (ctx.vars.has(funcName)) {
+        // we need to check vars because this could be a variable with a function expression
+        const variable = ctx.vars.get(funcName)!;
+        if (variable.type instanceof FunctionType) {
+          // TODO: make call indirect
+        } else {
+          this.error("Type", node, "Invalid type, expression is not a function expression.");
+        }
+      }
+    }
+  }
+  
+  private compileFunctionCall(ctx: ExecutionContext, funcName: string, scopeElement: ScopeTypeElement, parameters: Expression[], nodeTypeParameters: TypeExpression[]) {
+    // we need to resolve all the call type expressions on the function call
+    const nodeTypeParameterTypes = [] as ConcreteType[];
+    for (const nodeTypeParameter of nodeTypeParameters) {
+      const resolvedNodeTypeParameter = ctx.resolve(nodeTypeParameter);
+      if (resolvedNodeTypeParameter) {
+        nodeTypeParameterTypes.push(resolvedNodeTypeParameter);
+      } else {
+        this.error("Type", nodeTypeParameter, "Cannot resolve type.");
+        nodeTypeParameterTypes.push(new InvalidType(nodeTypeParameter));
+      }
+    }
+
+    // now we need to alias the types for the type expressions to be resolved in the other scope
+    const concreteTypesAlias = new Map(ctx.types);
+    for (let i = 0; i < nodeTypeParameterTypes.length; i++) {
+      const nodeTypeName = (scopeElement.node as FunctionDeclaration).typeParameters[i].name;
+      concreteTypesAlias.set(nodeTypeName, nodeTypeParameterTypes[i]);
+    }
+    // fn myFunc<a, b, c>(a, b, c)
+
+    // store all the runtime values
+    const parameterValues = [] as ExecutionContextValue[];
+
+    // evaluate all the parameters on the stack and pop them off one by one
+    for (let i = 0; i < parameters.length; i++) {
+      // first get the parameter
+      const parameter = parameters[i];
+      // then get the parameter's type
+      const typeParameter = (scopeElement.node as FunctionDeclaration).parameters[i].type;
+
+      // the parameter's type exists in another scope, so we actually need to get that scope to resolve the type
+      const scope = getScope(typeParameter)!;
+      assert(scope, `Scope must be defined at this point for function parameters.`);
+      const concreteParameterType = ctx.resolve(typeParameter, concreteTypesAlias, scope);
+      if (concreteParameterType) {
+        // now we pop the parameter's expression off the stack
+        this.visit(parameter);
+        const value = assert(ctx.stack.pop(), `Evaluating function parameter did not result in item on the top of the stack.`);
+  
+        // The last thing to do is evaluate and compare the types of the 
+        // parameter expressions vs the type parameters of the function
+        if (value.ty.isAssignableTo(concreteParameterType)) {
+          // the parameter is good!
+          parameterValues.push(this.ensureCompiled(value));
+        } else {
+          this.error("Type", parameter, "Parameter expression is not assignable to the parameter type.");
+          parameterValues.push(new CompileTimeInvalid(parameter));
+        }
+      } else {
+        // the parameter type could not be resolved
+        this.error("Type", typeParameter, "Could not resolve type parameter.");
+      }
+    }
+
+    // now we can resolve the function and call it
+    const func = this.queueCompileElement(scopeElement, nodeTypeParameterTypes);
+
+
   }
 }

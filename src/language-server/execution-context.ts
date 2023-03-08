@@ -1,4 +1,6 @@
-import { assert } from "console";
+import {
+  assert,
+} from "./util";
 import { AstNode } from "langium";
 import {
   ID,

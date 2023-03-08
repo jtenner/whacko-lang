@@ -11,6 +11,8 @@ export function parse(
 ): ParseResult<Program> | null {
   const ast = Whacko.parser.LangiumParser.parse<Program>(contents);
 
+  console.log(ast.lexerErrors);
+  console.log(ast.parserErrors);
   // @ts-ignore: This is for filename access later in compilation for type describing
   ast.value[Symbol.for("fullPath")] = fullPath;
   return ast;

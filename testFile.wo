@@ -1,6 +1,10 @@
 
+fn add(a: i32, b: i32): i32 {
+  return a + b;
+}
+
 export fn main(): void {
-  let a = 1 + 2,
-    b = 4;
-  a = a + b;
+  let a = i64<i32>(40),
+    b = i64<i32>(1);
+  a = add(a, b);
 }

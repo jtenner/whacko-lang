@@ -3,6 +3,7 @@ import path from "node:path";
 // @ts-ignore
 import { parseArgs } from "node:util";
 import { WhackoProgram } from "../language-server/program";
+import { assert } from "../language-server/util";
 // import { WhackoProgram } from "../compiler";
 
 const options = {};
@@ -24,7 +25,7 @@ export default async function main(args: string[]): Promise<void> {
   for (const stdLib of stdLibs) {
     const dirname = path.dirname(stdLib);
     const basename = path.basename(stdLib);
-    program.addModule(basename, dirname, false, program.globalScope);
+    assert(program.addModule(basename, dirname, false, program.globalScope), `std lib ${stdLib} failed to create a module.`);
   }
 
   for (const positional of positionals) {

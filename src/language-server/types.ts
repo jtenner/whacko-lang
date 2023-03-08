@@ -1,7 +1,7 @@
 import assert from "assert";
 import { AstNode } from "langium";
 import {} from "./types";
-import { ExecutionContext } from "./execution-context";
+import { ExecutionContext, ExecutionContextValue } from "./execution-context";
 import {
   Decorator,
   FunctionDeclaration,
@@ -16,14 +16,19 @@ function getPath(node: AstNode): string {
   return node.$document!.parseResult.value[Symbol.for("fullPath")] as string;
 }
 
-export abstract class ScopeElement {}
+export abstract class ScopeElement {
+  constructor(
+    public mod: WhackoModule,
+  ) {}
+}
 
 export class VariableScopeElement extends ScopeElement {
   constructor(
     public declarator: VariableDeclarator,
-    public immutable: boolean
+    public immutable: boolean,
+    mod: WhackoModule,
   ) {
-    super();
+    super(mod);
   }
 
   resolve(
@@ -37,8 +42,8 @@ export class VariableScopeElement extends ScopeElement {
 export abstract class ScopeTypeElement extends ScopeElement {
   builtin: BuiltinFunction | null = null;
 
-  constructor(public node: AstNode) {
-    super();
+  constructor(public node: AstNode, mod: WhackoModule) {
+    super(mod);
   }
 }
 
@@ -46,17 +51,17 @@ export class NamespaceTypeScopeElement extends ScopeTypeElement {
   exports = new Map<string, ScopeElement>();
   scope: Scope;
 
-  constructor(node: AstNode, parentScope: Scope) {
-    super(node);
-    this.scope = parentScope.forkTypes();
+  constructor(node: AstNode, parentScope: Scope, mod: WhackoModule) {
+    super(node, mod);
+    this.scope = parentScope.fork();
   }
 }
 
 export class StaticTypeScopeElement extends ScopeTypeElement {
   public cachedConcreteType: ConcreteType | null = null;
 
-  constructor(node: AstNode) {
-    super(node);
+  constructor(node: AstNode, mod: WhackoModule) {
+    super(node, mod);
   }
   resolve(): ConcreteType | null {
     // TODO: Actually resolve the type
@@ -70,14 +75,16 @@ export interface BuiltinFunctionProps {
   module: WhackoModule;
   pass: CompilationPass;
   program: WhackoProgram;
+  typeParameters: ConcreteType[];
+  parameters: ExecutionContextValue[];
 }
 
 export type BuiltinFunction = (props: BuiltinFunctionProps) => void;
 
 export class DynamicTypeScopeElement extends ScopeTypeElement {
   cachedConcreteTypes = new Map<string, ConcreteType>();
-  constructor(node: AstNode, public typeParameters: string[]) {
-    super(node);
+  constructor(node: AstNode, public typeParameters: string[], mod: WhackoModule) {
+    super(node, mod);
   }
 
   resolve(typeParameters: ConcreteType[]): ConcreteType | null {
@@ -89,7 +96,6 @@ export class DynamicTypeScopeElement extends ScopeTypeElement {
 const scopes = new WeakMap<AstNode, Scope>();
 
 export function setScope(node: AstNode, scope: Scope) {
-  console.log("setting scope for", node, scope);
   scopes.set(node, scope);
 }
 
@@ -110,9 +116,9 @@ export function getScope(node: AstNode): Scope | null {
 export class Scope {
   public elements = new Map<string, ScopeElement>();
 
-  constructor(elements?: Map<string, ScopeElement>) {
-    this.elements = elements ?? new Map();
-  }
+  constructor(
+    public parent: Scope | null = null,
+  ) {}
 
   add(name: string, element: ScopeElement) {
     assert(
@@ -122,28 +128,21 @@ export class Scope {
     this.elements.set(name, element);
   }
 
-  has(name: string) {
-    return this.elements.has(name);
+  has(name: string): boolean {
+    return this.elements.has(name) || this.parent?.has(name) || false;
   }
 
-  get(name: string): ScopeElement | null {
-    return this.elements.get(name) ?? null;
+  get(name: string, predicate: (element: ScopeElement) => boolean = () => true): ScopeElement | null {
+    if (this.elements.has(name)) {
+      const element = this.elements.get(name)!;
+      return predicate(element) ? element : null;
+    }
+    return this.parent?.get(name, predicate) ?? null;
   }
 
   fork() {
-    return new Scope(new Map(this.elements));
-  }
-
-  forkIf(predicate: (element: ScopeElement) => boolean) {
-    const result = new Map<string, ScopeElement>();
-    for (const [name, element] of this.elements) {
-      if (predicate(element)) result.set(name, element);
-    }
-    return new Scope(result);
-  }
-
-  forkTypes() {
-    return this.forkIf((element) => element instanceof ScopeTypeElement);
+    const result = new Scope(this);
+    return result;
   }
 }
 

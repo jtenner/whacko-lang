@@ -1,4 +1,6 @@
-import { assert } from "console";
+import {
+  assert,
+} from "../util";
 import {
   AsyncBlockLiteral,
   BlockStatement,
@@ -10,7 +12,7 @@ import {
   Program,
   SetterClassMember,
 } from "../generated/ast";
-import { NamespaceTypeScopeElement, Scope } from "../types";
+import { Scope } from "../types";
 import { WhackoPass } from "./WhackoPass";
 
 export class ScopeCreationPass extends WhackoPass {
@@ -28,7 +30,7 @@ export class ScopeCreationPass extends WhackoPass {
 
   override visitAsyncBlockLiteral(expression: AsyncBlockLiteral): void {
     const oldScope = this.currentScope;
-    const newScope = oldScope.forkTypes();
+    const newScope = oldScope.fork();
     this.currentMod!.scopes.set(expression, newScope);
     this.scopes.push(newScope);
     super.visitAsyncBlockLiteral(expression);
@@ -37,7 +39,7 @@ export class ScopeCreationPass extends WhackoPass {
 
   override visitClassDeclaration(node: ClassDeclaration): void {
     const oldScope = this.currentScope;
-    const newScope = oldScope.forkTypes();
+    const newScope = oldScope.fork();
     this.currentMod!.scopes.set(node, newScope);
     this.scopes.push(newScope);
     super.visitClassDeclaration(node);
@@ -46,7 +48,7 @@ export class ScopeCreationPass extends WhackoPass {
 
   override visitFunctionDeclaration(node: FunctionDeclaration): void {
     const oldScope = this.currentScope;
-    const newScope = oldScope.forkTypes();
+    const newScope = oldScope.fork();
     this.currentMod!.scopes.set(node, newScope);
     this.scopes.push(newScope);
     super.visitFunctionDeclaration(node);
@@ -55,7 +57,7 @@ export class ScopeCreationPass extends WhackoPass {
 
   override visitFunctionLiteral(expression: FunctionLiteral): void {
     const oldScope = this.currentScope;
-    const newScope = oldScope.forkTypes();
+    const newScope = oldScope.fork();
     this.currentMod!.scopes.set(expression, newScope);
     this.scopes.push(newScope);
     super.visitFunctionLiteral(expression);
@@ -64,7 +66,7 @@ export class ScopeCreationPass extends WhackoPass {
 
   override visitGetterClassMember(node: GetterClassMember): void {
     const oldScope = this.currentScope;
-    const newScope = oldScope.forkTypes();
+    const newScope = oldScope.fork();
     this.currentMod!.scopes.set(node, newScope);
     this.scopes.push(newScope);
     super.visitGetterClassMember(node);
@@ -73,7 +75,7 @@ export class ScopeCreationPass extends WhackoPass {
 
   override visitSetterClassMember(node: SetterClassMember): void {
     const oldScope = this.currentScope;
-    const newScope = oldScope.forkTypes();
+    const newScope = oldScope.fork();
     this.currentMod!.scopes.set(node, newScope);
     this.scopes.push(newScope);
     super.visitSetterClassMember(node);

@@ -1,6 +1,6 @@
 import { AstNode, isAstNode } from "langium";
 import { NodeFileSystem } from "langium/node";
-import { assert } from "node:console";
+import { assert } from "./util";
 import {
   isExpression,
   isStatement,
@@ -101,6 +101,8 @@ export class WhackoVisitor {
         return this.visitDeclareFunction(node);
       case "Program":
         return this.visitProgram(node);
+      case "BuiltinDeclaration":
+        return this.visitBuiltinDeclaration(node);
       case "DeclareDeclaration":
         return this.visitDeclareDeclaration(node);
       case "ImportDeclaration":
