@@ -11,8 +11,7 @@ export class WhackoModule {
     public path: string,
     public entry: boolean = false,
     public scope: Scope
-  ) {
-  }
+  ) {}
   diagnostics: IDiagnostic[] = [];
 
   error(type: string, node: AstNode, message: string) {

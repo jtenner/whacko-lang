@@ -225,12 +225,11 @@ export class CompilationPass extends WhackoPass {
     const ctx = this.currentCtx;
 
     if (assignmentOps.has(node.op)) return this.compileAssignment(node);
-    
+
     super.visitBinaryExpression(node);
     assert(ctx.stack.length >= 2, "Expected stack to have two items on it.");
     const right = ctx.stack.pop()!;
     const left = ctx.stack.pop()!;
-
 
     if (right instanceof InvalidType || left instanceof InvalidType) {
       ctx.stack.push(new CompileTimeInvalid(node));
@@ -264,7 +263,11 @@ export class CompilationPass extends WhackoPass {
           case "|":
           case "||":
           default: {
-            this.error("Semantic", node, "Compile time operator not supported " + node.op);
+            this.error(
+              "Semantic",
+              node,
+              "Compile time operator not supported " + node.op
+            );
             ctx.stack.push(new CompileTimeInvalid(node));
             return;
           }
@@ -305,7 +308,6 @@ export class CompilationPass extends WhackoPass {
       this.currentCtx.stack.push(new CompileTimeInvalid(node));
     }
   }
-
 
   private compileAssignment(node: BinaryExpression): void {
     const ctx = this.currentCtx;
@@ -440,18 +442,33 @@ export class CompilationPass extends WhackoPass {
               `Expression is invalid type, cannot assign variable.`
             );
             // we are safe to do the assignment, because errors have reported, and the `value` can be a poison value
-            const variable = new ExecutionVariable(immutable, name, value, resolvedType);
+            const variable = new ExecutionVariable(
+              immutable,
+              name,
+              value,
+              resolvedType
+            );
             ctx.vars.set(name, variable);
             continue;
           }
         } else {
           this.error("Type", node, `Unable to resolve type.`);
-          const variable = new ExecutionVariable(immutable, name, value, new InvalidType(type));
+          const variable = new ExecutionVariable(
+            immutable,
+            name,
+            value,
+            new InvalidType(type)
+          );
           ctx.vars.set(name, variable);
           continue;
         }
       } else {
-        const variable = new ExecutionVariable(immutable, name, value, value.ty);
+        const variable = new ExecutionVariable(
+          immutable,
+          name,
+          value,
+          value.ty
+        );
         ctx.vars.set(name, variable);
         continue;
       }
@@ -465,7 +482,11 @@ export class CompilationPass extends WhackoPass {
     if (variable) {
       ctx.stack.push(variable.value);
     } else {
-      this.error("Semantic", expression, `Cannot find variable named ${expression.root.name} in this context.`);
+      this.error(
+        "Semantic",
+        expression,
+        `Cannot find variable named ${expression.root.name} in this context.`
+      );
       ctx.stack.push(new CompileTimeInvalid(expression));
     }
   }

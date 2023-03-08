@@ -38,7 +38,7 @@ export default async function main(args: string[]): Promise<void> {
 
   program.compile();
 
-  for (const [,module] of program.modules) {
+  for (const [, module] of program.modules) {
     for (const diag of module.diagnostics) {
       console.log(diag);
     }

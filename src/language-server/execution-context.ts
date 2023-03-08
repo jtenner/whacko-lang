@@ -40,7 +40,7 @@ export class ExecutionVariable {
     public immutable: boolean,
     public name: string,
     public value: ExecutionContextValue,
-    public type: ConcreteType,
+    public type: ConcreteType
   ) {}
 }
 
