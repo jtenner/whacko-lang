@@ -7,8 +7,10 @@ import { ModuleCollectionPass } from "./passes/ModuleCollectionPass";
 import { ExportsPass } from "./passes/ExportsPass";
 import { ImportsPass } from "./passes/ImportsPass";
 import { ScopeCreationPass } from "./passes/ScopeCreationPass";
-import { BuiltinFunction, Scope } from "./types";
+import { BuiltinFunction, DynamicTypeScopeElement, Scope, StaticTypeScopeElement } from "./types";
 import { AstNode } from "langium";
+import { registerDefaultBuiltins } from "./builtins";
+import { CompilationPass } from "./passes/CompilationPass";
 const stdlibFolder = path.join(__dirname, "../std");
 
 export class WhackoProgram {
@@ -46,7 +48,6 @@ export class WhackoProgram {
         entry,
         scope
       );
-
       if (absoluteModPath.startsWith(stdlibFolder)) {
         const modName = path.basename(absoluteModPath, ".wo");
         this.modules.set("whacko:" + modName, mod);
@@ -82,11 +83,14 @@ export class WhackoProgram {
       }
       return mod;
     } catch (ex) {
+      console.error(ex);
       return null;
     }
   }
 
   compile(): Map<string, Buffer> {
+    registerDefaultBuiltins(this);
+
     const exportsPass = new ExportsPass(this);
     for (const [, module] of this.modules) {
       exportsPass.visitModule(module);
@@ -100,6 +104,23 @@ export class WhackoProgram {
     const scopeCreationPass = new ScopeCreationPass(this);
     for (const [, module] of this.modules) {
       scopeCreationPass.visitModule(module);
+    }
+
+    const compilationPass = new CompilationPass(this);
+    let foundMain = false;
+    outer: for (const [, module] of this.modules) {
+      if (module.entry) {
+        
+        for (const [name, exported] of module.exports) {
+          if (name === "main") {
+            if (exported instanceof StaticTypeScopeElement) {
+              compilationPass.compileElement(exported, null, module);
+            } else {
+              module.error("Semantic", (exported as DynamicTypeScopeElement).node, "Invalid main function, cannot be generic.");
+            }
+          }
+        }
+      }
     }
 
     return new Map();

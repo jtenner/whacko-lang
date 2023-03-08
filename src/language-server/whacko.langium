@@ -67,10 +67,7 @@ TupleTypeExpression:
     "(" types+=TypeExpression "," (types+=TypeExpression ("," types+=TypeExpression)* )? ")";
 
 NamedTypeExpression:
-    name=PathTypeExpression TypeParameters;
-
-PathTypeExpression:
-    ID ({infer PathTypeExpression.namespace=current} "." element=ID)*;
+    ID ({infer NamedTypeExpression.namespace=current} "." element=ID)* TypeParameters;
 
 ClassMember: ConstructorClassMember | FieldClassMember | MethodClassMember | GetterClassMember | SetterClassMember;
 
@@ -197,7 +194,10 @@ PathExpression:
         | {infer ArrayAccessExpression.arrayRoot=current} "[" indexExpression=Expression "]"
     )*;
 
-PrimaryExpression: FunctionLiteral | GroupLiteral | ID | FloatLiteral | IntegerLiteral | HexLiteral | BinaryLiteral | OctalLiteral | StringLiteral | FalseLiteral | TrueLiteral | NullLiteral | ThisLiteral | SuperLiteral | AsyncBlockLiteral;
+PrimaryExpression: FunctionLiteral | GroupLiteral | RootIdentifier | FloatLiteral | IntegerLiteral | HexLiteral | BinaryLiteral | OctalLiteral | StringLiteral | FalseLiteral | TrueLiteral | NullLiteral | ThisLiteral | SuperLiteral | AsyncBlockLiteral;
+
+RootIdentifier:
+    root=ID;
 
 FunctionLiteral:
     TypeParameters "(" ( parameters+=Parameter ("," parameters+=Parameter)* )? ")" ":" ReturnType "=>" block=BlockStatement;

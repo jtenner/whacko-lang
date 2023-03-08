@@ -15,6 +15,7 @@ import {
   RuntimeString,
   RuntimeFloat,
   RuntimeInteger,
+  ExecutionVariable,
 } from "../execution-context";
 import {
   BinaryExpression,
@@ -29,12 +30,18 @@ import {
   isID,
   isMemberAccessExpression,
   MemberAccessExpression,
+  VariableDeclarationStatement,
+  ID,
+  isRootIdentifier,
+  RootIdentifier,
 } from "../generated/ast";
+import { WhackoModule } from "../module";
 import {
   ClassType,
   ConcreteType,
   DynamicTypeScopeElement,
   FloatType,
+  getScope,
   IntegerType,
   InvalidType,
   ScopeTypeElement,
@@ -72,8 +79,10 @@ export class CompilationPass extends WhackoPass {
 
   compileElement(
     func: ScopeTypeElement,
-    typeParameters: ConcreteType[] | null
+    typeParameters: ConcreteType[] | null,
+    module: WhackoModule
   ) {
+    this.currentMod = module;
     assert(
       isFunctionDeclaration(func.node),
       `Expected function in FunctionCompilationPass.`
@@ -94,7 +103,11 @@ export class CompilationPass extends WhackoPass {
         return;
       }
     }
-    const ctx = new ExecutionContext();
+
+    const funcScope = getScope(func.node)!;
+    assert(funcScope, "Function scope should exist at this point.");
+
+    const ctx = new ExecutionContext(funcScope);
     if (typeParameters) {
       for (let i = 0; i < typeParameters.length; i++) {
         ctx.types.set(funcNode.typeParameters[i].name, typeParameters[i]);
@@ -210,12 +223,14 @@ export class CompilationPass extends WhackoPass {
 
   override visitBinaryExpression(node: BinaryExpression): void {
     const ctx = this.currentCtx;
-    assert(ctx.stack.length >= 2, "Expected stack to have two items on it.");
-    if (assignmentOps.has(node.op)) return this.compileAssignment(node);
 
+    if (assignmentOps.has(node.op)) return this.compileAssignment(node);
+    
     super.visitBinaryExpression(node);
+    assert(ctx.stack.length >= 2, "Expected stack to have two items on it.");
     const right = ctx.stack.pop()!;
     const left = ctx.stack.pop()!;
+
 
     if (right instanceof InvalidType || left instanceof InvalidType) {
       ctx.stack.push(new CompileTimeInvalid(node));
@@ -227,10 +242,33 @@ export class CompilationPass extends WhackoPass {
         left instanceof CompileTimeValue &&
         right instanceof CompileTimeValue
       ) {
-        // we can concatenate the two items
-        this.currentCtx.stack.push(
-          new CompileTimeBool(left.value === right.value, node)
-        );
+        // we can operate on these two items and make a constant
+        // TODO: use compiledLeft and compiledRight to emit a instruction in llvm
+        switch (node.op) {
+          case "!=":
+          case "%":
+          case "&":
+          case "&&":
+          case "*":
+          case "**":
+          case "+":
+          case "-":
+          case "/":
+          case "<":
+          case "<<":
+          case "<=":
+          case "==":
+          case ">":
+          case ">>":
+          case "^":
+          case "|":
+          case "||":
+          default: {
+            this.error("Semantic", node, "Compile time operator not supported " + node.op);
+            ctx.stack.push(new CompileTimeInvalid(node));
+            return;
+          }
+        }
       } else {
         const compiledLeft = this.ensureCompiled(left);
         const compiledRight = this.ensureCompiled(right);
@@ -256,6 +294,8 @@ export class CompilationPass extends WhackoPass {
           case "||":
           default: {
             this.error("Semantic", node, "Operator not supported " + node.op);
+            ctx.stack.push(new CompileTimeInvalid(node));
+            return;
           }
         }
         const compiledValue = 0 as any as RuntimeValue;
@@ -266,16 +306,24 @@ export class CompilationPass extends WhackoPass {
     }
   }
 
+
   private compileAssignment(node: BinaryExpression): void {
     const ctx = this.currentCtx;
 
-    if (isID(node.lhs)) {
-      const local = ctx.vars.get(node.lhs.name)!;
+    if (isRootIdentifier(node.lhs)) {
+      const local = ctx.vars.get(node.lhs.root.name)!;
       this.visit(node.rhs);
 
       // are we a constant variable, or a runtime variable
-      if (local instanceof RuntimeValue) {
-        assert(local, "Local not found");
+      if (local.immutable) {
+        // compile time constant variable! We need to emit a diagnostic and push void to the stack
+        this.error(
+          "Semantic",
+          node.lhs,
+          "Invalid left hand side, variable is immutable."
+        );
+        ctx.stack.push(new CompileTimeInvalid(node));
+      } else {
         // pop the rhs off the stack
         const rhs = ctx.stack.pop()!;
         assert(rhs);
@@ -301,23 +349,11 @@ export class CompilationPass extends WhackoPass {
             default:
           }
         } else {
-          // we already know that the assignment can't happen
-          ctx.vars.set(
-            node.lhs.name,
-            new RuntimeInvalid(new InvalidType(node))
-          );
+          // we already know that the assignment can't happen, but we can poison the variable here
+          local.value = rhs;
         }
-
         // then push the calculated value to the stack
         ctx.stack.push(rhs);
-      } else {
-        // compile time constant variable! We need to emit a diagnostic and push void to the stack
-        this.error(
-          "Semantic",
-          node.lhs,
-          "Invalid left hand side, variable is constant."
-        );
-        ctx.stack.push(new CompileTimeInvalid(node));
       }
     } else if (isMemberAccessExpression(node.lhs)) {
       const mas = node.lhs as MemberAccessExpression;
@@ -372,5 +408,65 @@ export class CompilationPass extends WhackoPass {
       return new RuntimeInvalid(value.ty);
     }
     throw new Error("Method not implemented.");
+  }
+
+  override visitVariableDeclarationStatement(
+    node: VariableDeclarationStatement
+  ): void {
+    const immutable = node.immutable;
+    const ctx = this.currentCtx;
+    for (const declarator of node.declarators) {
+      const name = declarator.name.name;
+      // if the variable is already declared, then we should just continue, this error has already been reported
+      if (ctx.vars.has(name)) continue;
+      const { expression, type } = declarator;
+
+      // compile the expression
+      super.visit(expression);
+      // the stack should have a single item at this point
+      assert(ctx.stack.length === 1, "Stack must have one item on it.");
+      const value = ctx.stack.pop()!;
+
+      // if the typeguard exists, we must do type checking
+      if (type) {
+        const resolvedType = ctx.resolve(type);
+
+        if (resolvedType) {
+          // if the type isn't assignable, we have a problem
+          if (!value.ty.isAssignableTo(resolvedType)) {
+            this.error(
+              "Type",
+              node,
+              `Expression is invalid type, cannot assign variable.`
+            );
+            // we are safe to do the assignment, because errors have reported, and the `value` can be a poison value
+            const variable = new ExecutionVariable(immutable, name, value, resolvedType);
+            ctx.vars.set(name, variable);
+            continue;
+          }
+        } else {
+          this.error("Type", node, `Unable to resolve type.`);
+          const variable = new ExecutionVariable(immutable, name, value, new InvalidType(type));
+          ctx.vars.set(name, variable);
+          continue;
+        }
+      } else {
+        const variable = new ExecutionVariable(immutable, name, value, value.ty);
+        ctx.vars.set(name, variable);
+        continue;
+      }
+    }
+  }
+
+  override visitRootIdentifier(expression: RootIdentifier): void {
+    const ctx = this.currentCtx;
+    const variable = ctx.vars.get(expression.root.name);
+    console.log(variable);
+    if (variable) {
+      ctx.stack.push(variable.value);
+    } else {
+      this.error("Semantic", expression, `Cannot find variable named ${expression.root.name} in this context.`);
+      ctx.stack.push(new CompileTimeInvalid(expression));
+    }
   }
 }

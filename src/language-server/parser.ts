@@ -12,7 +12,7 @@ export function parse(
   const ast = Whacko.parser.LangiumParser.parse<Program>(contents);
 
   // @ts-ignore: This is for filename access later in compilation for type describing
-  parsedContents.value[Symbol.for("fullPath")] = fullPath;
+  ast.value[Symbol.for("fullPath")] = fullPath;
   return ast;
   // visitor.visit(ast);
 }

@@ -1,5 +1,6 @@
 import { AstNode, isAstNode } from "langium";
 import { NodeFileSystem } from "langium/node";
+import { assert } from "node:console";
 import {
   isExpression,
   isStatement,
@@ -61,10 +62,11 @@ import {
   ArrayAccessExpression,
   MemberAccessExpression,
   NamespaceDeclaration,
-  PathTypeExpression,
+  PathExpression,
   Decorator,
   DeclareFunction,
   BuiltinDeclaration,
+  RootIdentifier,
 } from "./generated/ast";
 import { createWhackoServices, WhackoServices } from "./whacko-module";
 
@@ -207,6 +209,11 @@ export class WhackoVisitor {
         return this.visitAsyncBlockLiteral(node);
       case "ID":
         return this.visitIdentifier(node);
+      case "RootIdentifier":
+        return this.visitRootIdentifier(node);
+
+      default:
+        assert(false, "Unhandled node type: " + node.type);
     }
   }
 
@@ -309,16 +316,10 @@ export class WhackoVisitor {
     this.visitAll(node.types);
   }
 
-  visitPathTypeExpression(node: PathTypeExpression) {
+  visitNamedTypeExpression(node: NamedTypeExpression) {
     this.visit(node.namespace);
     this.visit(node.element);
-  }
-
-  visitNamedTypeExpression(node: NamedTypeExpression) {
-    this.visit(node.name);
-    for (const typeParameter of node.typeParameters) {
-      this.visit(typeParameter);
-    }
+    this.visitAll(node.typeParameters);
   }
 
   visitFieldClassMember(node: FieldClassMember) {
@@ -495,6 +496,10 @@ export class WhackoVisitor {
   visitAsyncBlockLiteral(expression: AsyncBlockLiteral) {
     if (expression.type) this.visit(expression.type);
     this.visit(expression.block);
+  }
+
+  visitRootIdentifier(expression: RootIdentifier) {
+    this.visit(expression.root);
   }
 
   visitIdentifier(expression: ID) {}

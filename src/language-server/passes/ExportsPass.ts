@@ -22,6 +22,7 @@ import {
   StaticTypeScopeElement,
   Scope,
   consumeDecorator,
+  setScope,
 } from "../types";
 import { WhackoPass } from "./WhackoPass";
 
@@ -153,14 +154,13 @@ export class ExportsPass extends WhackoPass {
   defineExportableType(node: any) {
     let element: ScopeTypeElement;
     const scope = this.stack.at(-1)!.scope;
-
     if (
       node.$type === "NamespaceDeclaration" ||
       node.$type === "DeclareDeclaration"
     ) {
       element = new NamespaceTypeScopeElement(node, scope);
       const newScope = (element as NamespaceTypeScopeElement).scope;
-      this.currentMod!.scopes.set(node, newScope);
+      setScope(node, newScope);
     } else {
       element = node.typeParameters?.length
         ? new DynamicTypeScopeElement(
@@ -168,6 +168,7 @@ export class ExportsPass extends WhackoPass {
             node.typeParameters.map((e: any) => e.name)
           )
         : new StaticTypeScopeElement(node);
+      setScope(node, scope);
     }
 
     const name = node.name.name;

@@ -9,6 +9,7 @@ import {
 } from "./generated/ast";
 import { CompilationPass } from "./passes/CompilationPass";
 import { WhackoProgram } from "./program";
+import { WhackoModule } from "./module";
 
 function getPath(node: AstNode): string {
   // @ts-ignore the `parse` function sets this symbol for later use
@@ -44,6 +45,7 @@ export abstract class ScopeTypeElement extends ScopeElement {
 export class NamespaceTypeScopeElement extends ScopeTypeElement {
   exports = new Map<string, ScopeElement>();
   scope: Scope;
+
   constructor(node: AstNode, parentScope: Scope) {
     super(node);
     this.scope = parentScope.forkTypes();
@@ -51,7 +53,7 @@ export class NamespaceTypeScopeElement extends ScopeTypeElement {
 }
 
 export class StaticTypeScopeElement extends ScopeTypeElement {
-  private cachedConcreteType: ConcreteType | null = null;
+  public cachedConcreteType: ConcreteType | null = null;
 
   constructor(node: AstNode) {
     super(node);
@@ -62,14 +64,15 @@ export class StaticTypeScopeElement extends ScopeTypeElement {
   }
 }
 
-interface BuiltinFunctionParameters {
-  program: WhackoProgram;
-  ctx: ExecutionContext;
+export interface BuiltinFunctionProps {
   ast: AstNode;
+  ctx: ExecutionContext;
+  module: WhackoModule;
   pass: CompilationPass;
+  program: WhackoProgram;
 }
 
-export type BuiltinFunction = () => void;
+export type BuiltinFunction = (props: BuiltinFunctionProps) => void;
 
 export class DynamicTypeScopeElement extends ScopeTypeElement {
   cachedConcreteTypes = new Map<string, ConcreteType>();
@@ -83,8 +86,29 @@ export class DynamicTypeScopeElement extends ScopeTypeElement {
   }
 }
 
+const scopes = new WeakMap<AstNode, Scope>();
+
+export function setScope(node: AstNode, scope: Scope) {
+  console.log("setting scope for", node, scope);
+  scopes.set(node, scope);
+}
+
+export function getScope(node: AstNode): Scope | null {
+  while (true) {
+    const scope = scopes.get(node);
+    if (scope) return scope;
+
+    // we need to go up the tree
+    if (node.$container) {
+      node = node.$container;
+      continue;
+    }
+    return null;
+  }
+}
+
 export class Scope {
-  private elements = new Map<string, ScopeElement>();
+  public elements = new Map<string, ScopeElement>();
 
   constructor(elements?: Map<string, ScopeElement>) {
     this.elements = elements ?? new Map();

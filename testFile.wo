@@ -1,3 +1,6 @@
-declare lunatic {
-  fn connect()
-} from "lunatic::tcp";
+
+export fn main(): void {
+  let a = 1 + 2,
+    b = 4;
+  a = a + b;
+}
