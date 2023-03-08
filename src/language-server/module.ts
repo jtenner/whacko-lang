@@ -9,9 +9,10 @@ export class WhackoModule {
   constructor(
     public ast: Program,
     public path: string,
-    public entry: boolean = false
-  ) {}
-  scope = new Scope();
+    public entry: boolean = false,
+    public scope: Scope
+  ) {
+  }
   diagnostics: IDiagnostic[] = [];
 
   error(type: string, node: AstNode, message: string) {
@@ -42,19 +43,5 @@ export class WhackoModule {
       line: range.character,
       message: `[${type}] ${message}`,
     });
-  }
-
-  getScope(node: AstNode): Scope | null {
-    while (true) {
-      const scope = this.scopes.get(node);
-      if (scope) return scope;
-
-      // we need to go up the tree
-      if (node.$container) {
-        node = node.$container;
-        continue;
-      }
-      return null;
-    }
   }
 }

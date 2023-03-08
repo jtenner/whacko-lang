@@ -6,9 +6,7 @@ import {
   FunctionDeclaration,
   FunctionLiteral,
   GetterClassMember,
-  GrabStatement,
   MethodClassMember,
-  NamespaceDeclaration,
   Program,
   SetterClassMember,
 } from "../generated/ast";

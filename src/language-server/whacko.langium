@@ -7,18 +7,29 @@ entry Program:
     | declarations+=FunctionDeclaration
     | declarations+=ClassDeclaration
     | declarations+=TypeDeclaration
-    | declarations+=NamespaceDeclaration)*;
+    | declarations+=NamespaceDeclaration
+    | declarations+=BuiltinDeclaration)*;
 
 NamespaceDeclaration:
-    (export?="export") "namespace" Name "{" ( declarations+=DeclareDeclaration
+    Decorators (export?="export") "namespace" Name "{" ( declarations+=DeclareDeclaration
     | exports+=ExportDeclaration
     | declarations+=FunctionDeclaration
     | declarations+=ClassDeclaration
     | declarations+=TypeDeclaration
-    | declarations+=NamespaceDeclaration)* "}";
+    | declarations+=NamespaceDeclaration
+    | declarations+=BuiltinDeclaration)* "}";
+
+BuiltinDeclaration:
+    Decorators (export?="export") "builtin" Name TypeParameters "(" Parameters ")" ReturnType ";";
 
 DeclareDeclaration:
-    (export?="export")? "declare" namespace=String method=String Name Parameters ":" ReturnType ";";
+    Decorators (export?="export") "declare" Name "{" functions+=DeclareFunction "}" "from" namespace=StringLiteral ";";
+
+DeclareFunction:
+    Decorators "fn" Name "(" Parameters ")" ":" ReturnType ";";
+
+EnumDeclaration:
+    Decorators (export?="export") "enum" Name "{"  "}";
 
 ImportDeclaration:
     "import" "{" (declarators+=ImportDeclarator ("," declarators+=ImportDeclarator)*)? "}" "from" path=String ";";
@@ -33,16 +44,16 @@ ExportDeclarator:
     Name ("as" alias=ID)?;
 
 FunctionDeclaration:
-    (export?="export")? (async="async")? "fn" Name  NamedTypeParameters Parameters ":" ReturnType block=BlockStatement;
+    Decorators (export?="export")? (async="async")? "fn" Name NamedTypeParameters Parameters ":" ReturnType block=BlockStatement;
 
 Parameter:
     Name ":" type=ID;
 
 TypeDeclaration:
-    (export?="export")? "type" Name NamedTypeParameters "=" type=TypeExpression ";";
+    Decorators (export?="export")? "type" Name NamedTypeParameters "=" type=TypeExpression ";";
 
 ClassDeclaration:
-    (export?="export")? (final?="final")? "class" Name NamedTypeParameters ("extends" extends=TypeExpression)? "{" members+=ClassMember* "}";
+    Decorators (export?="export")? (final?="final")? "class" Name NamedTypeParameters ("extends" extends=TypeExpression)? "{" members+=ClassMember* "}";
 
 TypeExpression: HeldTypeExpression | FunctionTypeExpression | NamedTypeExpression | TupleTypeExpression;
 
@@ -56,27 +67,24 @@ TupleTypeExpression:
     "(" types+=TypeExpression "," (types+=TypeExpression ("," types+=TypeExpression)* )? ")";
 
 NamedTypeExpression:
-    name=PathTypeExpression TypeParameters;
-
-PathTypeExpression:
-    ID ({infer PathTypeExpression.namespace=current} "." element=ID)*;
+    ID ({infer NamedTypeExpression.namespace=current} "." element=ID)* TypeParameters;
 
 ClassMember: ConstructorClassMember | FieldClassMember | MethodClassMember | GetterClassMember | SetterClassMember;
 
 FieldClassMember:
-    (private?="private")? Name ":" type=TypeExpression ("=" initializer=Expression)? ";";
+    Decorators (private?="private")? Name ":" type=TypeExpression ("=" initializer=Expression)? ";";
 
 MethodClassMember:
-    (private?="private")? Name Parameters ":" ReturnType block=BlockStatement;
+    Decorators (private?="private")? Name Parameters ":" ReturnType block=BlockStatement;
 
 GetterClassMember:
-    (private?="private")? "get" Name ":" ReturnType block=BlockStatement;
+    Decorators (private?="private")? "get" Name ":" ReturnType block=BlockStatement;
 
 SetterClassMember:
-    (private?="private")? "set" Name "(" parameter=Parameter ")" block=BlockStatement;
+    Decorators (private?="private")? "set" Name "(" parameter=Parameter ")" block=BlockStatement;
 
 ConstructorClassMember:
-    (private?="private")? "constructor" Parameters block=BlockStatement;
+    Decorators (private?="private")? "constructor" Parameters block=BlockStatement;
 
 Statement: BlockStatement | TypeDeclarationStatement | GrabStatement | WhileStatement | ContinueStatement | BreakStatement | IfElseStatement | ReturnStatement | VariableDeclarationStatement | ExpressionStatement;
 
@@ -154,10 +162,10 @@ ComaprisonExpression:
 BitShiftExpression:
     SumExpression ({infer BinaryExpression.lhs=current} op=("<<" | ">>") rhs=SumExpression)*;
 
-SumExpression: 
+SumExpression:
     ProductExpression ({infer BinaryExpression.lhs=current} op=("+" | "-") rhs=ProductExpression)*;
 
-ProductExpression: 
+ProductExpression:
     ExponentiationExpression ({infer BinaryExpression.lhs=current} op=("*" | "/" | "%") rhs=ExponentiationExpression)*;
 
 ExponentiationExpression: 
@@ -186,7 +194,10 @@ PathExpression:
         | {infer ArrayAccessExpression.arrayRoot=current} "[" indexExpression=Expression "]"
     )*;
 
-PrimaryExpression: FunctionLiteral | GroupLiteral | ID | FloatLiteral | IntegerLiteral | HexLiteral | BinaryLiteral | OctalLiteral | StringLiteral | FalseLiteral | TrueLiteral | NullLiteral | ThisLiteral | SuperLiteral | AsyncBlockLiteral;
+PrimaryExpression: FunctionLiteral | GroupLiteral | RootIdentifier | FloatLiteral | IntegerLiteral | HexLiteral | BinaryLiteral | OctalLiteral | StringLiteral | FalseLiteral | TrueLiteral | NullLiteral | ThisLiteral | SuperLiteral | AsyncBlockLiteral;
+
+RootIdentifier:
+    root=ID;
 
 FunctionLiteral:
     TypeParameters "(" ( parameters+=Parameter ("," parameters+=Parameter)* )? ")" ":" ReturnType "=>" block=BlockStatement;
@@ -208,6 +219,12 @@ fragment ReturnType:
 
 fragment Name:
     name=ID;
+
+fragment Decorators:
+    (decorators+=Decorator)*;
+
+Decorator:
+    "@" name=ID "(" CallParameters ")";
 
 GroupLiteral:
     "(" expression=Expression ")";
