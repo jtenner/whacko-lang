@@ -1,11 +1,11 @@
 
-@gloabl @name("i8") export builtin i8<T>(val: T): i8;
-@gloabl @name("i8") export builtin u8<T>(val: T): u8;
-@gloabl @name("i16") export builtin i16<T>(val: T): i16;
-@gloabl @name("u16") export builtin u16<T>(val: T): u16;
-@gloabl @name("i32") export builtin i32<T>(val: T): i32;
-@gloabl @name("u32") export builtin u32<T>(val: T): u32;
-@gloabl @name("i64") export builtin i64<T>(val: T): i64;
-@gloabl @name("u64") export builtin u64<T>(val: T): u64;
-@gloabl @name("isize") export builtin isize<T>(val: T): isize;
-@gloabl @name("usize") export builtin usize<T>(val: T): usize;
+@name("i8") export builtin i8<T>(val: T): i8;
+@name("i8") export builtin u8<T>(val: T): u8;
+@name("i16") export builtin i16<T>(val: T): i16;
+@name("u16") export builtin u16<T>(val: T): u16;
+@name("i32") export builtin i32<T>(val: T): i32;
+@name("u32") export builtin u32<T>(val: T): u32;
+@name("i64") export builtin i64<T>(val: T): i64;
+@name("u64") export builtin u64<T>(val: T): u64;
+@name("isize") export builtin isize<T>(val: T): isize;
+@name("usize") export builtin usize<T>(val: T): usize;

@@ -21,13 +21,13 @@ NamespaceDeclaration:
     | declarations+=BuiltinDeclaration)* "}";
 
 BuiltinDeclaration:
-    Decorators (export?="export") "builtin" Name NamedTypeParameters "(" Parameters ")" ReturnType ";";
+    Decorators (export?="export") "builtin" Name NamedTypeParameters Parameters ":" ReturnType ";";
 
 DeclareDeclaration:
     Decorators (export?="export") "declare" Name "{" functions+=DeclareFunction "}" "from" namespace=StringLiteral ";";
 
 DeclareFunction:
-    Decorators "fn" Name "(" Parameters ")" ":" ReturnType ";";
+    Decorators "fn" Name Parameters ":" ReturnType ";";
 
 EnumDeclaration:
     Decorators (export?="export") "enum" Name "{"  "}";
@@ -201,13 +201,13 @@ RootIdentifier:
     root=ID;
 
 FunctionLiteral:
-    TypeParameters "(" ( parameters+=Parameter ("," parameters+=Parameter)* )? ")" ":" ReturnType "=>" block=BlockStatement;
+    TypeParameters Parameters ":" ReturnType "=>" block=BlockStatement;
 
 fragment CallParameters:
     "(" (parameters+=Expression ("," parameters+=Expression)*)? ")";
 
 fragment Parameters:
-    "(" (parameters+=Parameter ("," parameters+=Parameter)*)? ")";
+    "(" ( parameters+=Parameter ("," parameters+=Parameter)* )? ")";
 
 fragment TypeParameters:
     ("<" typeParameters+=TypeExpression ("," typeParameters+=TypeExpression)* ">")?;
@@ -225,7 +225,7 @@ fragment Decorators:
     decorators+=Decorator*;
 
 Decorator:
-    "@" name=ID ("(" CallParameters ")")?;
+    "@" name=ID CallParameters?;
 
 GroupLiteral:
     "(" expression=Expression ")";
@@ -272,7 +272,6 @@ ID:
 
 terminal String: /"([^"\r\n]|\\\.)*"/;
 
-terminal DECORATOR: /@[a-zA-Z$_][a-zA-Z$_0-9]*/;
 terminal Identifier: /[a-zA-Z$_][a-zA-Z$_0-9]*/;
 
 terminal Binary: /0b[10]+/;

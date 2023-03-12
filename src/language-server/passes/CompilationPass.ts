@@ -17,6 +17,8 @@ import {
   RuntimeFloat,
   RuntimeInteger,
   ExecutionVariable,
+  RuntimeFunction,
+  RuntimeArray,
 } from "../execution-context";
 import {
   BinaryExpression,
@@ -38,24 +40,33 @@ import {
   TypeExpression,
   Expression,
   isBuiltinDeclaration,
+  BlockStatement,
 } from "../generated/ast";
 import { WhackoModule } from "../module";
 import {
+  BoolType,
   ClassType,
+  ConcreteFunction,
   ConcreteType,
   DynamicTypeScopeElement,
   FloatType,
   FunctionType,
   getScope,
+  IntegerEnumType,
   IntegerType,
   InvalidType,
   Scope,
   ScopeTypeElement,
   StaticTypeScopeElement,
+  StringType,
   Type,
 } from "../types";
 import { WhackoPass } from "./WhackoPass";
-
+import { AstNode } from "langium";
+import llvm, { LLVMBasicBlockRef, LLVMBuilderRef, LLVMFuncRef, LLVMTypeRef, LLVMValueRef, lower, lowerTypeArray } from "../../llvm/llvm";
+import { WhackoProgram } from "../program";
+import { ThemeIcon } from "vscode";
+const LLVM = await (await llvm).ready();
 const assignmentOps = new Set<string>([
   "=",
   "%=",
@@ -73,696 +84,319 @@ const assignmentOps = new Set<string>([
   "||=",
 ]);
 
-interface QueuedCompileElement {
+export class CompiledString {
+  constructor(
+    public ref: LLVMValueRef,
+    public value: string,
+    public byteLength: number,
+  ) {}
+}
+
+export interface QueuedFunctionCompilation {
   func: ScopeTypeElement;
-  typeParameters: ConcreteType[] | null;
+  module: WhackoModule;
+  typeParameters: Map<string, ConcreteType>;
 }
 
 export class CompilationPass extends WhackoPass {
-  executionStack: ExecutionContext[] = [];
-  func!: FunctionDeclaration;
+  private ctx!: ExecutionContext;
+  private func!: ConcreteFunction;
+  private queue: QueuedFunctionCompilation[] = [];
+  private entry!: LLVMBasicBlockRef;
+  private currentBlock!: LLVMBasicBlockRef;
+  private builder!: LLVMBuilderRef;
+  private compiledStrings = new Map<string, CompiledString>();
+  private cachedFunctions = new Map<string, ConcreteFunction>();
+  private tmp: bigint = 0n;
 
-  get currentCtx() {
-    const last = this.executionStack.at(-1)!;
-    assert(last, `Expected context to exist.`);
-    return last;
+  compile(program: WhackoProgram) {
+    outer: for (const [,module] of program.modules) {
+      for (const [exportName, element] of module.exports) {
+        if (exportName === "main") {
+          // we need to validate main is the right format
+          if (element instanceof StaticTypeScopeElement && element.node.$type === "FunctionDeclaration") {
+            this.queue.push({
+              func: element,
+              module,
+              typeParameters: new Map(),
+            });
+          }
+          break outer;
+        }
+      }
+    }
+    this.exhaustQueue();
   }
 
-  queue: QueuedCompileElement[] = [];
-  queueCompileElement(
-    func: ScopeTypeElement,
-    typeParameters: ConcreteType[] | null,
-  ): FunctionType {
-    this.queue.push({ func, typeParameters });
-    // TODO: Ensure that it returns a valid function type, even if the function body isn't compiled yet
-    throw new Error("Not implemented.");
+  private exhaustQueue() {
+    while (this.queue.length > 0) {
+      // there's a function declaration to compile
+      const item = this.queue.shift()!;
+      this.compileFunction(item);
+    }
   }
 
-  compileElement(
-    func: ScopeTypeElement,
-    typeParameters: ConcreteType[] | null,
-    module: WhackoModule
-  ) {
-    this.currentMod = module;
-    assert(
-      isFunctionDeclaration(func.node),
-      `Expected function in FunctionCompilationPass.`
+  private compileFunction(item: QueuedFunctionCompilation) {
+    const scope = getScope(item.func.node)!;
+    assert(scope, "The scope must exist at this point.");
+    const ctx = new ExecutionContext(scope, item.typeParameters);
+    this.ctx = ctx;
+    this.currentMod = item.module;
+    this.visit(item.func.node);
+    return this.func;
+  }
+  
+  override visitFunctionDeclaration(node: FunctionDeclaration): void {
+    // we need to evaluate the current function based on the current type parameters
+    // we also need to compile a function with the correct signature
+    // this requires getting the llvm types and parameter types for this function
+    const parameterNames = node.parameters.map(e => e.name.name);
+    const parameterTypes = node.parameters.map(e => this.ctx.resolve(e.type) ?? new InvalidType(e.type));
+    const returnType = this.ctx.resolve(node.returnType) ?? new InvalidType(node.returnType);
+    const typeParameters = node.typeParameters.map(e => this.ctx.types.get(e.name)!);
+    
+    // check for a cached function... which means we need to get a function type
+    const funcType = new FunctionType(
+      typeParameters,
+      parameterTypes,
+      parameterNames,
+      returnType,
+      node,
+      node.name.name,
     );
-    const funcNode = func.node as FunctionDeclaration;
-    if (func instanceof StaticTypeScopeElement) {
-      if (typeParameters?.length) {
-        this.error("Semantic", func.node, "Expected no type parameters.");
-        return;
-      }
-    } else if (func instanceof DynamicTypeScopeElement) {
-      if (typeParameters?.length !== func.typeParameters.length) {
-        this.error(
-          "Semantic",
-          func.node,
-          `Expected ${func.typeParameters.length} parameters.`
-        );
-        return;
-      }
+    const fullyQualifiedFuncName = funcType.getName();
+
+    // if the function already exists, we compiled it!
+    if (this.cachedFunctions.has(fullyQualifiedFuncName)) {
+      this.func = this.cachedFunctions.get(fullyQualifiedFuncName)!
+      return; // because we are already compiled
     }
 
-    const funcScope = getScope(func.node)!;
-    assert(funcScope, "Function scope should exist at this point.");
+    // next we need to define the function types in llvm and create a concrete function
+    const llvmParameterTypes = parameterTypes.map(e => e.llvmType!);
+    const llvmReturnType = returnType.llvmType!;
+    const llvmFuncType = LLVM._LLVMFunctionType(llvmReturnType, lowerTypeArray(llvmParameterTypes), llvmParameterTypes.length, 0);
+    const llvmFunc = LLVM._LLVMAddFunction(this.program.llvmModule, lower(node.name.name), llvmFuncType);
+    this.func = new ConcreteFunction(llvmFunc, funcType);
 
-    const ctx = new ExecutionContext(funcScope);
-    if (typeParameters) {
-      for (let i = 0; i < typeParameters.length; i++) {
-        ctx.types.set(funcNode.typeParameters[i].name, typeParameters[i]);
+    // next we need to initialize the context with some parameter variables
+    for (let i = 0; i < parameterNames.length; i++) {
+      const parameterName = parameterNames[i];
+      const parameterType = parameterTypes[i];
+    
+      this.ctx.vars.set(
+        parameterName,
+        new ExecutionVariable(
+          false,
+          parameterName,
+          this.getParameterLLVMRef(LLVM._LLVMGetParam(llvmFunc, i), parameterType),
+          parameterType
+        )
+      );
+    }
+
+    this.entry = LLVM._LLVMAppendBasicBlock(llvmFunc, lower("entry"));
+    this.currentBlock = this.entry;
+    this.builder = LLVM._LLVMCreateBuilder();
+    LLVM._LLVMPositionBuilderAtEnd(this.builder, this.entry);
+
+    super.visitFunctionDeclaration(node);
+  }
+  
+  private getParameterLLVMRef(i: number, ty: ConcreteType): RuntimeValue {
+    const ref = LLVM._LLVMGetParam(this.func.funcRef, i);
+    if (ty instanceof IntegerType) {
+      return new RuntimeInteger(ref, ty);
+    } else if (ty instanceof FloatType) {
+      return new RuntimeFloat(ref, ty);
+    } else if (ty instanceof StringType) {
+      return new RuntimeString(ref, ty);
+    } else if (ty instanceof FunctionType) {
+      return new RuntimeFunction(ref, ty);
+    } else if (ty instanceof BoolType) {
+      return new RuntimeBool(ref, ty);
+    } else if (ty instanceof InvalidType) {
+      return new RuntimeInvalid(ty);
+    } else if (ty instanceof RuntimeArray) {
+      return new RuntimeArray(ref, ty);
+    }
+    return new RuntimeInvalid(new InvalidType(ty.node));
+  }
+
+  override visitVariableDeclarationStatement(node: VariableDeclarationStatement): void {
+    const { immutable, declarators } = node;
+    for (let i = 0; i < declarators.length; i++) {
+      const { expression, name, type } = declarators[i];
+
+      if (this.ctx.vars.has(name.name)) {
+        // if it already exists, we can't even override the current variable
+        this.error("Semantic", name, `Element ${name.name} is already defined.`);
+        continue;
+      }
+
+      // we should always visit the expression
+      this.visit(expression);
+      const value = assert(this.ctx.stack.pop(), "Element must exist.");
+      
+      if (type) {
+        const variableType = this.ctx.resolve(type);
+        if (variableType) {
+          if (value.ty.isAssignableTo(variableType!)) {
+            // good we can store the variable
+            const variable = new ExecutionVariable(immutable, name.name, value, variableType);
+            this.ctx.vars.set(name.name, variable);
+          } else {
+            // bad, we store a compiletime invalid with the variableType
+            const invalid = new CompileTimeInvalid(expression);
+            const variable = new ExecutionVariable(immutable, name.name, invalid, invalid.ty);
+            this.ctx.vars.set(name.name, variable);
+          }
+        } else {
+          // bad, we couldn't resolve the type, set the variable to compile time invalid
+          const invalid = new CompileTimeInvalid(type);
+          const variable = new ExecutionVariable(immutable, name.name, invalid, invalid.ty);
+          this.ctx.vars.set(name.name, variable);
+        }
+      } else {
+        // good, no type guard, assume the variable's type is equal to the expression's
+        const variable = new ExecutionVariable(immutable, name.name, value, value.ty);
+        this.ctx.vars.set(name.name, variable);
       }
     }
-    this.func = funcNode;
-    this.executionStack.push(ctx);
-    this.visit(funcNode);
   }
 
-  override visitExpressionStatement(node: ExpressionStatement): void {
-    super.visitExpressionStatement(node);
-    const ctx = this.currentCtx;
-    assert(ctx.stack.length === 1);
-    ctx.stack.pop();
-  }
-
-  override visitStringLiteral(expression: StringLiteral): void {
-    const ctx = this.currentCtx;
-    ctx.stack.push(new CompileTimeString(expression.value, expression));
+  override visitBlockStatement(node: BlockStatement): void {
+    const nodeScope = assert(getScope(node), "Scope must be defined for this");
+    const ctx = this.ctx;
+    this.ctx = new ExecutionContext(nodeScope, new Map(ctx.types));
+    this.ctx.parent = ctx;
+    super.visitBlockStatement(node);
+    this.ctx = ctx;
   }
 
   override visitIntegerLiteral(expression: IntegerLiteral): void {
     const value = BigInt(expression.value);
-    if (
-      value <= 9_223_372_036_854_775_807n &&
-      value >= -9_223_372_036_854_775_808n
-    ) {
-      this.currentCtx.stack.push(
-        new CompileTimeInteger(
-          value,
-          new IntegerType(Type.i64, value, expression)
-        )
-      );
-    } else if (value >= 0n && value <= 18_446_744_073_709_551_615n) {
-      this.currentCtx.stack.push(
-        new CompileTimeInteger(
-          value,
-          new IntegerType(Type.u64, value, expression)
-        )
-      );
+    if (value <= 9223372036854775807n && value > -9223372036854775808n) {
+      this.ctx.stack.push(new CompileTimeInteger(value, new IntegerType(Type.i64, value, expression)));
+    } else if (value >= BigInt(0) && value <= 18446744073709551615n) {
+      this.ctx.stack.push(new CompileTimeInteger(value, new IntegerType(Type.u64, value, expression)));
     } else {
-      this.error(
-        "Semantic",
-        expression,
-        "Invalid number, must be a valid i64 or u64."
-      );
-    }
-  }
-
-  override visitFloatLiteral(expression: FloatLiteral): void {
-    const value = parseFloat(expression.value);
-    this.currentCtx.stack.push(
-      new CompileTimeFloat(value, new FloatType(Type.f64, value, expression))
-    );
-  }
-
-  override visitBinaryLiteral(expression: BinaryLiteral): void {
-    const value = BigInt(expression.value);
-    if (
-      value <= 9_223_372_036_854_775_807n &&
-      value >= -9_223_372_036_854_775_808n
-    ) {
-      this.currentCtx.stack.push(
-        new CompileTimeInteger(
-          value,
-          new IntegerType(Type.i64, value, expression)
-        )
-      );
-    } else if (value >= 0n && value <= 18_446_744_073_709_551_615n) {
-      this.currentCtx.stack.push(
-        new CompileTimeInteger(
-          value,
-          new IntegerType(Type.u64, value, expression)
-        )
-      );
-    } else {
-      this.error(
-        "Semantic",
-        expression,
-        "Invalid number, must be a valid i64 or u64."
-      );
-    }
-  }
-
-  override visitHexLiteral(expression: HexLiteral): void {
-    const value = BigInt(expression.value);
-    if (
-      value <= 9_223_372_036_854_775_807n &&
-      value >= -9_223_372_036_854_775_808n
-    ) {
-      this.currentCtx.stack.push(
-        new CompileTimeInteger(
-          value,
-          new IntegerType(Type.i64, value, expression)
-        )
-      );
-    } else if (value >= 0n && value <= 18_446_744_073_709_551_615n) {
-      this.currentCtx.stack.push(
-        new CompileTimeInteger(
-          value,
-          new IntegerType(Type.u64, value, expression)
-        )
-      );
-    } else {
-      this.error(
-        "Semantic",
-        expression,
-        "Invalid number, must be a valid i64 or u64."
-      );
+      this.ctx.stack.push(new CompileTimeInvalid(expression));
     }
   }
 
   override visitBinaryExpression(node: BinaryExpression): void {
-    const ctx = this.currentCtx;
+    switch (node.op) {
+      case "+": return this.compileAdditionExpression(node);
+      case "=": return this.compileAssignmentExpression(node);
+      default: {
+        this.visit(node.lhs);
+        this.visit(node.rhs);
+        this.ctx.stack.pop();
+        this.ctx.stack.pop();
+        this.ctx.stack.push(new CompileTimeInvalid(node));
+        this.error("Type", node, `Operator not supported: "${node.op}"`);
+      }
+    }
+  }
 
-    if (assignmentOps.has(node.op)) return this.compileAssignment(node);
-
-    super.visitBinaryExpression(node);
-    assert(ctx.stack.length >= 2, "Expected stack to have two items on it.");
-    const right = ctx.stack.pop()!;
-    const left = ctx.stack.pop()!;
-
-    if (right instanceof InvalidType || left instanceof InvalidType) {
-      ctx.stack.push(new CompileTimeInvalid(node));
+  private compileAssignmentExpression(node: BinaryExpression) {
+    const { lhs, rhs } = node;
+    if (isRootIdentifier(lhs)) {
+      const name = lhs.root.name;
+      const variable = this.ctx.vars.get(name);
+      if (variable) {
+        if (variable.immutable) {
+          this.ctx.stack.push(new CompileTimeInvalid(node));
+          this.error("Semantic", node, `Variable ${name} is immutable.`);
+        } else {
+          // we need to evaluate the rhs of the expression
+          this.visit(rhs);
+          const value = assert(this.ctx.stack.pop(), "There must be a value on the stack");
+          if (value.ty.isAssignableTo(variable.type)) {
+            const compiled = this.ensureCompiled(value);
+            variable.value = compiled;
+            this.ctx.stack.push(compiled);
+          } else {
+            this.ctx.stack.push(new CompileTimeInvalid(node));
+            this.error("Type", node, `Cannot assign expression to variable.`);
+          }
+        }
+      } else {
+        this.ctx.stack.push(new CompileTimeInvalid(node));
+        this.error("Semantic", node, `Invalid identifier ${name}.`);
+      }
       return;
     }
-
-    if (left.ty.isAssignableTo(right.ty)) {
-      if (
-        left instanceof CompileTimeValue &&
-        right instanceof CompileTimeValue
-      ) {
-        // we can operate on these two items and make a constant
-        // TODO: use compiledLeft and compiledRight to emit a instruction in llvm
-        switch (node.op) {
-          case "!=":
-          case "%":
-          case "&":
-          case "&&":
-          case "*":
-          case "**":
-          case "+":
-          case "-":
-          case "/":
-          case "<":
-          case "<<":
-          case "<=":
-          case "==":
-          case ">":
-          case ">>":
-          case "^":
-          case "|":
-          case "||":
-          default: {
-            this.error(
-              "Semantic",
-              node,
-              "Compile time operator not supported " + node.op
-            );
-            ctx.stack.push(new CompileTimeInvalid(node));
-            return;
-          }
-        }
-      } else {
-        const compiledLeft = this.ensureCompiled(left);
-        const compiledRight = this.ensureCompiled(right);
-        // TODO: use compiledLeft and compiledRight to emit a instruction in llvm
-        switch (node.op) {
-          case "!=":
-          case "%":
-          case "&":
-          case "&&":
-          case "*":
-          case "**":
-          case "+":
-          case "-":
-          case "/":
-          case "<":
-          case "<<":
-          case "<=":
-          case "==":
-          case ">":
-          case ">>":
-          case "^":
-          case "|":
-          case "||":
-          default: {
-            this.error("Semantic", node, "Operator not supported " + node.op);
-            ctx.stack.push(new CompileTimeInvalid(node));
-            return;
-          }
-        }
-        const compiledValue = 0 as any as RuntimeValue;
-        this.currentCtx.stack.push(compiledValue);
-      }
-    } else {
-      this.currentCtx.stack.push(new CompileTimeInvalid(node));
-    }
+    this.ctx.stack.push(new CompileTimeInvalid(node));
+    this.error("Type", node, `Operation not supported.`);
   }
 
-  private compileAssignment(node: BinaryExpression): void {
-    const ctx = this.currentCtx;
-
-    if (isRootIdentifier(node.lhs)) {
-      const local = ctx.vars.get(node.lhs.root.name)!;
-      this.visit(node.rhs);
-
-      // are we a constant variable, or a runtime variable
-      if (local.immutable) {
-        // compile time constant variable! We need to emit a diagnostic and push void to the stack
-        this.error(
-          "Semantic",
-          node.lhs,
-          "Invalid left hand side, variable is immutable."
-        );
-        ctx.stack.push(new CompileTimeInvalid(node));
-      } else {
-        // pop the rhs off the stack
-        const rhs = ctx.stack.pop()!;
-        assert(rhs);
-
-        if (rhs.valid) {
-          // perform an assignment using local.ref and rhs
-          switch (node.op) {
-            // TODO: What goes here?
-            case "=":
-            case "%=":
-            case "&&=":
-            case "&=":
-            case "**=":
-            case "*=":
-            case "+=":
-            case "-=":
-            case "/=":
-            case "<<=":
-            case ">>=":
-            case "^=":
-            case "|=":
-            case "||=":
-            default:
-          }
-        } else {
-          // we already know that the assignment can't happen, but we can poison the variable here
-          local.value = rhs;
-        }
-        // then push the calculated value to the stack
-        ctx.stack.push(rhs);
-      }
-    } else if (isMemberAccessExpression(node.lhs)) {
-      const mas = node.lhs as MemberAccessExpression;
-      this.visit(mas.memberRoot);
-      const rootElement = this.currentCtx.stack.pop()!;
-      assert(
-        rootElement,
-        "Could not pop context stack element because the stack was exhausted."
-      );
-      this.visit(node.rhs);
-      const valueElement = this.currentCtx.stack.pop()!;
-      assert(
-        valueElement,
-        "Could not pop context stack element because the stack was exhausted."
-      );
-      const propname = mas.member.name;
-      if (rootElement.ty instanceof ClassType) {
-        const classType = rootElement.ty;
-        // TODO: obtain field information from class type
-      } else {
-        this.error(
-          "Type",
-          mas.member,
-          `Invalid type, ${rootElement.ty.name} is not a class.`
-        );
-      }
-    } else {
-      // this.visit(node.lhs);
-      this.visit(node.rhs);
-      this.error(
-        "Semantic",
-        node.lhs,
-        "Invalid left hand side, invalid expression."
-      );
-      ctx.stack.pop();
-      ctx.stack.push(new CompileTimeInvalid(node));
+  private compileAdditionExpression(node: BinaryExpression) {
+    // compile both sides and return the expressions
+    super.visitBinaryExpression(node);
+    // rhs is on top
+    const rhs = assert(this.ctx.stack.pop(), "Value must exist on the stack");
+    const lhs = assert(this.ctx.stack.pop(), "Value must exist on the stack");
+    // if the types are equal, and the sides are valid
+    if (lhs.ty.isEqual(rhs.ty) && rhs.valid && lhs.valid) {
+      // we can perform the operation
+      if (lhs instanceof CompileTimeInteger && rhs instanceof CompileTimeInteger) {
+        // integer types are the same
+        const ty = lhs.ty as IntegerType;
+        const bits = ty.bits;
+        const signed = ty.signed;
+        const addedValue = lhs.value + rhs.value;
+        const value = signed ? BigInt.asIntN(bits, addedValue) : BigInt.asUintN(bits, addedValue);
+        this.ctx.stack.push(new CompileTimeInteger(value, new IntegerType(ty.ty as IntegerEnumType, value, node)));
+        return;
+      } else if (lhs instanceof CompileTimeFloat && rhs instanceof CompileTimeFloat) {
+        // add the floats
+        const value = lhs.value + rhs.value;
+        this.ctx.stack.push(new CompileTimeFloat(value, new FloatType(value, lhs.ty.ty, node)));
+        return
+      } else if (lhs instanceof CompileTimeString && rhs instanceof CompileTimeString) {
+        const value = lhs.value + rhs.value;
+        // concatenate the strings manually
+        this.ctx.stack.push(new CompileTimeString(value, node));
+        return
+      } else if (lhs instanceof RuntimeInteger || rhs instanceof RuntimeInteger) {
+        const compiledlhs = this.ensureCompiled(lhs) as RuntimeValue;
+        const compiledrhs = this.ensureCompiled(rhs) as RuntimeValue;
+        const tmpname = "tmp" + (this.tmp++).toString();
+        const inst = LLVM._LLVMBuildAdd(this.builder, compiledlhs.ref, compiledrhs.ref, lower(tmpname));
+        this.ctx.stack.push(new RuntimeInteger(inst, new IntegerType(lhs.ty.ty as IntegerEnumType, null, node)));
+        return;
+      } else if (lhs instanceof RuntimeFloat || rhs instanceof RuntimeFloat) {
+        const compiledlhs = this.ensureCompiled(lhs) as RuntimeValue;
+        const compiledrhs = this.ensureCompiled(rhs) as RuntimeValue;
+        const tmpname = "tmp" + (this.tmp++).toString();
+        const inst = LLVM._LLVMBuildAdd(this.builder, compiledlhs.ref, compiledrhs.ref, lower(tmpname));
+        this.ctx.stack.push(new RuntimeInteger(inst, new FloatType(lhs.ty.ty as any, null, node)));
+        return;
+      } 
     }
+    this.error("Type", node, `Addition operation not supported.`);
+    this.ctx.stack.push(new CompileTimeInvalid(node));
   }
 
-  private ensureCompiled(value: ExecutionContextValue): RuntimeValue {
-    // TODO: turn compile time constants into runtime values
-    if (value instanceof RuntimeValue) return value;
-    else if (value instanceof CompileTimeBool) {
-      return new RuntimeBool(0, value.ty);
-    } else if (value instanceof CompileTimeString) {
-      return new RuntimeString(0, value.ty);
-    } else if (value instanceof CompileTimeFloat) {
-      return new RuntimeFloat(0, value.ty);
-    } else if (value instanceof CompileTimeInteger) {
-      return new RuntimeInteger(0, value.ty);
-    } else if (value instanceof CompileTimeInvalid) {
-      return new RuntimeInvalid(value.ty);
+  private ensureCompiled(expression: ExecutionContextValue): RuntimeValue | CompileTimeInvalid {
+    if (expression instanceof RuntimeValue) { return expression; }
+    else if (expression instanceof CompileTimeInteger) {
+      const inst = LLVM._LLVMConstInt(assert(expression.ty.llvmType, "The llvm type for the expression must exist."), expression.value, 0);
+      return new RuntimeInteger(inst, expression.ty);
+    } else if (expression instanceof CompileTimeFloat) {
+      const inst = LLVM._LLVMConstReal(assert(expression.ty.llvmType, "The llvm type for the expression must exist."), expression.value);
+      return new RuntimeFloat(inst, expression.ty);
+    } else if (expression instanceof CompileTimeString) {
+      const compiledString = this.compiledStrings.get(expression.value);
+      if (compiledString) return new RuntimeString(compiledString.ref, new StringType(expression.value, expression.ty.node));
+      const lowered = lower(expression.value);
+      const inst = LLVM._LLVMBuildGlobalStringPtr(this.builder, lowered, lowered);
+      const newCompiledString = new CompiledString(inst, expression.value, Buffer.byteLength(expression.value));
+      return new RuntimeString(inst, new StringType(expression.value, expression.ty.node));
     }
-    throw new Error("Method not implemented.");
-  }
-
-  override visitVariableDeclarationStatement(
-    node: VariableDeclarationStatement
-  ): void {
-    const immutable = node.immutable;
-    const ctx = this.currentCtx;
-    for (const declarator of node.declarators) {
-      const name = declarator.name.name;
-      // if the variable is already declared, then we should just continue, this error has already been reported
-      if (ctx.vars.has(name)) continue;
-      const { expression, type } = declarator;
-
-      // compile the expression
-      super.visit(expression);
-      // the stack should have a single item at this point
-      const value = assert(ctx.stack.pop(), "Stack must have one item on it.");
-      assert(ctx.stack.length === 0, "Stack is not empty after evaluating a variable declarator.");
-
-      // if the typeguard exists, we must do type checking
-      if (type) {
-        const resolvedType = ctx.resolve(type);
-
-        if (resolvedType) {
-          // if the type isn't assignable, we have a problem
-          if (!value.ty.isAssignableTo(resolvedType)) {
-            this.error(
-              "Type",
-              node,
-              `Expression is invalid type, cannot assign variable.`
-            );
-            // we are safe to do the assignment, because errors have reported, and the `value` can be a poison value
-            const variable = new ExecutionVariable(
-              immutable,
-              name,
-              value,
-              resolvedType
-            );
-            ctx.vars.set(name, variable);
-            continue;
-          }
-        } else {
-          this.error("Type", node, `Unable to resolve type.`);
-          const variable = new ExecutionVariable(
-            immutable,
-            name,
-            value,
-            new InvalidType(type)
-          );
-          ctx.vars.set(name, variable);
-          continue;
-        }
-      } else {
-        const variable = new ExecutionVariable(
-          immutable,
-          name,
-          value,
-          value.ty
-        );
-        ctx.vars.set(name, variable);
-        continue;
-      }
-    }
-  }
-
-  override visitRootIdentifier(expression: RootIdentifier): void {
-    const ctx = this.currentCtx;
-    const variable = ctx.vars.get(expression.root.name);
-    if (variable) {
-      ctx.stack.push(variable.value);
-    } else {
-      this.error(
-        "Semantic",
-        expression,
-        `Cannot find variable named ${expression.root.name} in this context.`
-      );
-      ctx.stack.push(new CompileTimeInvalid(expression));
-    }
-  }
-
-  override visitCallExpression(node: CallExpression): void {
-    const ctx = this.currentCtx;
-    if (isRootIdentifier(node.callRoot)) {
-      const scope = getScope(node)!;
-      const funcName = node.callRoot.root.name;
-      assert(scope, "Scope must exist already.");
-      const scopeElement = scope.get(funcName)!;
-      if (scopeElement) {
-        if (scopeElement instanceof ScopeTypeElement) {
-          if(isFunctionDeclaration(scopeElement.node)) {
-            const nodeTypeParameters = node.typeParameters;
-            // normalize the type parameters, there are none on StaticTypeScopeElements
-            const scopeTypeParameters = scopeElement instanceof DynamicTypeScopeElement
-              ? scopeElement.typeParameters
-              : [];
-  
-            if (nodeTypeParameters.length === scopeTypeParameters.length) {
-              if (node.parameters.length === scopeElement.node.parameters.length) {
-                this.compileFunctionCall(ctx, funcName, scopeElement, node.parameters, nodeTypeParameters);
-              } else {
-                this.error("Type", node.callRoot, "Function parameters does not match signature");
-              }
-            } else {
-              this.error("Type", node.callRoot, "Function type parameters does not match signature.");
-            }
-          } else if (isBuiltinDeclaration(scopeElement.node)) {
-            const builtinNode = scopeElement.node;
-            const builtin = scopeElement.builtin;
-            if (builtin) {
-              const concreteTypeParameters = [] as ConcreteType[];
-              for (const typeParameter of node.typeParameters) {
-                const concreteType = ctx.resolve(typeParameter);
-                if (concreteType) {
-                  // it resolved
-                  concreteTypeParameters.push(concreteType);
-                } else {
-                  this.error("Type", typeParameter, `Cannot resolve type parameter.`);
-                  concreteTypeParameters.push(new InvalidType(typeParameter));
-                }
-              }
-  
-              if (concreteTypeParameters.length !== builtinNode.typeParameters.length) {
-                this.error("Type", node.callRoot, `Invalid call to builtin ${builtinNode.name.name}, invalid type parameters.`);
-              }
-  
-              // name all the parameter types with their concrete alias
-              const concreteTypesAlias = new Map(ctx.types);
-              for (let i = 0; i < builtinNode.typeParameters.length; i++) {
-                const builtinNodeTypeParameterName = builtinNode.typeParameters[i].name;
-                const concreteTypeParameter = concreteTypeParameters[i];
-                concreteTypesAlias.set(builtinNodeTypeParameterName, concreteTypeParameter);
-              }
-  
-              const parameters = [] as ExecutionContextValue[];
-              for (let i = 0; i < builtinNode.parameters.length; i++) {
-                const builtinNodeParameter = builtinNode.parameters[i];
-                const builtinNodeParameterType = builtinNodeParameter.type;
-                const builtinNodeScope = assert(getScope(builtinNodeParameter), "Scope must exist at this point.");
-                
-                // visit this expression
-                this.visit(node.parameters[i]);
-                const value = assert(ctx.stack.pop(), "Stack must have a value at this point.");
-                const concreteValueType = ctx.resolve(builtinNodeParameterType, concreteTypesAlias, builtinNodeScope);
-                if (!concreteValueType) {
-                  this.error("Type", builtinNodeParameterType, `Cannot resolve type for call expression.`);
-                  parameters.push(new CompileTimeInvalid(builtinNodeParameter));
-                } else if (!value.ty.isAssignableTo(concreteValueType)) {
-                  this.error("Type", node.parameters[i], `Type does not match type parameter in function signature.`);
-                  parameters.push(new CompileTimeInvalid(node.parameters[i]));
-                } else {
-                  parameters.push(value);
-                }
-              }
-  
-              builtin({
-                ast: builtinNode,
-                ctx,
-                module: this.currentMod!,
-                pass: this,
-                program: this.program,
-                parameters,
-                typeParameters: concreteTypeParameters,
-              });
-            } else {
-              this.error("Builtin", builtinNode, "Builtin not defined");
-            }
-          } else {
-            this.error("Type", node.callRoot, `${funcName} is not a function.`);
-          }
-        } else if (ctx.vars.has(funcName)) {
-          // we need to check vars because this could be a variable with a function expression
-          const variable = ctx.vars.get(funcName)!;
-          if (variable.type instanceof FunctionType) {
-            // TODO: make call indirect
-          } else {
-            this.error("Type", node, "Invalid type, expression is not a function expression.");
-          }
-        }
-      } else {
-        this.error("Semantic", node.callRoot, "Element does not exist.");
-      }
-      if (scopeElement instanceof ScopeTypeElement) {
-        if(isFunctionDeclaration(scopeElement.node)) {
-          const nodeTypeParameters = node.typeParameters;
-          // normalize the type parameters, there are none on StaticTypeScopeElements
-          const scopeTypeParameters = scopeElement instanceof DynamicTypeScopeElement
-            ? scopeElement.typeParameters
-            : [];
-
-          if (nodeTypeParameters.length === scopeTypeParameters.length) {
-            if (node.parameters.length === scopeElement.node.parameters.length) {
-              this.compileFunctionCall(ctx, funcName, scopeElement, node.parameters, nodeTypeParameters);
-            } else {
-              this.error("Type", node.callRoot, "Function parameters does not match signature");
-            }
-          } else {
-            this.error("Type", node.callRoot, "Function type parameters does not match signature.");
-          }
-        } else if (isBuiltinDeclaration(scopeElement.node)) {
-          const builtinNode = scopeElement.node;
-          const builtin = scopeElement.builtin;
-          if (builtin) {
-            const concreteTypeParameters = [] as ConcreteType[];
-            for (const typeParameter of node.typeParameters) {
-              const concreteType = ctx.resolve(typeParameter);
-              if (concreteType) {
-                // it resolved
-                concreteTypeParameters.push(concreteType);
-              } else {
-                this.error("Type", typeParameter, `Cannot resolve type parameter.`);
-                concreteTypeParameters.push(new InvalidType(typeParameter));
-              }
-            }
-
-            if (concreteTypeParameters.length !== builtinNode.typeParameters.length) {
-              this.error("Type", node.callRoot, `Invalid call to builtin ${builtinNode.name.name}, invalid type parameters.`);
-            }
-
-            // name all the parameter types with their concrete alias
-            const concreteTypesAlias = new Map(ctx.types);
-            for (let i = 0; i < builtinNode.typeParameters.length; i++) {
-              const builtinNodeTypeParameterName = builtinNode.typeParameters[i].name;
-              const concreteTypeParameter = concreteTypeParameters[i];
-              concreteTypesAlias.set(builtinNodeTypeParameterName, concreteTypeParameter);
-            }
-
-            const parameters = [] as ExecutionContextValue[];
-            for (let i = 0; i < builtinNode.parameters.length; i++) {
-              const builtinNodeParameter = builtinNode.parameters[i];
-              const builtinNodeParameterType = builtinNodeParameter.type;
-              const builtinNodeScope = assert(getScope(builtinNodeParameter), "Scope must exist at this point.");
-              
-              // visit this expression
-              this.visit(node.parameters[i]);
-              const value = assert(ctx.stack.pop(), "Stack must have a value at this point.");
-              const concreteValueType = ctx.resolve(builtinNodeParameterType, concreteTypesAlias, builtinNodeScope);
-              if (!concreteValueType) {
-                this.error("Type", builtinNodeParameterType, `Cannot resolve type for call expression.`);
-                parameters.push(new CompileTimeInvalid(builtinNodeParameter));
-              } else if (!value.ty.isAssignableTo(concreteValueType)) {
-                this.error("Type", node.parameters[i], `Type does not match type parameter in function signature.`);
-                parameters.push(new CompileTimeInvalid(node.parameters[i]));
-              } else {
-                parameters.push(value);
-              }
-            }
-
-            builtin({
-              ast: builtinNode,
-              ctx,
-              module: this.currentMod!,
-              pass: this,
-              program: this.program,
-              parameters,
-              typeParameters: concreteTypeParameters,
-            });
-          } else {
-            this.error("Builtin", builtinNode, "Builtin not defined");
-          }
-        } else {
-          this.error("Type", node.callRoot, `${funcName} is not a function.`);
-        }
-      } else if (ctx.vars.has(funcName)) {
-        // we need to check vars because this could be a variable with a function expression
-        const variable = ctx.vars.get(funcName)!;
-        if (variable.type instanceof FunctionType) {
-          // TODO: make call indirect
-        } else {
-          this.error("Type", node, "Invalid type, expression is not a function expression.");
-        }
-      }
-    }
-  }
-  
-  private compileFunctionCall(ctx: ExecutionContext, funcName: string, scopeElement: ScopeTypeElement, parameters: Expression[], nodeTypeParameters: TypeExpression[]) {
-    // we need to resolve all the call type expressions on the function call
-    const nodeTypeParameterTypes = [] as ConcreteType[];
-    for (const nodeTypeParameter of nodeTypeParameters) {
-      const resolvedNodeTypeParameter = ctx.resolve(nodeTypeParameter);
-      if (resolvedNodeTypeParameter) {
-        nodeTypeParameterTypes.push(resolvedNodeTypeParameter);
-      } else {
-        this.error("Type", nodeTypeParameter, "Cannot resolve type.");
-        nodeTypeParameterTypes.push(new InvalidType(nodeTypeParameter));
-      }
-    }
-
-    // now we need to alias the types for the type expressions to be resolved in the other scope
-    const concreteTypesAlias = new Map(ctx.types);
-    for (let i = 0; i < nodeTypeParameterTypes.length; i++) {
-      const nodeTypeName = (scopeElement.node as FunctionDeclaration).typeParameters[i].name;
-      concreteTypesAlias.set(nodeTypeName, nodeTypeParameterTypes[i]);
-    }
-    // fn myFunc<a, b, c>(a, b, c)
-
-    // store all the runtime values
-    const parameterValues = [] as ExecutionContextValue[];
-
-    // evaluate all the parameters on the stack and pop them off one by one
-    for (let i = 0; i < parameters.length; i++) {
-      // first get the parameter
-      const parameter = parameters[i];
-      // then get the parameter's type
-      const typeParameter = (scopeElement.node as FunctionDeclaration).parameters[i].type;
-
-      // the parameter's type exists in another scope, so we actually need to get that scope to resolve the type
-      const scope = getScope(typeParameter)!;
-      assert(scope, `Scope must be defined at this point for function parameters.`);
-      const concreteParameterType = ctx.resolve(typeParameter, concreteTypesAlias, scope);
-      if (concreteParameterType) {
-        // now we pop the parameter's expression off the stack
-        this.visit(parameter);
-        const value = assert(ctx.stack.pop(), `Evaluating function parameter did not result in item on the top of the stack.`);
-  
-        // The last thing to do is evaluate and compare the types of the 
-        // parameter expressions vs the type parameters of the function
-        if (value.ty.isAssignableTo(concreteParameterType)) {
-          // the parameter is good!
-          parameterValues.push(this.ensureCompiled(value));
-        } else {
-          this.error("Type", parameter, "Parameter expression is not assignable to the parameter type.");
-          parameterValues.push(new CompileTimeInvalid(parameter));
-        }
-      } else {
-        // the parameter type could not be resolved
-        this.error("Type", typeParameter, "Could not resolve type parameter.");
-      }
-    }
-
-    // now we can resolve the function and call it
-    const func = this.queueCompileElement(scopeElement, nodeTypeParameterTypes);
-
-
+    this.error("Type", expression.ty.node, `Cannot ensure expression is compiled, expression is not supported.`);
+    return new CompileTimeInvalid(expression.ty.node);
   }
 }

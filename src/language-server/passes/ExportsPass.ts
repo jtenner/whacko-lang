@@ -200,13 +200,6 @@ export class ExportsPass extends WhackoPass {
         } else {
           exports.set(name, element);
         }
-        // @ts-expect-error
-        if (element.node.decorators) {
-          // @ts-expect-error
-          if (consumeDecorator("global", element.node.decorators)) {
-            this.program.globalScope.add(name, element);
-          }
-        }
       }
     }
 

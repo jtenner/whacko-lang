@@ -16,12 +16,17 @@ import {
 import { AstNode } from "langium";
 import { registerDefaultBuiltins } from "./builtins";
 import { CompilationPass } from "./passes/CompilationPass";
+import llvm, { lower } from "../llvm/llvm.js";
 const stdlibFolder = path.join(__dirname, "../std");
+const LLVM = await (await llvm).ready();
+
 
 export class WhackoProgram {
   constructor() {
     registerDefaultBuiltins(this);
   }
+
+  llvmModule = LLVM._LLVMModuleCreateWithName(lower("whacko"));
 
   modules = new Map<string, WhackoModule>();
   globalScope = new Scope();
@@ -113,25 +118,7 @@ export class WhackoProgram {
     }
 
     const compilationPass = new CompilationPass(this);
-    let foundMain = false;
-    outer: for (const [, module] of this.modules) {
-      if (module.entry) {
-        for (const [name, exported] of module.exports) {
-          if (name === "main") {
-            if (exported instanceof StaticTypeScopeElement) {
-              compilationPass.compileElement(exported, null, module);
-            } else {
-              module.error(
-                "Semantic",
-                (exported as DynamicTypeScopeElement).node,
-                "Invalid main function, cannot be generic."
-              );
-            }
-          }
-        }
-      }
-    }
-
+    compilationPass.compile(this);
     return new Map();
   }
 }

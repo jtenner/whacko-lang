@@ -12,7 +12,6 @@ import { CallExpression, isCallExpression } from "./generated/ast";
 import { WhackoProgram } from "./program";
 import {
   BuiltinFunctionProps,
-  ConcreteType,
   IntegerEnumType,
   IntegerType,
   Type,
@@ -29,15 +28,17 @@ const integerCast =
       && value.ty.isEqual(parameterType)
       && parameterType instanceof IntegerType
     ) {
-      // we are good to go
       if (value instanceof CompileTimeInteger) {
+        // we are good to go
         const intValue = signed
           ? BigInt.asIntN(size, value.value)
           : BigInt.asUintN(size, value.value);
         ctx.stack.push(new CompileTimeInteger(intValue, new IntegerType(ty, intValue, ast)));
       } else {
-
+        // TODO: Implement runtime casting
       }
+    } else {
+      ctx.stack.push(new CompileTimeInvalid(ast));
     }
   };
 

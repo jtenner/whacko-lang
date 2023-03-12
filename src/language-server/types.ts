@@ -1,7 +1,7 @@
 import assert from "assert";
 import { AstNode } from "langium";
 import {} from "./types";
-import { ExecutionContext, ExecutionContextValue } from "./execution-context";
+import { ExecutionContext, ExecutionContextValue, RuntimeInteger, RuntimeValue } from "./execution-context";
 import {
   Decorator,
   FunctionDeclaration,
@@ -10,6 +10,8 @@ import {
 import { CompilationPass } from "./passes/CompilationPass";
 import { WhackoProgram } from "./program";
 import { WhackoModule } from "./module";
+import llvm, { LLVMFuncRef } from "../llvm/llvm";
+const LLVM = await (await llvm).ready();
 
 function getPath(node: AstNode): string {
   // @ts-ignore the `parse` function sets this symbol for later use
@@ -178,6 +180,45 @@ export abstract class ConcreteType {
     public name: string
   ) {}
 
+  get isSigned() {
+    switch(this.ty) {
+      case Type.i8:
+      case Type.i16:
+      case Type.i32:
+      case Type.i64:
+      case Type.isize:
+        return true;
+    }
+    return false;
+  }
+
+  get llvmType() {
+    switch (this.ty) {
+      case Type.bool: return LLVM._LLVMInt1Type();
+      case Type.i8: return LLVM._LLVMInt8Type();
+      case Type.u8: return LLVM._LLVMInt8Type();
+      case Type.i16: return LLVM._LLVMInt16Type();
+      case Type.u16: return LLVM._LLVMInt16Type();
+      case Type.i32: return LLVM._LLVMInt32Type();
+      case Type.u32: return LLVM._LLVMInt32Type();
+      case Type.i64: return LLVM._LLVMInt64Type();
+      case Type.u64: return LLVM._LLVMInt64Type();
+      case Type.f32: return LLVM._LLVMFloatType();
+      case Type.f64: return LLVM._LLVMDoubleType();
+      case Type.string: return LLVM._LLVMInt32Type();
+      case Type.array: return LLVM._LLVMInt32Type();
+      case Type.func: return LLVM._LLVMInt32Type();
+      case Type.method: return LLVM._LLVMInt32Type();
+      case Type.v128: return null;
+      case Type.isize: return LLVM._LLVMInt32Type();
+      case Type.usize: return LLVM._LLVMInt32Type();
+      case Type.async: return LLVM._LLVMInt32Type();
+      case Type.void: return LLVM._LLVMVoidType();
+      case Type.tuple: return null;
+      case Type.held: return LLVM._LLVMInt32Type();
+    }
+  }
+
   isEqual(other: ConcreteType) {
     return this.ty === other.ty;
   }
@@ -186,11 +227,11 @@ export abstract class ConcreteType {
     switch (this.ty) {
       case Type.i8:
       case Type.u8: {
-        return 1;
+        return 1n;
       }
       case Type.i16:
       case Type.u16: {
-        return 2;
+        return 2n;
       }
       case Type.array:
       case Type.f32:
@@ -201,18 +242,18 @@ export abstract class ConcreteType {
       case Type.method:
       case Type.string:
       case Type.usize: {
-        return 4;
+        return 4n;
       }
       case Type.f64:
       case Type.i64:
       case Type.u64: {
-        return 8;
+        return 8n;
       }
       case Type.v128: {
-        return 16;
+        return 16n;
       }
     }
-    return 0;
+    return 0n;
   }
 
   isAssignableTo(other: ConcreteType) {
@@ -220,6 +261,13 @@ export abstract class ConcreteType {
   }
 
   abstract getName(): string;
+}
+
+export class ConcreteFunction {
+  constructor(
+    public funcRef: LLVMFuncRef,
+    public ty: FunctionType,
+  ) {}
 }
 
 export class ArrayType extends ConcreteType {
@@ -250,7 +298,8 @@ export class Parameter {
 export class FunctionType extends ConcreteType {
   constructor(
     public typeParameters: ConcreteType[],
-    public parameters: Parameter[],
+    public parameterTypes: ConcreteType[],
+    public parameterNames: string[],
     public returnType: ConcreteType,
     node: AstNode,
     name: string
@@ -260,10 +309,10 @@ export class FunctionType extends ConcreteType {
 
   override isEqual(other: ConcreteType) {
     return (
-      other instanceof ConcreteMethodType &&
-      this.parameters.reduce(
+      other instanceof FunctionType &&
+      this.parameterTypes.reduce(
         (acc, param, i) =>
-          param.fieldType.isEqual(other.parameters[i].fieldType),
+          param.isEqual(other.parameterTypes[i]),
         true
       ) &&
       this.returnType.isEqual(this.returnType)
@@ -321,13 +370,20 @@ export class ConcreteMethodType extends ConcreteType {
 }
 
 export class Field {
-  constructor(public name: string, public ty: ConcreteType) {}
+  constructor(public name: string, public ty: ConcreteType, public offset: bigint) {}
+}
+
+export class PrototypeMethod {
+  constructor(
+    public element: AstNode,
+    public concreteTypes: Map<string, ConcreteType>,
+  ) {}
 }
 
 export class ClassType extends ConcreteType {
   public methods = new Map<string, ConcreteMethodType>();
   public fields = new Map<string, Field>();
-
+  public prototypes = new Map<string, PrototypeMethod>();
   constructor(
     public extendsClass: ClassType | null = null,
     public typeParameters: ConcreteType[],
@@ -335,6 +391,11 @@ export class ClassType extends ConcreteType {
     name: string
   ) {
     super(Type.usize, node, name);
+  }
+
+  addPrototypeMethod(name: string, method: PrototypeMethod) {
+    assert(!this.prototypes.has(name));
+    this.prototypes.set(name, method);
   }
 
   addMethod(name: string, method: ConcreteMethodType) {
@@ -350,7 +411,7 @@ export class ClassType extends ConcreteType {
   get offset() {
     return Array.from(this.fields.values()).reduce(
       (left, right) => left + right.ty.size!,
-      0
+      0n
     );
   }
 
@@ -432,6 +493,38 @@ export class IntegerType extends ConcreteType {
         return "usize";
     }
     throw new Error("Invalid number type.");
+  }
+
+  get signed() {
+    switch (this.ty) {
+      case Type.isize:
+      case Type.i8:
+      case Type.i16:
+      case Type.i32:
+      case Type.i64:
+        return true;
+    }
+    return false;
+  }
+
+  get bits() {
+    switch (this.ty) {
+      case Type.i8:
+      case Type.u8:
+        return 8;
+      case Type.i16:
+      case Type.u16:
+        return 16;
+      case Type.i32:
+      case Type.u32:
+      case Type.isize:
+      case Type.usize:
+        return 32;
+      case Type.i64:
+      case Type.u64:
+        return 64;
+    }
+    return 0;
   }
 }
 
