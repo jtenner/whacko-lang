@@ -7,14 +7,47 @@ import { ModuleCollectionPass } from "./passes/ModuleCollectionPass";
 import { ExportsPass } from "./passes/ExportsPass";
 import { ImportsPass } from "./passes/ImportsPass";
 import { ScopeCreationPass } from "./passes/ScopeCreationPass";
+import {
+  BuiltinFunction,
+  DynamicTypeScopeElement,
+  Scope,
+  StaticTypeScopeElement,
+} from "./types";
+import { AstNode } from "langium";
+import { registerDefaultBuiltins } from "./builtins";
+import { CompilationPass } from "./passes/CompilationPass";
+const stdlibFolder = path.join(__dirname, "../std");
+import type { Module, LLVMModuleRef, LLVMContextRef } from "llvm-js";
+
+export type LLVMJSUtil = typeof import("llvm-js");
 
 export class WhackoProgram {
+  llvmContext: LLVMContextRef;
+  constructor(public LLVM: Module, public LLVMUtil: LLVMJSUtil) {
+    registerDefaultBuiltins(this);
+    this.llvmModule = LLVM._LLVMModuleCreateWithName(LLVMUtil.lower("whacko"));
+    this.llvmContext = LLVM._LLVMContextCreate();
+  }
+
+  llvmModule: LLVMModuleRef;
+
   modules = new Map<string, WhackoModule>();
+  globalScope = new Scope();
+  builtins = new Map<string, BuiltinFunction>();
+  names = new Map<AstNode, string>();
+
+  addBuiltin(name: string, func: BuiltinFunction) {
+    if (this.builtins.has(name)) {
+      throw new Error("Builtin already defined.");
+    }
+    this.builtins.set(name, func);
+  }
 
   addModule(
     modPath: string,
     from: string,
-    entry: boolean
+    entry: boolean,
+    scope: Scope
   ): WhackoModule | null {
     const absoluteModPath = path.join(from, modPath);
     if (this.modules.has(absoluteModPath)) {
@@ -23,14 +56,20 @@ export class WhackoProgram {
 
     try {
       const contents = fs.readFileSync(absoluteModPath, "utf-8");
-      const parsedContents = parse(contents);
+      const parsedContents = parse(contents, absoluteModPath);
       if (!parsedContents) return null;
       const mod = new WhackoModule(
         parsedContents.value,
         absoluteModPath,
-        entry
+        entry,
+        scope
       );
-      this.modules.set(absoluteModPath, mod);
+      if (absoluteModPath.startsWith(stdlibFolder)) {
+        const modName = path.basename(absoluteModPath, ".wo");
+        this.modules.set("whacko:" + modName, mod);
+      } else {
+        this.modules.set(absoluteModPath, mod);
+      }
 
       // Diagnostics from the parser get added at the module level
       for (const lexerDiagnostic of parsedContents.lexerErrors) {
@@ -56,10 +95,11 @@ export class WhackoProgram {
       const dirname = path.dirname(absoluteModPath);
       for (const module of collectModules.modulesToAdd) {
         // this is where the child modules are added
-        this.addModule(module, dirname, false);
+        this.addModule(module, dirname, false, this.globalScope.fork());
       }
       return mod;
     } catch (ex) {
+      console.error(ex);
       return null;
     }
   }
@@ -80,6 +120,8 @@ export class WhackoProgram {
       scopeCreationPass.visitModule(module);
     }
 
+    const compilationPass = new CompilationPass(this);
+    compilationPass.compile(this);
     return new Map();
   }
 }

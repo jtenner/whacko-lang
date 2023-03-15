@@ -1,23 +1,56 @@
+import { glob } from "glob";
+import path from "node:path";
 // @ts-ignore
 import { parseArgs } from "node:util";
 import { WhackoProgram } from "../language-server/program";
+import { assert } from "../language-server/util";
 // import { WhackoProgram } from "../compiler";
 
 const options = {};
 
 export default async function main(args: string[]): Promise<void> {
+  const llvm = await eval(`import("llvm-js")`);
+  const LLVM = await llvm.load();
   const { values, positionals } = parseArgs({
     args,
     options,
     allowPositionals: true,
   });
-  const program = new WhackoProgram();
-  for (const positional of positionals) {
-    program.addModule(positional, process.cwd(), true);
+  const program = new WhackoProgram(LLVM, llvm);
+
+  // first step in any program is registering the builtins
+  const stdLibs = glob.sync("std/*.wo", {
+    absolute: true,
+    root: __dirname,
+  });
+
+  for (const stdLib of stdLibs) {
+    const dirname = path.dirname(stdLib);
+    const basename = path.basename(stdLib);
+    assert(
+      program.addModule(basename, dirname, false, program.globalScope),
+      `std lib ${stdLib} failed to create a module.`
+    );
   }
 
-  program.compile();
-  for (const [name, module] of program.modules) {
-    console.log(name, module);
+  for (const positional of positionals) {
+    program.addModule(
+      positional,
+      process.cwd(),
+      true,
+      program.globalScope.fork()
+    );
+  }
+
+  try {
+    program.compile();
+  } catch (ex) {
+    console.log(ex);
+  }
+
+  for (const [, module] of program.modules) {
+    for (const diag of module.diagnostics) {
+      console.log(diag);
+    }
   }
 }

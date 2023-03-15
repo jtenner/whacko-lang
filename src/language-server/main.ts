@@ -2,7 +2,6 @@ import { startLanguageServer } from "langium";
 import { NodeFileSystem } from "langium/node";
 import { createConnection, ProposedFeatures } from "vscode-languageserver/node";
 import { createWhackoServices } from "./whacko-module";
-
 // Create a connection to the client
 const connection = createConnection(ProposedFeatures.all);
 

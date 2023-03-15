@@ -1,14 +1,18 @@
-import assert from "assert";
+import { assert } from "../util";
 import { AstNode } from "langium";
 import {
+  BuiltinDeclaration,
   ClassDeclaration,
   DeclareDeclaration,
+  DeclareFunction,
   ExportDeclarator,
   FunctionDeclaration,
   ID,
+  isStringLiteral,
   NamespaceDeclaration,
   Program,
   TypeDeclaration,
+  TypeDeclarationStatement,
 } from "../generated/ast";
 import {
   DynamicTypeScopeElement,
@@ -17,6 +21,8 @@ import {
   ScopeElement,
   StaticTypeScopeElement,
   Scope,
+  consumeDecorator,
+  setScope,
 } from "../types";
 import { WhackoPass } from "./WhackoPass";
 
@@ -33,6 +39,8 @@ interface Exportable {
 
 export class ExportsPass extends WhackoPass {
   stack: Exportable[] = [];
+  nameStack = "";
+
   override visitProgram(node: Program): void {
     this.stack.push(this.currentMod!);
     super.visitProgram(node);
@@ -42,15 +50,46 @@ export class ExportsPass extends WhackoPass {
 
   override visitClassDeclaration(node: ClassDeclaration): void {
     this.defineExportableType(node);
+    super.visitClassDeclaration(node);
   }
 
-  // declare "module" "method" (...params): returnType;
-  override visitDeclareDeclaration(node: DeclareDeclaration): void {
-    this.defineExportableType(node);
+  override visitBuiltinDeclaration(node: BuiltinDeclaration): void {
+    const element = this.defineExportableType(node);
+    const name = consumeDecorator("name", node.decorators);
+    if (!name) {
+      this.error(
+        "Semantic",
+        node.name,
+        `Invalid builtin, must have a name defined.`
+      );
+    } else {
+      const valid =
+        name.parameters.length === 1 && isStringLiteral(name.parameters[0]);
+      if (valid) {
+        const builtinName = (name.parameters[0] as any).value as string;
+        const builtin = this.program.builtins.get(builtinName);
+        if (builtin) {
+          element.builtin = builtin;
+        } else {
+          this.error(
+            "Semantic",
+            name.parameters[0],
+            `Invalid builtin name, must be already be defined in the program.`
+          );
+        }
+      } else {
+        this.error(
+          "Semantic",
+          node.name,
+          `Invalid decorator for builtin, must have a single parameter string to define the name of the builtin.`
+        );
+      }
+    }
   }
 
   override visitFunctionDeclaration(node: FunctionDeclaration): void {
     this.defineExportableType(node);
+    super.visitFunctionDeclaration(node);
   }
 
   // type A<b> = Map<string, b>;
@@ -60,10 +99,23 @@ export class ExportsPass extends WhackoPass {
 
   override visitNamespaceDeclaration(node: NamespaceDeclaration): void {
     const element = this.defineExportableType(node);
-
-    this.stack.push(element as NamespaceTypeScopeElement);
+    this.stack.push(element);
+    const saveName = this.nameStack;
+    this.nameStack = saveName + "." + node.name.name;
     super.visitNamespaceDeclaration(node);
+    this.nameStack = saveName;
     this.stack.pop();
+  }
+
+  override visitDeclareDeclaration(node: DeclareDeclaration): void {
+    const element = this.defineExportableType(node);
+    this.stack.push(element);
+    super.visitDeclareDeclaration(node);
+    this.stack.pop();
+  }
+
+  override visitDeclareFunction(node: DeclareFunction): void {
+    const element = this.defineExportableType(node);
   }
 
   override visitExportDeclarator(node: ExportDeclarator): void {
@@ -94,24 +146,39 @@ export class ExportsPass extends WhackoPass {
     }
   }
 
-  defineExportableType(node: Declaration) {
+  defineExportableType(
+    node: NamespaceDeclaration | DeclareDeclaration
+  ): NamespaceTypeScopeElement;
+  defineExportableType(
+    node: Declaration | BuiltinDeclaration
+  ): DynamicTypeScopeElement | StaticTypeScopeElement;
+  defineExportableType(node: DeclareFunction): StaticTypeScopeElement;
+  defineExportableType(node: any) {
     let element: ScopeTypeElement;
     const scope = this.stack.at(-1)!.scope;
-
-    if (node.$type === "NamespaceDeclaration") {
-      element = new NamespaceTypeScopeElement(node, scope);
+    if (
+      node.$type === "NamespaceDeclaration" ||
+      node.$type === "DeclareDeclaration"
+    ) {
+      element = new NamespaceTypeScopeElement(node, scope, this.currentMod!);
       const newScope = (element as NamespaceTypeScopeElement).scope;
-      this.currentMod!.scopes.set(node, newScope);
+      setScope(node, newScope);
     } else {
       element = node.typeParameters?.length
         ? new DynamicTypeScopeElement(
             node,
-            node.typeParameters.map((e) => e.name)
+            node.typeParameters.map((e: any) => e.name),
+            this.currentMod!
           )
-        : new StaticTypeScopeElement(node);
+        : new StaticTypeScopeElement(node, this.currentMod!);
+      setScope(node, scope);
     }
 
     const name = node.name.name;
+    this.program.names.set(
+      node,
+      this.currentMod!.path + "~" + this.nameStack + name
+    );
     if (scope.has(name)) {
       this.error(
         `Semantic`,
@@ -120,7 +187,7 @@ export class ExportsPass extends WhackoPass {
       );
     } else {
       scope.add(name, element);
-      if (node.export) {
+      if (node.export || node.$type === "DeclareFunction") {
         const exports = this.stack.at(-1)!.exports;
         if (exports.has(name)) {
           this.error(
@@ -133,6 +200,26 @@ export class ExportsPass extends WhackoPass {
         }
       }
     }
+
     return element;
+  }
+
+  override visitTypeDeclarationStatement(node: TypeDeclarationStatement): void {
+    const scope = this.stack.at(-1)!.scope;
+    const name = node.name.name;
+    if (scope.has(name)) {
+      this.error("Semantic", node, `${name} is already defined in this scope.`);
+    } else {
+      scope.add(
+        name,
+        node.typeParameters.length
+          ? new DynamicTypeScopeElement(
+              node.type,
+              node.typeParameters.map((e) => e.name),
+              this.currentMod!
+            )
+          : new StaticTypeScopeElement(node.type, this.currentMod!)
+      );
+    }
   }
 }

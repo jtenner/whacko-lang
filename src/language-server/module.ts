@@ -1,5 +1,6 @@
 import { AstNode } from "langium";
 import { Program } from "./generated/ast";
+import { WhackoProgram } from "./program";
 import { Scope, ScopeElement } from "./types";
 import { DiagnosticLevel, IDiagnostic } from "./util";
 
@@ -9,9 +10,9 @@ export class WhackoModule {
   constructor(
     public ast: Program,
     public path: string,
-    public entry: boolean = false
+    public entry: boolean = false,
+    public scope: Scope
   ) {}
-  scope = new Scope();
   diagnostics: IDiagnostic[] = [];
 
   error(type: string, node: AstNode, message: string) {
@@ -42,19 +43,5 @@ export class WhackoModule {
       line: range.character,
       message: `[${type}] ${message}`,
     });
-  }
-
-  getScope(node: AstNode): Scope | null {
-    while (true) {
-      const scope = this.scopes.get(node);
-      if (scope) return scope;
-
-      // we need to go up the tree
-      if (node.$container) {
-        node = node.$container;
-        continue;
-      }
-      return null;
-    }
   }
 }

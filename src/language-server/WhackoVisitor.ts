@@ -1,5 +1,6 @@
 import { AstNode, isAstNode } from "langium";
 import { NodeFileSystem } from "langium/node";
+import { assert } from "./util";
 import {
   isExpression,
   isStatement,
@@ -61,7 +62,11 @@ import {
   ArrayAccessExpression,
   MemberAccessExpression,
   NamespaceDeclaration,
-  PathTypeExpression,
+  PathExpression,
+  Decorator,
+  DeclareFunction,
+  BuiltinDeclaration,
+  RootIdentifier,
 } from "./generated/ast";
 import { createWhackoServices, WhackoServices } from "./whacko-module";
 
@@ -84,10 +89,20 @@ export class WhackoVisitor {
   private services: WhackoServices =
     createWhackoServices(NodeFileSystem).Whacko;
 
+  visitAll(nodes: any[]) {
+    for (const node of nodes) this.visit(node);
+  }
+
   visit(node: any) {
     switch (node.$type) {
+      case "Decorator":
+        return this.visitDecorator(node);
+      case "DeclareFunction":
+        return this.visitDeclareFunction(node);
       case "Program":
         return this.visitProgram(node);
+      case "BuiltinDeclaration":
+        return this.visitBuiltinDeclaration(node);
       case "DeclareDeclaration":
         return this.visitDeclareDeclaration(node);
       case "ImportDeclaration":
@@ -164,7 +179,7 @@ export class WhackoVisitor {
         return this.visitCallExpression(node);
       case "NewExpression":
         return this.visitNewExpression(node);
-      case "MemberAccess":
+      case "MemberAccessExpression":
         return this.visitMemberAccessExpression(node);
       case "ArrayAccessExpression":
         return this.visitArrayAccessExpression(node);
@@ -196,50 +211,60 @@ export class WhackoVisitor {
         return this.visitAsyncBlockLiteral(node);
       case "ID":
         return this.visitIdentifier(node);
+      case "RootIdentifier":
+        return this.visitRootIdentifier(node);
+
+      default:
+        assert(false, "Unhandled node type: " + node.type);
     }
   }
 
   visitProgram(node: Program) {
-    for (const imports of node.imports) {
-      this.visit(imports);
-    }
-    for (const declaration of node.declarations) {
-      this.visit(declaration);
-    }
-    for (const exports of node.exports) {
-      this.visit(exports);
-    }
+    this.visitAll(node.imports);
+    this.visitAll(node.declarations);
+    this.visitAll(node.exports);
   }
 
   visitNamespaceDeclaration(node: NamespaceDeclaration) {
-    for (const declaration of node.declarations) {
-      this.visit(declaration);
-    }
-    for (const exports of node.exports) {
-      this.visit(exports);
-    }
+    this.visitAll(node.decorators);
+    this.visitAll(node.declarations);
+    this.visitAll(node.exports);
   }
 
   visitDeclareDeclaration(node: DeclareDeclaration) {
+    this.visitAll(node.decorators);
+    this.visit(node.name);
+    this.visitAll(node.functions);
     this.visit(node.namespace);
-    this.visit(node.method);
-    for (const parameter of node.parameters) {
-      this.visit(parameter);
-    }
+  }
+
+  visitBuiltinDeclaration(node: BuiltinDeclaration) {
+    this.visitAll(node.decorators);
+    this.visit(node.name);
+    this.visitAll(node.typeParameters);
+    this.visitAll(node.parameters);
     this.visit(node.returnType);
   }
 
+  visitDeclareFunction(node: DeclareFunction) {
+    this.visitAll(node.decorators);
+    this.visit(node.name);
+    this.visitAll(node.parameters);
+    this.visit(node.returnType);
+  }
+
+  visitDecorator(node: Decorator) {
+    this.visit(node.name);
+    this.visitAll(node.parameters);
+  }
+
   visitImportDeclaration(node: ImportDeclaration) {
-    for (const declarator of node.declarators) {
-      this.visit(declarator);
-    }
+    this.visitAll(node.declarators);
     this.visit(node.path);
   }
 
   visitExportDeclaration(node: ExportDeclaration) {
-    for (const declarator of node.declarators) {
-      this.visit(declarator);
-    }
+    this.visitAll(node.declarators);
   }
 
   visitExportDeclarator(node: ExportDeclarator) {
@@ -253,13 +278,10 @@ export class WhackoVisitor {
   }
 
   visitFunctionDeclaration(node: FunctionDeclaration) {
+    this.visitAll(node.decorators);
     this.visit(node.name);
-    for (const typeParameter of node.typeParameters) {
-      this.visit(typeParameter);
-    }
-    for (const parameter of node.parameters) {
-      this.visit(parameter);
-    }
+    this.visitAll(node.typeParameters);
+    this.visitAll(node.parameters);
     this.visit(node.returnType);
     this.visit(node.block);
   }
@@ -270,19 +292,17 @@ export class WhackoVisitor {
   }
 
   visitTypeDeclaration(node: TypeDeclaration) {
+    this.visitAll(node.decorators);
     this.visit(node.name);
-    for (const typeParameter of node.typeParameters) {
-      this.visit(typeParameter);
-    }
+    this.visitAll(node.typeParameters);
     this.visit(node.type);
   }
 
   visitClassDeclaration(node: ClassDeclaration) {
+    this.visitAll(node.decorators);
     this.visit(node.name);
     if (node.extends) this.visit(node.extends);
-    for (const member of node.members) {
-      this.visit(member);
-    }
+    this.visitAll(node.members);
   }
 
   visitHeldTypeExpression(node: HeldTypeExpression) {
@@ -290,75 +310,62 @@ export class WhackoVisitor {
   }
 
   visitFunctionTypeExpression(node: FunctionTypeExpression) {
-    for (const parameter of node.parameters) {
-      this.visit(parameter);
-    }
+    this.visitAll(node.parameters);
     this.visit(node.returnType);
   }
 
   visitTupleTypeExpression(node: TupleTypeExpression) {
-    for (const type of node.types) {
-      this.visit(type);
-    }
-  }
-
-  visitPathTypeExpression(node: PathTypeExpression) {
-    this.visit(node.namespace);
-    this.visit(node.element);
+    this.visitAll(node.types);
   }
 
   visitNamedTypeExpression(node: NamedTypeExpression) {
-    this.visit(node.name);
-    for (const typeParameter of node.typeParameters) {
-      this.visit(typeParameter);
-    }
+    this.visit(node.namespace);
+    this.visit(node.element);
+    this.visitAll(node.typeParameters);
   }
 
   visitFieldClassMember(node: FieldClassMember) {
+    this.visit(node.decorators);
     this.visit(node.name);
     this.visit(node.type);
     if (node.initializer) this.visit(node.initializer);
   }
 
   visitMethodClassMember(node: MethodClassMember) {
+    this.visitAll(node.decorators);
     this.visit(node.name);
-    for (const parameter of node.parameters) {
-      this.visit(parameter);
-    }
+    this.visitAll(node.parameters);
     this.visit(node.returnType);
     this.visit(node.block);
   }
 
   visitGetterClassMember(node: GetterClassMember) {
+    this.visitAll(node.decorators);
     this.visit(node.name);
     this.visit(node.returnType);
     this.visit(node.block);
   }
 
   visitSetterClassMember(node: SetterClassMember) {
+    this.visitAll(node.decorators);
     this.visit(node.name);
     this.visit(node.parameter);
     this.visit(node.block);
   }
 
   visitConstructorClassMember(node: ConstructorClassMember) {
-    for (const parameter of node.parameters) {
-      this.visit(parameter);
-    }
+    this.visitAll(node.decorators);
+    this.visitAll(node.parameters);
     this.visit(node.block);
   }
 
   visitBlockStatement(node: BlockStatement) {
-    for (const statement of node.statements) {
-      this.visit(statement);
-    }
+    this.visitAll(node.statements);
   }
 
   visitTypeDeclarationStatement(node: TypeDeclarationStatement) {
     this.visit(node.name);
-    for (const typeParameter of node.typeParameters) {
-      this.visit(typeParameter);
-    }
+    this.visitAll(node.typeParameters);
     this.visit(node.type);
   }
 
@@ -383,13 +390,11 @@ export class WhackoVisitor {
   }
 
   visitReturnStatement(node: ReturnStatement) {
-    this.visit(node.expression);
+    if (node.expression) this.visit(node.expression);
   }
 
   visitVariableDeclarationStatement(node: VariableDeclarationStatement) {
-    for (const declarator of node.declarators) {
-      this.visit(declarator);
-    }
+    this.visitAll(node.declarators);
   }
 
   visitVariableDeclarator(node: VariableDeclarator) {
@@ -437,19 +442,14 @@ export class WhackoVisitor {
 
   visitCallExpression(node: CallExpression) {
     this.visit(node.callRoot);
-    for (const parameter of node.typeParameters) this.visit(parameter);
-    for (const parameter of node.parameters) this.visit(parameter);
+    this.visitAll(node.typeParameters);
+    this.visitAll(node.parameters);
   }
 
   visitNewExpression(node: NewExpression) {
     this.visit(node.expression);
-
-    for (const param of node.typeParameters) {
-      this.visit(param);
-    }
-    for (const param of node.parameters) {
-      this.visit(param);
-    }
+    this.visitAll(node.typeParameters);
+    this.visitAll(node.parameters);
   }
 
   visitMemberAccessExpression(node: MemberAccessExpression) {
@@ -463,12 +463,8 @@ export class WhackoVisitor {
   }
 
   visitFunctionLiteral(expression: FunctionLiteral) {
-    for (const typeParameter of expression.typeParameters) {
-      this.visit(typeParameter);
-    }
-    for (const parameter of expression.parameters) {
-      this.visit(parameter);
-    }
+    this.visitAll(expression.typeParameters);
+    this.visitAll(expression.parameters);
     this.visit(expression.returnType);
     this.visit(expression.block);
   }
@@ -502,6 +498,10 @@ export class WhackoVisitor {
   visitAsyncBlockLiteral(expression: AsyncBlockLiteral) {
     if (expression.type) this.visit(expression.type);
     this.visit(expression.block);
+  }
+
+  visitRootIdentifier(expression: RootIdentifier) {
+    this.visit(expression.root);
   }
 
   visitIdentifier(expression: ID) {}
@@ -540,28 +540,22 @@ export class WhackoVisitor {
 
   replaceNode(node: AstNode, replacer: AstNode) {
     const parent = node.$container;
-    if (!isAstNode(node) || !isAstNode(replacer))
-      throw new Error("Node or Replacement Node parameter is not an ASTNode");
 
-    if (
-      (isDeclaration(node) && isDeclaration(replacer)) ||
-      (isStatement(node) && isStatement(replacer)) ||
-      (isExpression(node) && isExpression(replacer))
-    ) {
-      // @ts-ignore: this is safe I promise, $container is readonly
-      replacer.$container = node.$container;
-      // @ts-ignore: this is safe I promise, $container is readonly
-      replacer.$containerIndex = node.$containerIndex;
-      // @ts-ignore: this is safe I promise, $container is readonly
-      replacer.$containerProperty = node.$containerProperty;
+    // TODO: Add some validation statements that check container types
 
-      if (typeof node.$containerIndex === "number") {
-        // @ts-ignore: this is safe I promise
-        parent[node.$containerProperty][node.$containerIndex] = replacer;
-      } else {
-        // @ts-ignore: this is safe I promise
-        parent[node.$containerProperty] = replacer;
-      }
+    // @ts-ignore: this is safe I promise, $container is readonly
+    replacer.$container = node.$container;
+    // @ts-ignore: this is safe I promise, $container is readonly
+    replacer.$containerIndex = node.$containerIndex;
+    // @ts-ignore: this is safe I promise, $container is readonly
+    replacer.$containerProperty = node.$containerProperty;
+
+    if (typeof node.$containerIndex === "number") {
+      // @ts-ignore: this is safe I promise
+      parent[node.$containerProperty][node.$containerIndex] = replacer;
+    } else {
+      // @ts-ignore: this is safe I promise
+      parent[node.$containerProperty] = replacer;
     }
   }
 }
