@@ -1,9 +1,10 @@
-import {
-  assert,
-} from "./util";
+import { assert } from "./util";
 import { AstNode } from "langium";
 import {
   ClassDeclaration,
+  DeclareDeclaration,
+  DeclareFunction,
+  FunctionDeclaration,
   ID,
   isClassDeclaration,
   isConstructorClassMember,
@@ -15,6 +16,7 @@ import {
   isSetterClassMember,
   isTypeDeclaration,
   NamedTypeExpression,
+  NamespaceDeclaration,
   TypeDeclaration,
   TypeExpression,
 } from "./generated/ast";
@@ -39,11 +41,15 @@ import {
   Type,
   Field,
   PrototypeMethod,
+  VoidType,
+  ScopeElement,
+  FunctionReferenceType,
+  DeclareDeclarationType,
+  NamespaceDeclarationType,
+  DeclareFunctionType,
 } from "./types";
 import { getFileName, getModule } from "./passes/ModuleCollectionPass";
-import llvm, { LLVMValueRef } from "../llvm/llvm";
-
-const LLVM = await (await llvm).ready();
+import { LLVMValueRef } from "llvm-js";
 
 export class ExecutionVariable {
   constructor(
@@ -57,11 +63,11 @@ export class ExecutionVariable {
 export class ExecutionContext {
   parent: ExecutionContext | null = null;
   stack = [] as ExecutionContextValue[];
-  vars = new Map<string, ExecutionVariable>();
 
   constructor(
     public scope: Scope,
     public types = new Map<string, ConcreteType>(),
+    public vars = new Map<string, ExecutionVariable>()
   ) {}
 
   getVariable(name: string): ExecutionVariable | null {
@@ -69,37 +75,37 @@ export class ExecutionContext {
   }
 
   resolve(
-    expression: TypeExpression,
+    typeExpression: TypeExpression,
     typeMap = this.types,
     scope = this.scope
   ): ConcreteType | null {
-    if (expression.$type === "FunctionTypeExpression") {
+    if (typeExpression.$type === "FunctionTypeExpression") {
       // TODO: We don't support this yet, and I need help
       return null;
-    } else if (expression.$type === "TupleTypeExpression") {
-      const types = expression.types;
+    } else if (typeExpression.$type === "TupleTypeExpression") {
+      const types = typeExpression.types;
       const concreteTypes = [] as ConcreteType[];
       for (const type of types) {
         const resolvedType = this.resolve(type);
         if (!resolvedType) return null;
         concreteTypes.push(resolvedType);
       }
-      const tupleType = new TupleType(concreteTypes, expression);
+      const tupleType = new TupleType(concreteTypes, typeExpression);
       return tupleType;
-    } else if (expression.$type === "HeldTypeExpression") {
-      const resolvedType = this.resolve(expression.type);
+    } else if (typeExpression.$type === "HeldTypeExpression") {
+      const resolvedType = this.resolve(typeExpression.type);
       if (!resolvedType) return null;
-      const heldType = new HeldType(resolvedType, expression);
+      const heldType = new HeldType(resolvedType, typeExpression);
       return heldType;
-    } else if (expression.$type === "NamedTypeExpression") {
+    } else if (typeExpression.$type === "NamedTypeExpression") {
       // the element's name exists on the current expression
-      const elementName = expression.element.name;
+      const elementName = typeExpression.element.name;
       // type parameters must be resolved
-      const typeParameters = expression.typeParameters;
+      const typeParameters = typeExpression.typeParameters;
 
       // we visit every child and extract a namespace element or return null
       const toVisit = [] as ID[];
-      let accumulator: NamedTypeExpression | ID = expression.namespace;
+      let accumulator: NamedTypeExpression | ID = typeExpression.namespace;
       while (true) {
         if (isID(accumulator)) {
           toVisit.push(accumulator);
@@ -151,7 +157,7 @@ export class ExecutionContext {
 
       const concreteTypeParameters = [] as ConcreteType[];
 
-      // 
+      //
       if (element instanceof StaticTypeScopeElement) {
         // we are static, maybe there's a short circuit
         if (element.cachedConcreteType) return element.cachedConcreteType;
@@ -167,37 +173,39 @@ export class ExecutionContext {
         return this.resolveClass(element, concreteTypeParameters);
       if (element.node.$type === "TypeDeclaration")
         return this.resolveTypeDeclaration(element, concreteTypeParameters);
-    } else if (expression.$type === "ID") {
-      const id = expression as ID;
+    } else if (typeExpression.$type === "ID") {
+      const id = typeExpression as ID;
       const name = id.name;
       if (typeMap.has(name)) return typeMap.get(name)!;
 
       // raw type
       switch (name) {
         case "i8":
-          return new IntegerType(Type.i8, null, expression);
+          return new IntegerType(Type.i8, null, typeExpression);
         case "u8":
-          return new IntegerType(Type.u8, null, expression);
+          return new IntegerType(Type.u8, null, typeExpression);
         case "i16":
-          return new IntegerType(Type.i16, null, expression);
+          return new IntegerType(Type.i16, null, typeExpression);
         case "u16":
-          return new IntegerType(Type.u16, null, expression);
+          return new IntegerType(Type.u16, null, typeExpression);
         case "i32":
-          return new IntegerType(Type.i32, null, expression);
+          return new IntegerType(Type.i32, null, typeExpression);
         case "u32":
-          return new IntegerType(Type.u32, null, expression);
+          return new IntegerType(Type.u32, null, typeExpression);
         case "i64":
-          return new IntegerType(Type.i64, null, expression);
+          return new IntegerType(Type.i64, null, typeExpression);
         case "u64":
-          return new IntegerType(Type.u64, null, expression);
+          return new IntegerType(Type.u64, null, typeExpression);
         case "isize":
-          return new IntegerType(Type.isize, null, expression);
+          return new IntegerType(Type.isize, null, typeExpression);
         case "usize":
-          return new IntegerType(Type.usize, null, expression);
+          return new IntegerType(Type.usize, null, typeExpression);
         case "f32":
-          return new FloatType(Type.f32, null, expression);
+          return new FloatType(Type.f32, null, typeExpression);
         case "f64":
-          return new FloatType(Type.f64, null, expression);
+          return new FloatType(Type.f64, null, typeExpression);
+        case "void":
+          return new VoidType(typeExpression);
       }
     }
     // something happened?
@@ -226,7 +234,11 @@ export class ExecutionContext {
     if (node.extends) {
       assert(scope);
       // we must resolve the extends class
-      const nodeExtendsType = this.resolve(node.extends, concreteTypeMap, scope);
+      const nodeExtendsType = this.resolve(
+        node.extends,
+        concreteTypeMap,
+        scope
+      );
       if (nodeExtendsType instanceof ClassType) {
         nodeExtends = nodeExtendsType;
       } else {
@@ -236,12 +248,18 @@ export class ExecutionContext {
     }
 
     const fileName = getFileName(node) as string;
-    const classType = new ClassType(nodeExtends, typeParameters, node, `${fileName}~${node.name.name}`);
+    const classType = new ClassType(
+      nodeExtends,
+      typeParameters,
+      node,
+      `${fileName}~${node.name.name}`
+    );
 
     // we now need to check the ScopeElement for cached classes that match this type
     if (element instanceof DynamicTypeScopeElement) {
       const name = classType.getName();
-      if (element.cachedConcreteTypes.has(name)) return element.cachedConcreteTypes.get(name)! as ClassType;
+      if (element.cachedConcreteTypes.has(name))
+        return element.cachedConcreteTypes.get(name)! as ClassType;
       // we aren't cached, because both static and dynamic checks failed
       element.cachedConcreteTypes.set(name, classType);
     }
@@ -257,7 +275,11 @@ export class ExecutionContext {
           offset += type.size;
           classType.addField(field);
         } else {
-          element.mod.error("Type", member.type, `Cannot resolve type for field ${member.name.name}.`);
+          element.mod.error(
+            "Type",
+            member.type,
+            `Cannot resolve type for field ${member.name.name}.`
+          );
         }
       } else if (isGetterClassMember(member)) {
         // TODO: check for setters of the same name, compare types if they exist
@@ -266,15 +288,15 @@ export class ExecutionContext {
         // TODO: check for getters of the same name, compare types if they exist
         element.mod.error("Type", member, "Setters not supported.");
       } else if (isMethodClassMember(member)) {
-        classType.addPrototypeMethod(member.name.name, 
-          new PrototypeMethod(member, concreteTypeMap),
-          );
-        } else if (isConstructorClassMember(member)) {
+        classType.addPrototypeMethod(
+          member.name.name,
+          new PrototypeMethod(member, concreteTypeMap)
+        );
+      } else if (isConstructorClassMember(member)) {
         element.mod.error("Type", member, "Constructors are not supported.");
         // classType.addMethod("constructor", this.resolveConstructor(member, concreteTypeMap, scope));
       }
     }
-
 
     return classType;
     // TODO: resolve classes
@@ -314,25 +336,42 @@ export abstract class ExecutionContextValue {
   }
 }
 
-export abstract class RuntimeValue extends ExecutionContextValue {
+export class RuntimeValue extends ExecutionContextValue {
   constructor(public ref: LLVMValueRef, ty: ConcreteType) {
     super(ty);
-  }
-}
-
-export class RuntimeInvalid extends RuntimeValue {
-  constructor(ty: ConcreteType) {
-    super(LLVM._LLVMGetPoison(ty.llvmType!), ty);
-  }
-
-  override get valid() {
-    return false;
   }
 }
 
 export abstract class CompileTimeValue<T> extends ExecutionContextValue {
   constructor(public value: T, type: ConcreteType) {
     super(type);
+  }
+}
+
+export class CompileTimeFunctionReference extends CompileTimeValue<ScopeElement> {
+  constructor(value: ScopeElement) {
+    super(value, new FunctionReferenceType(value.node as FunctionDeclaration));
+  }
+}
+
+export class CompileTimeDeclareDeclarationReference extends CompileTimeValue<ScopeElement> {
+  constructor(value: ScopeElement) {
+    super(value, new DeclareDeclarationType(value.node as DeclareDeclaration));
+  }
+}
+
+export class CompileTimeNamespaceDeclarationReference extends CompileTimeValue<ScopeElement> {
+  constructor(value: ScopeElement) {
+    super(
+      value,
+      new NamespaceDeclarationType(value.node as NamespaceDeclaration)
+    );
+  }
+}
+
+export class CompileTimeDeclareFunctionReference extends CompileTimeValue<ScopeElement> {
+  constructor(value: ScopeElement) {
+    super(value, new DeclareFunctionType(value.node as DeclareFunction));
   }
 }
 
@@ -348,21 +387,9 @@ export class CompileTimeInteger extends CompileTimeValue<bigint> {
   }
 }
 
-export class RuntimeInteger extends RuntimeValue {
-  constructor(ref: LLVMValueRef, ty: ConcreteType) {
-    super(ref, ty);
-  }
-}
-
 export class CompileTimeFloat extends CompileTimeValue<number> {
   constructor(value: number, ty: FloatType) {
     super(value, ty);
-  }
-}
-
-export class RuntimeFloat extends RuntimeValue {
-  constructor(ref: LLVMValueRef, ty: ConcreteType) {
-    super(ref, ty);
   }
 }
 
@@ -379,29 +406,5 @@ export class CompileTimeInvalid extends CompileTimeValue<void> {
 export class CompileTimeBool extends CompileTimeValue<boolean> {
   constructor(value: boolean, node: AstNode) {
     super(value, new BoolType(value, node));
-  }
-}
-
-export class RuntimeBool extends RuntimeValue {
-  constructor(ref: LLVMValueRef, ty: ConcreteType) {
-    super(ref, ty);
-  }
-}
-
-export class RuntimeString extends RuntimeValue {
-  constructor(ref: LLVMValueRef, ty: ConcreteType) {
-    super(ref, ty);
-  }
-}
-
-export class RuntimeArray extends RuntimeValue {
-  constructor(ref: LLVMValueRef, ty: ConcreteType) {
-    super(ref, ty);
-  }
-}
-
-export class RuntimeFunction extends RuntimeValue {
-  constructor(ref: LLVMValueRef, ty: ConcreteType) {
-    super(ref, ty);
   }
 }

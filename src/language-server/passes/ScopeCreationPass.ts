@@ -1,6 +1,4 @@
-import {
-  assert,
-} from "../util";
+import { assert } from "../util";
 import {
   AsyncBlockLiteral,
   BlockStatement,

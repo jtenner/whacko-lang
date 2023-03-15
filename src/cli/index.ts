@@ -9,12 +9,14 @@ import { assert } from "../language-server/util";
 const options = {};
 
 export default async function main(args: string[]): Promise<void> {
+  const llvm = await eval(`import("llvm-js")`);
+  const LLVM = await llvm.load();
   const { values, positionals } = parseArgs({
     args,
     options,
     allowPositionals: true,
   });
-  const program = new WhackoProgram();
+  const program = new WhackoProgram(LLVM, llvm);
 
   // first step in any program is registering the builtins
   const stdLibs = glob.sync("std/*.wo", {
@@ -25,7 +27,10 @@ export default async function main(args: string[]): Promise<void> {
   for (const stdLib of stdLibs) {
     const dirname = path.dirname(stdLib);
     const basename = path.basename(stdLib);
-    assert(program.addModule(basename, dirname, false, program.globalScope), `std lib ${stdLib} failed to create a module.`);
+    assert(
+      program.addModule(basename, dirname, false, program.globalScope),
+      `std lib ${stdLib} failed to create a module.`
+    );
   }
 
   for (const positional of positionals) {
@@ -37,7 +42,11 @@ export default async function main(args: string[]): Promise<void> {
     );
   }
 
-  program.compile();
+  try {
+    program.compile();
+  } catch (ex) {
+    console.log(ex);
+  }
 
   for (const [, module] of program.modules) {
     for (const diag of module.diagnostics) {

@@ -1,6 +1,4 @@
-import {
-  assert,
-} from "../util";
+import { assert } from "../util";
 import { AstNode } from "langium";
 import {
   BuiltinDeclaration,
@@ -117,7 +115,7 @@ export class ExportsPass extends WhackoPass {
   }
 
   override visitDeclareFunction(node: DeclareFunction): void {
-    this.defineExportableType(node);
+    const element = this.defineExportableType(node);
   }
 
   override visitExportDeclarator(node: ExportDeclarator): void {
@@ -189,7 +187,7 @@ export class ExportsPass extends WhackoPass {
       );
     } else {
       scope.add(name, element);
-      if (node.export) {
+      if (node.export || node.$type === "DeclareFunction") {
         const exports = this.stack.at(-1)!.exports;
         if (exports.has(name)) {
           this.error(
@@ -212,9 +210,14 @@ export class ExportsPass extends WhackoPass {
     if (scope.has(name)) {
       this.error("Semantic", node, `${name} is already defined in this scope.`);
     } else {
-      scope.add(name, 
+      scope.add(
+        name,
         node.typeParameters.length
-          ? new DynamicTypeScopeElement(node.type, node.typeParameters.map(e => e.name), this.currentMod!)
+          ? new DynamicTypeScopeElement(
+              node.type,
+              node.typeParameters.map((e) => e.name),
+              this.currentMod!
+            )
           : new StaticTypeScopeElement(node.type, this.currentMod!)
       );
     }

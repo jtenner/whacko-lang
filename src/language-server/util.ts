@@ -11,7 +11,10 @@ export interface IDiagnostic {
   col: number;
 }
 
-export function assert<T>(condition: T, message: string = "No message provided") {
+export function assert<T>(
+  condition: T,
+  message: string = "No message provided"
+) {
   if (!condition) throw new Error(message);
   return condition;
 }

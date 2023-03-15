@@ -1,51 +1,33 @@
 import assert from "assert";
 import { AstNode } from "langium";
 import {} from "./types";
-import { ExecutionContext, ExecutionContextValue, RuntimeInteger, RuntimeValue } from "./execution-context";
+import { ExecutionContext, ExecutionContextValue } from "./execution-context";
 import {
+  DeclareDeclaration,
+  DeclareFunction,
   Decorator,
   FunctionDeclaration,
+  NamespaceDeclaration,
   VariableDeclarator,
 } from "./generated/ast";
 import { CompilationPass } from "./passes/CompilationPass";
 import { WhackoProgram } from "./program";
 import { WhackoModule } from "./module";
-import llvm, { LLVMFuncRef } from "../llvm/llvm";
-const LLVM = await (await llvm).ready();
-
+import type { Module, LLVMValueRef } from "llvm-js";
+import { getFileName } from "./passes/ModuleCollectionPass";
 function getPath(node: AstNode): string {
   // @ts-ignore the `parse` function sets this symbol for later use
   return node.$document!.parseResult.value[Symbol.for("fullPath")] as string;
 }
 
 export abstract class ScopeElement {
-  constructor(
-    public mod: WhackoModule,
-  ) {}
-}
-
-export class VariableScopeElement extends ScopeElement {
-  constructor(
-    public declarator: VariableDeclarator,
-    public immutable: boolean,
-    mod: WhackoModule,
-  ) {
-    super(mod);
-  }
-
-  resolve(
-    typeParameters: ConcreteType,
-    ctx: ExecutionContext
-  ): ConcreteType | null {
-    return null;
-  }
+  builtin: BuiltinFunction | null = null;
+  constructor(public mod: WhackoModule, public node: AstNode) {}
 }
 
 export abstract class ScopeTypeElement extends ScopeElement {
-  builtin: BuiltinFunction | null = null;
-
-  constructor(public node: AstNode, mod: WhackoModule) {
-    super(mod);
+  constructor(node: AstNode, mod: WhackoModule) {
+    super(mod, node);
   }
 }
 
@@ -85,7 +67,11 @@ export type BuiltinFunction = (props: BuiltinFunctionProps) => void;
 
 export class DynamicTypeScopeElement extends ScopeTypeElement {
   cachedConcreteTypes = new Map<string, ConcreteType>();
-  constructor(node: AstNode, public typeParameters: string[], mod: WhackoModule) {
+  constructor(
+    node: AstNode,
+    public typeParameters: string[],
+    mod: WhackoModule
+  ) {
     super(node, mod);
   }
 
@@ -118,9 +104,7 @@ export function getScope(node: AstNode): Scope | null {
 export class Scope {
   public elements = new Map<string, ScopeElement>();
 
-  constructor(
-    public parent: Scope | null = null,
-  ) {}
+  constructor(public parent: Scope | null = null) {}
 
   add(name: string, element: ScopeElement) {
     assert(
@@ -134,7 +118,10 @@ export class Scope {
     return this.elements.has(name) || this.parent?.has(name) || false;
   }
 
-  get(name: string, predicate: (element: ScopeElement) => boolean = () => true): ScopeElement | null {
+  get(
+    name: string,
+    predicate: (element: ScopeElement) => boolean = () => true
+  ): ScopeElement | null {
     if (this.elements.has(name)) {
       const element = this.elements.get(name)!;
       return predicate(element) ? element : null;
@@ -171,6 +158,8 @@ export const enum Type {
   void,
   tuple,
   held,
+  scope,
+  namespace,
 }
 
 export abstract class ConcreteType {
@@ -180,8 +169,10 @@ export abstract class ConcreteType {
     public name: string
   ) {}
 
+  abstract get isNumeric(): boolean;
+
   get isSigned() {
-    switch(this.ty) {
+    switch (this.ty) {
       case Type.i8:
       case Type.i16:
       case Type.i32:
@@ -192,30 +183,55 @@ export abstract class ConcreteType {
     return false;
   }
 
-  get llvmType() {
+  llvmType(LLVM: Module) {
     switch (this.ty) {
-      case Type.bool: return LLVM._LLVMInt1Type();
-      case Type.i8: return LLVM._LLVMInt8Type();
-      case Type.u8: return LLVM._LLVMInt8Type();
-      case Type.i16: return LLVM._LLVMInt16Type();
-      case Type.u16: return LLVM._LLVMInt16Type();
-      case Type.i32: return LLVM._LLVMInt32Type();
-      case Type.u32: return LLVM._LLVMInt32Type();
-      case Type.i64: return LLVM._LLVMInt64Type();
-      case Type.u64: return LLVM._LLVMInt64Type();
-      case Type.f32: return LLVM._LLVMFloatType();
-      case Type.f64: return LLVM._LLVMDoubleType();
-      case Type.string: return LLVM._LLVMInt32Type();
-      case Type.array: return LLVM._LLVMInt32Type();
-      case Type.func: return LLVM._LLVMInt32Type();
-      case Type.method: return LLVM._LLVMInt32Type();
-      case Type.v128: return null;
-      case Type.isize: return LLVM._LLVMInt32Type();
-      case Type.usize: return LLVM._LLVMInt32Type();
-      case Type.async: return LLVM._LLVMInt32Type();
-      case Type.void: return LLVM._LLVMVoidType();
-      case Type.tuple: return null;
-      case Type.held: return LLVM._LLVMInt32Type();
+      case Type.bool:
+        return LLVM._LLVMInt1Type();
+      case Type.i8:
+        return LLVM._LLVMInt8Type();
+      case Type.u8:
+        return LLVM._LLVMInt8Type();
+      case Type.i16:
+        return LLVM._LLVMInt16Type();
+      case Type.u16:
+        return LLVM._LLVMInt16Type();
+      case Type.i32:
+        return LLVM._LLVMInt32Type();
+      case Type.u32:
+        return LLVM._LLVMInt32Type();
+      case Type.i64:
+        return LLVM._LLVMInt64Type();
+      case Type.u64:
+        return LLVM._LLVMInt64Type();
+      case Type.f32:
+        return LLVM._LLVMFloatType();
+      case Type.f64:
+        return LLVM._LLVMDoubleType();
+      case Type.string:
+        return LLVM._LLVMInt32Type();
+      case Type.array:
+        return LLVM._LLVMInt32Type();
+      case Type.func:
+        return LLVM._LLVMInt32Type();
+      case Type.method:
+        return LLVM._LLVMInt32Type();
+      case Type.v128:
+        return LLVM._LLVMInt128Type();
+      case Type.isize:
+        return LLVM._LLVMInt32Type();
+      case Type.usize:
+        return LLVM._LLVMInt32Type();
+      case Type.async:
+        return LLVM._LLVMInt32Type();
+      case Type.void:
+        return LLVM._LLVMVoidType();
+      case Type.tuple:
+        return null;
+      case Type.held:
+        return LLVM._LLVMInt32Type();
+      case Type.scope:
+      case Type.namespace:
+        return null;
     }
   }
 
@@ -264,10 +280,7 @@ export abstract class ConcreteType {
 }
 
 export class ConcreteFunction {
-  constructor(
-    public funcRef: LLVMFuncRef,
-    public ty: FunctionType,
-  ) {}
+  constructor(public funcRef: LLVMValueRef, public ty: FunctionType) {}
 }
 
 export class ArrayType extends ConcreteType {
@@ -278,6 +291,10 @@ export class ArrayType extends ConcreteType {
     name: string
   ) {
     super(Type.array, node, name);
+  }
+
+  override get isNumeric() {
+    return false;
   }
 
   override isEqual(other: ConcreteType) {
@@ -297,7 +314,6 @@ export class Parameter {
 
 export class FunctionType extends ConcreteType {
   constructor(
-    public typeParameters: ConcreteType[],
     public parameterTypes: ConcreteType[],
     public parameterNames: string[],
     public returnType: ConcreteType,
@@ -307,12 +323,15 @@ export class FunctionType extends ConcreteType {
     super(Type.method, node, name);
   }
 
+  override get isNumeric() {
+    return false;
+  }
+
   override isEqual(other: ConcreteType) {
     return (
       other instanceof FunctionType &&
       this.parameterTypes.reduce(
-        (acc, param, i) =>
-          param.isEqual(other.parameterTypes[i]),
+        (acc, param, i) => param.isEqual(other.parameterTypes[i]),
         true
       ) &&
       this.returnType.isEqual(this.returnType)
@@ -320,22 +339,15 @@ export class FunctionType extends ConcreteType {
   }
 
   override getName() {
-    const typeParameters = this.typeParameters.length
-      ? `<${this.typeParameters.map((e) => e.name).join(",")}>`
-      : "";
-
-    const filename = getPath(this.node) as string;
-    return `${filename}~${
-      (this.node as FunctionDeclaration).name.name
-    }${typeParameters}`;
+    const parameterNames = this.parameterTypes.map((e) => e.getName());
+    return `Function(${parameterNames.join(",")})`;
   }
 }
 
-export class ConcreteMethodType extends ConcreteType {
+export class MethodType extends ConcreteType {
   constructor(
     public thisType: ClassType,
-    public typeParameters: ConcreteType[],
-    public parameters: Parameter[],
+    public parameterTypes: ConcreteType[],
     public returnType: ConcreteType,
     node: AstNode,
     name: string
@@ -343,13 +355,17 @@ export class ConcreteMethodType extends ConcreteType {
     super(Type.method, node, name);
   }
 
+  override get isNumeric() {
+    return false;
+  }
+
   override isEqual(other: ConcreteType) {
     return (
-      other instanceof ConcreteMethodType &&
+      other instanceof MethodType &&
       other.thisType.isEqual(this.thisType) &&
-      this.parameters.reduce(
-        (acc, param, i) =>
-          param.fieldType.isEqual(other.parameters[i].fieldType),
+      other.parameterTypes.length === this.parameterTypes.length &&
+      this.parameterTypes.reduce(
+        (acc, param, i) => param.isEqual(other.parameterTypes[i]),
         true
       ) &&
       this.returnType.isEqual(this.returnType)
@@ -357,31 +373,89 @@ export class ConcreteMethodType extends ConcreteType {
   }
 
   override getName(): string {
-    return this.typeParameters.length
-      ? `${this.name}<${this.typeParameters
-          .map((e) => e.getName())
-          .join(",")}>(${this.thisType.getName()}, ${this.parameters.map((e) =>
-          e.fieldType.getName()
+    return this.parameterTypes.length
+      ? `Method(this ${this.thisType.getName()}, ${this.parameterTypes.map(
+          (e) => e.getName()
         )}): ${this.returnType.getName()}`
-      : `${this.name}(${this.thisType.getName()}, ${this.parameters.map((e) =>
-          e.fieldType.getName()
+      : `Method(this ${this.thisType.getName()}, ${this.parameterTypes.map(
+          (e) => e.getName()
         )}): ${this.returnType.getName()}`;
   }
 }
 
 export class Field {
-  constructor(public name: string, public ty: ConcreteType, public offset: bigint) {}
+  constructor(
+    public name: string,
+    public ty: ConcreteType,
+    public offset: bigint
+  ) {}
 }
 
 export class PrototypeMethod {
   constructor(
     public element: AstNode,
-    public concreteTypes: Map<string, ConcreteType>,
+    public concreteTypes: Map<string, ConcreteType>
   ) {}
 }
 
+export class NamespaceDeclarationType extends ConcreteType {
+  constructor(node: NamespaceDeclaration) {
+    super(Type.namespace, node, node.name.name);
+  }
+
+  getName(): string {
+    return "";
+  }
+
+  get isNumeric(): boolean {
+    return false;
+  }
+}
+
+export class DeclareFunctionType extends ConcreteType {
+  constructor(node: DeclareFunction) {
+    super(Type.func, node, node.name.name);
+  }
+
+  getName(): string {
+    return "";
+  }
+
+  get isNumeric(): boolean {
+    return false;
+  }
+}
+
+export class FunctionReferenceType extends ConcreteType {
+  constructor(node: FunctionDeclaration) {
+    super(Type.func, node, node.name.name);
+  }
+
+  getName(): string {
+    return "";
+  }
+
+  get isNumeric(): boolean {
+    return false;
+  }
+}
+
+export class DeclareDeclarationType extends ConcreteType {
+  constructor(node: DeclareDeclaration) {
+    super(Type.namespace, node, node.name.name);
+  }
+
+  getName(): string {
+    return "";
+  }
+
+  get isNumeric(): boolean {
+    return false;
+  }
+}
+
 export class ClassType extends ConcreteType {
-  public methods = new Map<string, ConcreteMethodType>();
+  public methods = new Map<string, MethodType>();
   public fields = new Map<string, Field>();
   public prototypes = new Map<string, PrototypeMethod>();
   constructor(
@@ -393,12 +467,16 @@ export class ClassType extends ConcreteType {
     super(Type.usize, node, name);
   }
 
+  override get isNumeric() {
+    return false;
+  }
+
   addPrototypeMethod(name: string, method: PrototypeMethod) {
     assert(!this.prototypes.has(name));
     this.prototypes.set(name, method);
   }
 
-  addMethod(name: string, method: ConcreteMethodType) {
+  addMethod(name: string, method: MethodType) {
     assert(!this.methods.has(name));
     this.methods.set(name, method);
   }
@@ -443,6 +521,10 @@ export class StringType extends ConcreteType {
     super(Type.string, node, "");
   }
 
+  override get isNumeric() {
+    return false;
+  }
+
   override getName(): string {
     return "string";
   }
@@ -467,6 +549,10 @@ export class IntegerType extends ConcreteType {
     node: AstNode
   ) {
     super(ty, node, "");
+  }
+
+  override get isNumeric() {
+    return true;
   }
 
   override getName(): string {
@@ -533,6 +619,10 @@ export class BoolType extends ConcreteType {
     super(Type.bool, node, "");
   }
 
+  override get isNumeric() {
+    return false;
+  }
+
   override getName(): string {
     return "bool";
   }
@@ -545,6 +635,10 @@ export class FloatType extends ConcreteType {
     node: AstNode
   ) {
     super(ty, node, "");
+  }
+
+  override get isNumeric() {
+    return true;
   }
 
   override getName(): string {
@@ -563,6 +657,10 @@ export class AsyncType extends ConcreteType {
     super(Type.async, node, "");
   }
 
+  override get isNumeric() {
+    return false;
+  }
+
   override getName(): string {
     return `async<${this.genericType.getName()}>`;
   }
@@ -571,6 +669,10 @@ export class AsyncType extends ConcreteType {
 export class TupleType extends ConcreteType {
   constructor(public types: ConcreteType[], node: AstNode) {
     super(Type.tuple, node, "");
+  }
+
+  override get isNumeric() {
+    return false;
   }
 
   override getName(): string {
@@ -613,6 +715,10 @@ export class HeldType extends ConcreteType {
     super(Type.held, node, "");
   }
 
+  override get isNumeric() {
+    return false;
+  }
+
   override isEqual(other: ConcreteType): boolean {
     return (
       other instanceof HeldType && this.genericType.isEqual(other.genericType)
@@ -629,6 +735,10 @@ export class SIMDType extends ConcreteType {
     super(Type.v128, node, "");
   }
 
+  override get isNumeric() {
+    return false;
+  }
+
   override getName(): string {
     return "v128";
   }
@@ -638,12 +748,19 @@ export class InvalidType extends ConcreteType {
   constructor(node: AstNode) {
     super(Type.void, node, "");
   }
+
+  override get isNumeric() {
+    return false;
+  }
+
   override isEqual(_: ConcreteType): boolean {
     return false;
   }
+
   override isAssignableTo(_: ConcreteType): boolean {
     return false;
   }
+
   override getName(): string {
     return "invalid";
   }
@@ -668,6 +785,10 @@ export function consumeDecorator(
 export class VoidType extends ConcreteType {
   constructor(node: AstNode) {
     super(Type.void, node, "");
+  }
+
+  override get isNumeric() {
+    return false;
   }
 
   override getName(): string {

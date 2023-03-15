@@ -2,8 +2,8 @@ grammar Whacko
 
 entry Program:
     ( declarations+=DeclareDeclaration
-    | imports+=ImportDeclaration
-    | exports+=ExportDeclaration
+    | imports     +=ImportDeclaration
+    | exports     +=ExportDeclaration
     | declarations+=BuiltinDeclaration
     | declarations+=FunctionDeclaration
     | declarations+=ClassDeclaration
@@ -12,8 +12,9 @@ entry Program:
 )*;
 
 NamespaceDeclaration:
-    Decorators (export?="export") "namespace" Name "{" ( declarations+=DeclareDeclaration
-    | exports+=ExportDeclaration
+    Decorators (export?="export") "namespace" Name "{" ( 
+      declarations+=DeclareDeclaration
+    | exports     +=ExportDeclaration
     | declarations+=FunctionDeclaration
     | declarations+=ClassDeclaration
     | declarations+=TypeDeclaration
@@ -21,16 +22,16 @@ NamespaceDeclaration:
     | declarations+=BuiltinDeclaration)* "}";
 
 BuiltinDeclaration:
-    Decorators (export?="export") "builtin" Name NamedTypeParameters Parameters ":" ReturnType ";";
+    Decorators (export?="export")? "builtin" Name NamedTypeParameters Parameters ":" ReturnType ";";
 
 DeclareDeclaration:
-    Decorators (export?="export") "declare" Name "{" functions+=DeclareFunction "}" "from" namespace=StringLiteral ";";
+    Decorators (export?="export")? "declare" Name  "{" functions+=DeclareFunction* "}" "from" namespace=StringLiteral ";";
 
 DeclareFunction:
     Decorators "fn" Name Parameters ":" ReturnType ";";
 
 EnumDeclaration:
-    Decorators (export?="export") "enum" Name "{"  "}";
+    Decorators (export?="export")? "enum" Name "{"  "}";
 
 ImportDeclaration:
     "import" "{" (declarators+=ImportDeclarator ("," declarators+=ImportDeclarator)*)? "}" "from" path=String ";";
@@ -111,7 +112,7 @@ IfElseStatement:
     "if" "(" condition=Expression ")" truthy=Statement ("else" falsy=Statement)?;
 
 ReturnStatement:
-    "return" expression=Expression ";";
+    "return" expression=Expression? ";";
 
 VariableDeclarationStatement:
     (immutable?="const" | "let") declarators+=VariableDeclarator ("," declarators+=VariableDeclarator)* ";";

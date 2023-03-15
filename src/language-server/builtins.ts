@@ -1,12 +1,8 @@
-
 import {
   CompileTimeFloat,
   CompileTimeInteger,
   CompileTimeInvalid,
   CompileTimeValue,
-  RuntimeFloat,
-  RuntimeInteger,
-  RuntimeInvalid,
 } from "./execution-context";
 import { CallExpression, isCallExpression } from "./generated/ast";
 import { WhackoProgram } from "./program";
@@ -23,17 +19,19 @@ const integerCast =
     const [value] = parameters;
     const [parameterType] = typeParameters;
     if (
-      parameters.length === 1
-      && typeParameters.length === 1
-      && value.ty.isEqual(parameterType)
-      && parameterType instanceof IntegerType
+      parameters.length === 1 &&
+      typeParameters.length === 1 &&
+      value.ty.isEqual(parameterType) &&
+      parameterType instanceof IntegerType
     ) {
       if (value instanceof CompileTimeInteger) {
         // we are good to go
         const intValue = signed
           ? BigInt.asIntN(size, value.value)
           : BigInt.asUintN(size, value.value);
-        ctx.stack.push(new CompileTimeInteger(intValue, new IntegerType(ty, intValue, ast)));
+        ctx.stack.push(
+          new CompileTimeInteger(intValue, new IntegerType(ty, intValue, ast))
+        );
       } else {
         // TODO: Implement runtime casting
       }

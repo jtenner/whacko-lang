@@ -8,11 +8,14 @@ const fileNames = new WeakMap<AstNode, string>();
 const modules = new WeakMap<AstNode, WhackoModule>();
 
 export function getFileName(node: AstNode) {
-  return fileNames.get(node.$document!.parseResult.value);
+  while (node.$container) node = node.$container;
+  const fileName = fileNames.get(node);
+  return fileName;
 }
 
 export function getModule(node: AstNode) {
-  return modules.get(node.$document!.parseResult.value);
+  while (node.$container) node = node.$container;
+  return modules.get(node);
 }
 
 export class ModuleCollectionPass extends WhackoPass {

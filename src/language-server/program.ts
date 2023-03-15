@@ -16,17 +16,20 @@ import {
 import { AstNode } from "langium";
 import { registerDefaultBuiltins } from "./builtins";
 import { CompilationPass } from "./passes/CompilationPass";
-import llvm, { lower } from "../llvm/llvm.js";
 const stdlibFolder = path.join(__dirname, "../std");
-const LLVM = await (await llvm).ready();
+import type { Module, LLVMModuleRef, LLVMContextRef } from "llvm-js";
 
+export type LLVMJSUtil = typeof import("llvm-js");
 
 export class WhackoProgram {
-  constructor() {
+  llvmContext: LLVMContextRef;
+  constructor(public LLVM: Module, public LLVMUtil: LLVMJSUtil) {
     registerDefaultBuiltins(this);
+    this.llvmModule = LLVM._LLVMModuleCreateWithName(LLVMUtil.lower("whacko"));
+    this.llvmContext = LLVM._LLVMContextCreate();
   }
 
-  llvmModule = LLVM._LLVMModuleCreateWithName(lower("whacko"));
+  llvmModule: LLVMModuleRef;
 
   modules = new Map<string, WhackoModule>();
   globalScope = new Scope();

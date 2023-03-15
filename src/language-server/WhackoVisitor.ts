@@ -179,7 +179,7 @@ export class WhackoVisitor {
         return this.visitCallExpression(node);
       case "NewExpression":
         return this.visitNewExpression(node);
-      case "MemberAccess":
+      case "MemberAccessExpression":
         return this.visitMemberAccessExpression(node);
       case "ArrayAccessExpression":
         return this.visitArrayAccessExpression(node);
@@ -390,7 +390,7 @@ export class WhackoVisitor {
   }
 
   visitReturnStatement(node: ReturnStatement) {
-    this.visit(node.expression);
+    if (node.expression) this.visit(node.expression);
   }
 
   visitVariableDeclarationStatement(node: VariableDeclarationStatement) {
