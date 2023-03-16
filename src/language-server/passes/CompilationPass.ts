@@ -73,7 +73,7 @@ import {
   VoidType,
 } from "../types";
 import { WhackoPass } from "./WhackoPass";
-import {
+import type {
   LLVMAttributeIndex,
   LLVMBasicBlockRef,
   LLVMBuilderRef,
@@ -282,9 +282,9 @@ export class CompilationPass extends WhackoPass {
 
     // next we need to define the function types in llvm and create a concrete function
     const llvmParameterTypes = parameterTypes.map(
-      (e) => e.llvmType(this.LLVM!)!
+      (e) => e.llvmType(this.LLVM!, this.program.LLVMUtil)!
     );
-    const llvmReturnType = returnType.llvmType(this.LLVM!)!;
+    const llvmReturnType = returnType.llvmType(this.LLVM, this.program.LLVMUtil)!;
     const llvmFuncType = this.LLVM._LLVMFunctionType(
       llvmReturnType,
       // this is the problem here
@@ -342,6 +342,7 @@ export class CompilationPass extends WhackoPass {
       });
     }
 
+    this.cachedFunctions.set(name, func);
     return func;
   }
 
@@ -622,7 +623,7 @@ export class CompilationPass extends WhackoPass {
             this.builder,
             this.LLVM._LLVMGetPoison(
               assert(
-                returnType.llvmType(this.LLVM),
+                returnType.llvmType(this.LLVM, this.program.LLVMUtil),
                 "Must have valid LLVM type"
               )
             )
@@ -633,7 +634,7 @@ export class CompilationPass extends WhackoPass {
         this.LLVM._LLVMBuildRet(
           this.builder,
           this.LLVM._LLVMGetPoison(
-            assert(returnType.llvmType(this.LLVM), "Must have valid LLVM type")
+            assert(returnType.llvmType(this.LLVM, this.program.LLVMUtil), "Must have valid LLVM type")
           )
         );
       }
@@ -754,7 +755,6 @@ export class CompilationPass extends WhackoPass {
         }
 
         // we didn't find it
-        console.log("Uhoh.");
         this.error("Type", typeParameter, `Could not infer type parameter.`);
         this.ctx.stack.push(new CompileTimeInvalid(typeParameter));
         return;
@@ -868,7 +868,7 @@ export class CompilationPass extends WhackoPass {
       // now that the function is garunteed to be compiled, we can make the llvm call
       const ref = this.LLVM._LLVMBuildCall2(
         this.builder,
-        func.ty.returnType.llvmType(this.LLVM)!,
+        func.ty.llvmType(this.LLVM, this.program.LLVMUtil)!,
         func.funcRef,
         loweredExpressions,
         callParameterValues.length,
@@ -1151,7 +1151,7 @@ export class CompilationPass extends WhackoPass {
             break;
           case "**":
           default:
-            ref = this.LLVM._LLVMGetPoison(lhs.ty.llvmType(this.LLVM)!);
+            ref = this.LLVM._LLVMGetPoison(lhs.ty.llvmType(this.LLVM, this.program.LLVMUtil)!);
         }
 
         this.ctx.stack.push(
@@ -1170,7 +1170,7 @@ export class CompilationPass extends WhackoPass {
     } else if (value instanceof CompileTimeInteger) {
       const inst = this.LLVM._LLVMConstInt(
         assert(
-          value.ty.llvmType(this.program.LLVM),
+          value.ty.llvmType(this.LLVM, this.program.LLVMUtil),
           "The llvm type for the expression must exist."
         ),
         value.value,
@@ -1180,7 +1180,7 @@ export class CompilationPass extends WhackoPass {
     } else if (value instanceof CompileTimeFloat) {
       const inst = this.LLVM._LLVMConstReal(
         assert(
-          value.ty.llvmType(this.program.LLVM),
+          value.ty.llvmType(this.LLVM, this.program.LLVMUtil),
           "The llvm type for the expression must exist."
         ),
         value.value
@@ -1206,7 +1206,7 @@ export class CompilationPass extends WhackoPass {
       );
       return new RuntimeValue(inst, new StringType(value.value, value.ty.node));
     } else if (value instanceof CompileTimeBool) {
-      const ref = this.LLVM._LLVMConstInt(value.ty.llvmType(this.LLVM)!, value.value ? 1n : 0n, 0);
+      const ref = this.LLVM._LLVMConstInt(value.ty.llvmType(this.LLVM, this.program.LLVMUtil)!, value.value ? 1n : 0n, 0);
       return new RuntimeValue(ref, new BoolType(null, value.ty.node));
     }
     this.error(
@@ -1215,7 +1215,7 @@ export class CompilationPass extends WhackoPass {
       `Cannot ensure expression is compiled, expression is not supported.`
     );
     return new RuntimeValue(
-      this.LLVM._LLVMGetPoison(value.ty.llvmType(this.LLVM)!),
+      this.LLVM._LLVMGetPoison(value.ty.llvmType(this.LLVM, this.program.LLVMUtil)!),
       value.ty
     );
   }
@@ -1233,14 +1233,88 @@ export class CompilationPass extends WhackoPass {
     const lhsValue = assert(this.ctx.stack.pop(), "LHS must exist on the stack.");
     this.visit(node.rhs);
     const rhsValue = assert(this.ctx.stack.pop(), "RHS must exist on the stack.");
-
     // If any values are invalid, the top of the stack should be invalid
-    if (lhsValue instanceof CompileTimeInvalid || rhsValue instanceof CompileTimeInvalid) {
+    if (
+      lhsValue instanceof CompileTimeInvalid
+      || rhsValue instanceof CompileTimeInvalid
+    ) {
       this.ctx.stack.push(new CompileTimeInvalid(node));
       return;
     }
 
-    // TODO: Body of logical and
+    if (
+      (lhsValue instanceof CompileTimeInteger || lhsValue instanceof CompileTimeBool) 
+      && (rhsValue instanceof CompileTimeInteger || rhsValue instanceof CompileTimeBool)
+    ) {
+      const result = Boolean(lhsValue.value) && Boolean(rhsValue.value);
+      this.ctx.stack.push(new CompileTimeBool(result, node));
+      return;
+    }
+    // we need to check the types if either of them are runtime
+    if (
+      (lhsValue instanceof RuntimeValue || rhsValue instanceof RuntimeValue)
+      && (lhsValue.ty instanceof IntegerType || lhsValue.ty instanceof BoolType)
+      && (rhsValue.ty instanceof IntegerType || rhsValue.ty instanceof BoolType)
+    ) {
+      const compiledLHS = this.ensureCompiled(lhsValue);
+      const compiledRHS = this.ensureCompiled(rhsValue);
+
+      const lhsNE0Name = this.program.LLVMUtil.lower(this.getTempName());
+      const rhsNE0Name = this.program.LLVMUtil.lower(this.getTempName());
+
+      // check if the value equals 0
+      const lhsNE0 = this.LLVM._LLVMBuildICmp(
+        this.builder,
+        this.program.LLVMUtil.LLVMIntPredicate.Ne,
+        compiledLHS.ref,
+        this.LLVM._LLVMConstInt(lhsValue.ty.llvmType(this.LLVM, this.program.LLVMUtil)!, 0n, 0),
+        lhsNE0Name
+      );
+      const rhsNE0 = this.LLVM._LLVMBuildICmp(
+        this.builder,
+        this.program.LLVMUtil.LLVMIntPredicate.Ne,
+        compiledRHS.ref,
+        this.LLVM._LLVMConstInt(rhsValue.ty.llvmType(this.LLVM, this.program.LLVMUtil)!, 0n, 0),
+        rhsNE0Name
+      );
+
+      // next we need to cast to int1
+      const lhsCastName = this.program.LLVMUtil.lower(this.getTempName());
+      const rhsCastName = this.program.LLVMUtil.lower(this.getTempName());
+      const boolType = new BoolType(null, node);
+      const lhsCast = this.LLVM._LLVMBuildIntCast2(
+        this.builder,
+        lhsNE0,
+        boolType.llvmType(this.LLVM, this.program.LLVMUtil)!,
+        0,
+        lhsCastName,
+      );
+      const rhsCast = this.LLVM._LLVMBuildIntCast2(
+        this.builder,
+        rhsNE0,
+        boolType.llvmType(this.LLVM, this.program.LLVMUtil)!,
+        0,
+        rhsCastName,
+      );
+
+      // finally perform and
+      const resultName = this.program.LLVMUtil.lower(this.getTempName());
+      const result = this.LLVM._LLVMBuildAnd(
+        this.builder,
+        lhsCast,
+        rhsCast,
+        resultName
+      );
+
+      this.ctx.stack.push(new RuntimeValue(result, new BoolType(null, node)));
+      this.LLVM._free(lhsNE0Name);
+      this.LLVM._free(rhsNE0Name);
+      this.LLVM._free(lhsCastName);
+      this.LLVM._free(rhsCastName);
+      this.LLVM._free(resultName);
+      return;
+    }
+    
 
     this.ctx.stack.push(new CompileTimeInvalid(node));
     this.error("Semantic", node, `Operation not supported.`);
@@ -1259,6 +1333,7 @@ export class CompilationPass extends WhackoPass {
     }
 
     // TODO: Body of logical or
+
 
     this.ctx.stack.push(new CompileTimeInvalid(node));
     this.error("Semantic", node, `Operation not supported.`);

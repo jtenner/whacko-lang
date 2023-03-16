@@ -13,7 +13,7 @@ import {
 import { CompilationPass } from "./passes/CompilationPass";
 import { WhackoProgram } from "./program";
 import { WhackoModule } from "./module";
-import type { Module, LLVMValueRef } from "llvm-js";
+import type { Module, LLVMValueRef, LLVMTypeRef } from "llvm-js";
 import { getFileName } from "./passes/ModuleCollectionPass";
 function getPath(node: AstNode): string {
   // @ts-ignore the `parse` function sets this symbol for later use
@@ -183,7 +183,7 @@ export abstract class ConcreteType {
     return false;
   }
 
-  llvmType(LLVM: Module) {
+  llvmType(LLVM: Module, LLVMUtil: typeof import("llvm-js")) {
     switch (this.ty) {
       case Type.bool:
         return LLVM._LLVMInt1Type();
@@ -341,6 +341,18 @@ export class FunctionType extends ConcreteType {
   override getName() {
     const parameterNames = this.parameterTypes.map((e) => e.getName());
     return `Function(${parameterNames.join(",")})`;
+  }
+
+  override llvmType(LLVM: Module, LLVMUtil: typeof import("llvm-js")): LLVMTypeRef | null {
+    const loweredParameterTypes = LLVMUtil.lowerPointerArray(this.parameterTypes.map(e => e.llvmType(LLVM, LLVMUtil)!));
+    const result = LLVM._LLVMFunctionType(
+      this.returnType.llvmType(LLVM, LLVMUtil)!,
+      loweredParameterTypes,
+      this.parameterTypes.length,
+      0,
+    );
+    LLVM._free(loweredParameterTypes);
+    return result;
   }
 }
 

@@ -180,6 +180,8 @@ export class ExecutionContext {
 
       // raw type
       switch (name) {
+        case "bool":
+          return new BoolType(null, typeExpression);
         case "i8":
           return new IntegerType(Type.i8, null, typeExpression);
         case "u8":

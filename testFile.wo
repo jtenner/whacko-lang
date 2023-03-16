@@ -2,15 +2,15 @@
 //   fn connect(ptr: i32, len: i32): i32;
 // } from "lunatic";
 // 
-// fn add(a: i32, b: i32): i32 {
-//   return a + b;
-// }
+
+fn someBool(): bool {
+  return true;
+}
 
 export fn main(): void {
-  let a = false;
-  let b = a;
-  if (b) {
-    Unreachable();
+  let a = someBool() && true;
+  if (a) {
+    someBool();
   }
   return;
 }
