@@ -1,13 +1,16 @@
-declare lunatic {
-  fn connect(ptr: i32, len: i32): i32;
-} from "lunatic";
-
-fn add(a: i32, b: i32): i32 {
-  return a + b;
-}
+// declare lunatic {
+//   fn connect(ptr: i32, len: i32): i32;
+// } from "lunatic";
+// 
+// fn add(a: i32, b: i32): i32 {
+//   return a + b;
+// }
 
 export fn main(): void {
-  let a = add(i32(1), i32(2));
-  lunatic.connect(i32(1), i32(1));
+  let a = false;
+  let b = a;
+  if (b) {
+    Unreachable();
+  }
   return;
 }

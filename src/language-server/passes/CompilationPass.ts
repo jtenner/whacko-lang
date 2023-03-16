@@ -45,9 +45,13 @@ import {
   isStringLiteral,
   isNamespaceDeclaration,
   isCallExpression,
+  IfElseStatement,
+  TrueLiteral,
+  FalseLiteral,
 } from "../generated/ast";
 import { WhackoModule } from "../module";
 import {
+  BoolType,
   BuiltinFunction,
   ClassType,
   ConcreteFunction,
@@ -164,15 +168,15 @@ export interface QueuedFunctionCompilation {
 }
 
 export class CompilationPass extends WhackoPass {
-  private ctx!: ExecutionContext;
-  private func!: ConcreteFunction;
+  ctx!: ExecutionContext;
+  func!: ConcreteFunction;
   private entry!: LLVMBasicBlockRef;
   private currentBlock!: LLVMBasicBlockRef;
-  private builder!: LLVMBuilderRef;
+  builder!: LLVMBuilderRef;
   private compiledStrings = new Map<string, CompiledString>();
   private cachedFunctions = new Map<string, ConcreteFunction>();
   private tmp: bigint = 0n;
-  private LLVM!: Module;
+  LLVM!: Module;
 
   /**
    * Compile a program.
@@ -348,7 +352,8 @@ export class CompilationPass extends WhackoPass {
       const { ctx, func, node, typeParameters, module } = this.queue.pop()!;
 
       if (isFunctionDeclaration(node)) {
-        this.entry = this.LLVM._LLVMAppendBasicBlock(
+        this.entry = this.LLVM._LLVMAppendBasicBlockInContext(
+          this.program.llvmContext,
           func.funcRef,
           this.program.LLVMUtil.lower("entry")
         );
@@ -387,6 +392,62 @@ export class CompilationPass extends WhackoPass {
     super.visitFunctionDeclaration(node);
   }
 
+  override visitIfElseStatement(node: IfElseStatement): void {
+    // this.LLVM._LLVMBuildBr()
+    this.visit(node.condition);
+    const condition = assert(this.ctx.stack.pop(), "Condition must be on the stack.");
+
+    if (condition instanceof CompileTimeBool || condition instanceof CompileTimeInteger) {
+      // we can just visit the falsy or the truthy branches without jumps
+      if (condition.value) {
+        this.visit(node.truthy);
+      } else {
+        if (node.falsy) this.visit(node.falsy);
+      }
+      return;
+    }
+
+    // while we are on the current block
+    const compiledCondition = this.ensureCompiled(condition);
+
+    if (
+      !(compiledCondition.ty instanceof IntegerType)
+      && !(compiledCondition.ty instanceof BoolType)
+    ) {
+      this.error("Type", node, `Invalid conditional expression.`);
+      return;
+    }
+
+    const truthyLabelName = this.program.LLVMUtil.lower(this.getTempName());
+    const truthyLabel = this.LLVM._LLVMAppendBasicBlockInContext(this.program.llvmContext, this.func.funcRef, truthyLabelName);
+
+    const falsyLabelName = this.program.LLVMUtil.lower(this.getTempName());
+    const falsyLabel = this.LLVM._LLVMAppendBasicBlockInContext(this.program.llvmContext, this.func.funcRef, falsyLabelName);
+
+    const nextLabelName = this.program.LLVMUtil.lower(this.getTempName());
+    const nextLabel = this.LLVM._LLVMAppendBasicBlockInContext(this.program.llvmContext, this.func.funcRef, falsyLabelName);
+
+    // now we can create the jump instruction
+    this.LLVM._LLVMBuildCondBr(this.builder, compiledCondition.ref, truthyLabel, falsyLabel);
+ 
+    // next we position the builder and compile all the truthy statements
+    this.LLVM._LLVMPositionBuilderAtEnd(this.builder, truthyLabel);
+    this.visit(node.truthy);
+    this.LLVM._LLVMBuildBr(this.builder, nextLabel);
+
+    // finally if there is a falsy statement, we compile it
+    this.LLVM._LLVMPositionBuilderAtEnd(this.builder, falsyLabel);
+    if (node.falsy) this.visit(node.falsy);
+    this.LLVM._LLVMBuildBr(this.builder, nextLabel);
+
+    // finally start compiling the next block
+    this.LLVM._LLVMPositionBuilderAtEnd(this.builder, nextLabel);
+
+    this.LLVM._free(truthyLabelName);
+    this.LLVM._free(falsyLabelName);
+    this.LLVM._free(nextLabelName);
+  }
+
   override visitVariableDeclarationStatement(
     node: VariableDeclarationStatement
   ): void {
@@ -416,7 +477,7 @@ export class CompilationPass extends WhackoPass {
             const variable = new ExecutionVariable(
               immutable,
               name.name,
-              value,
+              immutable ? value : this.ensureCompiled(value),
               variableType
             );
             this.ctx.vars.set(name.name, variable);
@@ -447,7 +508,7 @@ export class CompilationPass extends WhackoPass {
         const variable = new ExecutionVariable(
           immutable,
           name.name,
-          value,
+          immutable ? value : this.ensureCompiled(value),
           value.ty
         );
         this.ctx.vars.set(name.name, variable);
@@ -622,9 +683,12 @@ export class CompilationPass extends WhackoPass {
       case "*":
       case "**":
         return this.compileMathExpresion(node);
-
       case "=":
         return this.compileAssignmentExpression(node);
+      case "&&":
+        return this.compileLogicalAndExpression(node);
+      case "||":
+        return this.compileLogicalOrExpression(node);
       default: {
         this.visit(node.lhs);
         this.visit(node.rhs);
@@ -944,7 +1008,7 @@ export class CompilationPass extends WhackoPass {
     this.ctx.stack.push(new CompileTimeInvalid(node));
   }
 
-  private getTempName() {
+  getTempName() {
     return "tmp" + (this.tmp++).toString();
   }
 
@@ -1100,7 +1164,7 @@ export class CompilationPass extends WhackoPass {
     }
   }
 
-  private ensureCompiled(value: ExecutionContextValue): RuntimeValue {
+  ensureCompiled(value: ExecutionContextValue): RuntimeValue {
     if (value instanceof RuntimeValue) {
       return value;
     } else if (value instanceof CompileTimeInteger) {
@@ -1141,6 +1205,9 @@ export class CompilationPass extends WhackoPass {
         Buffer.byteLength(value.value)
       );
       return new RuntimeValue(inst, new StringType(value.value, value.ty.node));
+    } else if (value instanceof CompileTimeBool) {
+      const ref = this.LLVM._LLVMConstInt(value.ty.llvmType(this.LLVM)!, value.value ? 1n : 0n, 0);
+      return new RuntimeValue(ref, new BoolType(null, value.ty.node));
     }
     this.error(
       "Type",
@@ -1151,5 +1218,49 @@ export class CompilationPass extends WhackoPass {
       this.LLVM._LLVMGetPoison(value.ty.llvmType(this.LLVM)!),
       value.ty
     );
+  }
+
+  override visitTrueLiteral(expression: TrueLiteral): void {
+    this.ctx.stack.push(new CompileTimeBool(true, expression));
+  }
+
+  override visitFalseLiteral(expression: FalseLiteral): void {
+    this.ctx.stack.push(new CompileTimeBool(false, expression));
+  }
+
+  private compileLogicalAndExpression(node: BinaryExpression) {
+    this.visit(node.lhs);
+    const lhsValue = assert(this.ctx.stack.pop(), "LHS must exist on the stack.");
+    this.visit(node.rhs);
+    const rhsValue = assert(this.ctx.stack.pop(), "RHS must exist on the stack.");
+
+    // If any values are invalid, the top of the stack should be invalid
+    if (lhsValue instanceof CompileTimeInvalid || rhsValue instanceof CompileTimeInvalid) {
+      this.ctx.stack.push(new CompileTimeInvalid(node));
+      return;
+    }
+
+    // TODO: Body of logical and
+
+    this.ctx.stack.push(new CompileTimeInvalid(node));
+    this.error("Semantic", node, `Operation not supported.`);
+  }
+
+  private compileLogicalOrExpression(node: BinaryExpression) {
+    this.visit(node.lhs);
+    const lhsValue = assert(this.ctx.stack.pop(), "LHS must exist on the stack.");
+    this.visit(node.rhs);
+    const rhsValue = assert(this.ctx.stack.pop(), "RHS must exist on the stack.");
+
+    // If any values are invalid, the top of the stack should be invalid
+    if (lhsValue instanceof CompileTimeInvalid || rhsValue instanceof CompileTimeInvalid) {
+      this.ctx.stack.push(new CompileTimeInvalid(node));
+      return;
+    }
+
+    // TODO: Body of logical or
+
+    this.ctx.stack.push(new CompileTimeInvalid(node));
+    this.error("Semantic", node, `Operation not supported.`);
   }
 }
