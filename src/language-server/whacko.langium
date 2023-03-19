@@ -179,7 +179,7 @@ ExponentiationExpression:
     Epsilon ({infer BinaryExpression.lhs=current} op="**" rhs=Epsilon)*;
 
 Epsilon:
-    NewExpression AwaitExpression | HoldExpression | NewExpression | LeftUnaryExpression | PathExpression | PrimaryExpression;
+    NewExpression | AwaitExpression | HoldExpression | NewExpression | LeftUnaryExpression | PathExpression | PrimaryExpression;
 
 LeftUnaryExpression:
     op=("!" | "-" | "+" | "~") expression=LeftUnaryExpression;
