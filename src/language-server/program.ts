@@ -2,13 +2,14 @@ import { WhackoModule } from "./module";
 import path from "node:path";
 import fs from "node:fs";
 import { parse } from "./parser";
-import { DiagnosticLevel } from "./util";
+import { assert, DiagnosticLevel } from "./util";
 import { ModuleCollectionPass } from "./passes/ModuleCollectionPass";
 import { ExportsPass } from "./passes/ExportsPass";
 import { ImportsPass } from "./passes/ImportsPass";
 import { ScopeCreationPass } from "./passes/ScopeCreationPass";
 import {
   BuiltinFunction,
+  BuiltinTypeFunction,
   DynamicTypeScopeElement,
   Scope,
   StaticTypeScopeElement,
@@ -17,7 +18,18 @@ import { AstNode } from "langium";
 import { registerDefaultBuiltins } from "./builtins";
 import { CompilationPass } from "./passes/CompilationPass";
 const stdlibFolder = path.join(__dirname, "../std");
-import type { Module, LLVMModuleRef, LLVMContextRef } from "llvm-js";
+import type {
+  LLVMAttributeIndex,
+  LLVMBasicBlockRef,
+  LLVMBuilderRef,
+  LLVMContextRef,
+  LLVMModuleRef,
+  LLVMVerifierFailureAction,
+  LLVMTypeRef,
+  LLVMValueRef,
+  LLVMStringRef,
+  Module,
+} from "llvm-js";
 
 export type LLVMJSUtil = typeof import("llvm-js");
 
@@ -34,6 +46,7 @@ export class WhackoProgram {
   modules = new Map<string, WhackoModule>();
   globalScope = new Scope();
   builtins = new Map<string, BuiltinFunction>();
+  builtinTypes = new Map<string, BuiltinTypeFunction>();
   names = new Map<AstNode, string>();
 
   addBuiltin(name: string, func: BuiltinFunction) {
@@ -41,6 +54,13 @@ export class WhackoProgram {
       throw new Error("Builtin already defined.");
     }
     this.builtins.set(name, func);
+  }
+
+  addBuiltinType(name: string, func: BuiltinTypeFunction) {
+    if (this.builtinTypes.has(name)) {
+      throw new Error("Builtin already defined.");
+    }
+    this.builtinTypes.set(name, func);
   }
 
   addModule(
@@ -121,7 +141,67 @@ export class WhackoProgram {
     }
 
     const compilationPass = new CompilationPass(this);
+
+    const targetTriplePtr = this.LLVMUtil.lower("wasm32-wasi");
+    const cpuPtr = this.LLVMUtil.lower("generic");
+    const featuresPtr = this.LLVMUtil.lower("");
+    const target = this.LLVM._LLVMGetTargetFromName(targetTriplePtr);
+    const machine = this.LLVM._LLVMCreateTargetMachine(
+      target,
+      targetTriplePtr,
+      cpuPtr,
+      featuresPtr,
+      this.LLVMUtil.LLVMCodeGenOptLevel.LLVMCodeGenLevelNone,
+      this.LLVMUtil.LLVMRelocMode.LLVMRelocDefault,
+      this.LLVMUtil.LLVMCodeModel.LLVMCodeModelLarge,
+    );
+    this.LLVM._LLVMSetTarget(this.llvmModule, targetTriplePtr);
+
+    // TODO: Figure out why data layout is messing with things
+    // const dataLayout = this.LLVM._LLVMCreateTargetDataLayout(machine);
+    // this.LLVM._LLVMSetModuleDataLayout(this.llvmModule, dataLayout);
+
+    const dataLayoutStrPtr = this.LLVM._LLVMGetDataLayoutStr(this.llvmModule);
+    const dataLayoutStr = this.LLVMUtil.lift(dataLayoutStrPtr);
+    this.LLVM._free(dataLayoutStrPtr);
+
+    // compile the module
     compilationPass.compile(this);
-    return new Map();
+
+    // post module creation
+    const pm = this.LLVM._LLVMCreatePassManager();
+    this.LLVM._LLVMFinalizeFunctionPassManager(pm);
+
+    this.LLVM._free(targetTriplePtr);
+    this.LLVM._LLVMDisposePassManager(pm);
+
+    const strRef = this.LLVM._LLVMPrintModuleToString(this.llvmModule);
+    const str = this.LLVMUtil.lift(strRef);
+    console.error(str);
+
+    const errorPointer = this.LLVM._malloc<LLVMStringRef[]>(4);
+    this.LLVM._LLVMVerifyModule(
+      this.llvmModule,
+      1 as LLVMVerifierFailureAction,
+      errorPointer
+    );
+
+    const stringPtr = this.LLVM.HEAPU32[errorPointer >>> 2] as LLVMStringRef;
+    const errorString = stringPtr === 0 ? null : this.LLVMUtil.lift(stringPtr);
+    console.error(errorString);
+
+    const bufref = this.LLVM._LLVMWriteBitcodeToMemoryBuffer(this.llvmModule);
+    const bufrefStart = this.LLVM.HEAPU32[bufref >>> 2];
+    const bufrefEnd = this.LLVM.HEAPU32[(bufref >>> 2) + 1];
+
+    this.LLVM._LLVMDisposeMemoryBuffer(bufref);
+    this.LLVM._LLVMDisposeBuilder(compilationPass.builder);
+    this.LLVM._LLVMDisposeModule(this.llvmModule);
+    this.LLVM._LLVMDisposeTargetMachine(machine);
+    this.LLVM._LLVMContextDispose(this.llvmContext);
+    return new Map([
+      ["test.bc", Buffer.from(this.LLVM.HEAPU8.buffer, bufrefStart, bufrefEnd - bufrefStart)],
+      ["test.ll", Buffer.from(str)],
+    ]);
   }
 }

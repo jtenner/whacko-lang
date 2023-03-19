@@ -5,6 +5,7 @@ import { parseArgs } from "node:util";
 import { WhackoProgram } from "../language-server/program";
 import { assert } from "../language-server/util";
 // import { WhackoProgram } from "../compiler";
+import fs from "node:fs/promises";
 
 const options = {};
 
@@ -43,14 +44,17 @@ export default async function main(args: string[]): Promise<void> {
   }
 
   try {
-    program.compile();
+    const result = program.compile();
+    for (const [file, buff] of result) {
+      await fs.writeFile(file, buff);
+    }
   } catch (ex) {
-    console.log(ex);
+    console.error(ex);
   }
 
   for (const [, module] of program.modules) {
     for (const diag of module.diagnostics) {
-      console.log(diag);
+      console.error(module.path, "->", diag);
     }
   }
 }

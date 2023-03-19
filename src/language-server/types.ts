@@ -22,6 +22,7 @@ function getPath(node: AstNode): string {
 
 export abstract class ScopeElement {
   builtin: BuiltinFunction | null = null;
+  builtinType: BuiltinTypeFunction | null = null;
   constructor(public mod: WhackoModule, public node: AstNode) {}
 }
 
@@ -47,10 +48,6 @@ export class StaticTypeScopeElement extends ScopeTypeElement {
   constructor(node: AstNode, mod: WhackoModule) {
     super(node, mod);
   }
-  resolve(): ConcreteType | null {
-    // TODO: Actually resolve the type
-    return this.cachedConcreteType;
-  }
 }
 
 export interface BuiltinFunctionProps {
@@ -63,7 +60,15 @@ export interface BuiltinFunctionProps {
   parameters: ExecutionContextValue[];
 }
 
+export interface BuiltinTypeFunctionProps {
+  ast: AstNode;
+  ctx: ExecutionContext;
+  module: WhackoModule;
+  typeParameters: ConcreteType[];
+}
+
 export type BuiltinFunction = (props: BuiltinFunctionProps) => void;
+export type BuiltinTypeFunction = (props: BuiltinTypeFunctionProps) => ConcreteType;
 
 export class DynamicTypeScopeElement extends ScopeTypeElement {
   cachedConcreteTypes = new Map<string, ConcreteType>();
@@ -73,11 +78,6 @@ export class DynamicTypeScopeElement extends ScopeTypeElement {
     mod: WhackoModule
   ) {
     super(node, mod);
-  }
-
-  resolve(typeParameters: ConcreteType[]): ConcreteType | null {
-    // TODO: Actually resolve type with type parameters
-    return new VoidType(this.node);
   }
 }
 
@@ -343,13 +343,18 @@ export class FunctionType extends ConcreteType {
     return `Function(${parameterNames.join(",")})`;
   }
 
-  override llvmType(LLVM: Module, LLVMUtil: typeof import("llvm-js")): LLVMTypeRef | null {
-    const loweredParameterTypes = LLVMUtil.lowerPointerArray(this.parameterTypes.map(e => e.llvmType(LLVM, LLVMUtil)!));
+  override llvmType(
+    LLVM: Module,
+    LLVMUtil: typeof import("llvm-js")
+  ): LLVMTypeRef | null {
+    const loweredParameterTypes = LLVMUtil.lowerPointerArray(
+      this.parameterTypes.map((e) => e.llvmType(LLVM, LLVMUtil)!)
+    );
     const result = LLVM._LLVMFunctionType(
       this.returnType.llvmType(LLVM, LLVMUtil)!,
       loweredParameterTypes,
       this.parameterTypes.length,
-      0,
+      0
     );
     LLVM._free(loweredParameterTypes);
     return result;
@@ -662,6 +667,17 @@ export class FloatType extends ConcreteType {
     }
     throw new Error("Invalid number type.");
   }
+
+  
+  get bits() {
+    switch (this.ty) {
+      case Type.f32:
+        return 32;
+      case Type.f64:
+        return 64;
+    }
+    return 0;
+  }
 }
 
 export class AsyncType extends ConcreteType {
@@ -742,8 +758,109 @@ export class HeldType extends ConcreteType {
   }
 }
 
-export class SIMDType extends ConcreteType {
+export function simdOf(type: ConcreteType) {
+  switch (type.ty) {
+    case Type.i8:  return new i8x16Type(type.node);
+    case Type.u8:  return new u8x16Type(type.node);
+    case Type.i16: return new i16x8Type(type.node);
+    case Type.u16: return new u16x8Type(type.node);
+    case Type.i32: return new i32x4Type(type.node);
+    case Type.u32: return new u32x4Type(type.node);
+    case Type.f32: return new f32x4Type(type.node);
+    case Type.i64: return new i64x2Type(type.node);
+    case Type.u64: return new u64x2Type(type.node);
+    case Type.f64: return new f64x2Type(type.node);
+  }
+  return new InvalidType(type.node);
+}
+
+export class VectorType extends ConcreteType {
+  constructor(public numberType: ConcreteType, node: AstNode) {
+    super(Type.v128, node, "");
+  }
+
+  override get isNumeric() {
+    return false;
+  }
+
+  override llvmType(LLVM: Module, LLVMUtil: typeof import("llvm-js")): LLVMTypeRef | null {
+    const bits = (this.numberType as FloatType | IntegerType).bits;
+    const laneCount = 16n / this.numberType.size;
+    return LLVM._LLVMVectorType(LLVM._LLVMIntType(bits), Number(laneCount));
+  }
+
+  getName() {
+    const bits = (this.numberType as FloatType | IntegerType).bits;
+    const laneCount = 16n / this.numberType.size;
+    
+    if (this.numberType instanceof FloatType) {
+      return `f${bits}x${laneCount}`;
+    } else {
+      return `${(this.numberType as IntegerType).signed ? "i" : "u"}${bits}x${laneCount}`;
+    }
+  }
+
+  override isAssignableTo(other: ConcreteType): boolean {
+    return other instanceof VectorType;
+  }
+}
+
+export class i8x16Type extends VectorType {
   constructor(node: AstNode) {
+    super(new IntegerType(Type.i8, 0n, node), node);
+  }
+}
+export class u8x16Type extends VectorType {
+  constructor(node: AstNode) {
+    super(new IntegerType(Type.u8, 0n, node), node);
+  }
+}
+
+export class i16x8Type extends VectorType {
+  constructor(node: AstNode) {
+    super(new IntegerType(Type.i16, 0n, node), node);
+  }
+}
+export class u16x8Type extends VectorType {
+  constructor(node: AstNode) {
+    super(new IntegerType(Type.u16, 0n, node), node);
+  }
+}
+
+export class i32x4Type extends VectorType {
+  constructor(node: AstNode) {
+    super(new IntegerType(Type.i32, 0n, node), node);
+  }
+}
+export class u32x4Type extends VectorType {
+  constructor(node: AstNode) {
+    super(new IntegerType(Type.u32, 0n, node), node);
+  }
+}
+export class f32x4Type extends VectorType {
+  constructor(node: AstNode) {
+    super(new FloatType(Type.f32, 0, node), node);
+  }
+}
+
+export class i64x2Type extends VectorType {
+  constructor(node: AstNode) {
+    super(new IntegerType(Type.i32, 0n, node), node);
+  }
+}
+export class u64x2Type extends VectorType {
+  constructor(node: AstNode) {
+    super(new IntegerType(Type.u64, 0n, node), node);
+  }
+}
+export class f64x2Type extends VectorType {
+  constructor(node: AstNode) {
+    super(new FloatType(Type.f64, 0, node), node);
+  }
+}
+
+export class SIMDType extends ConcreteType {
+  constructor(public laneType: ConcreteType, node: AstNode) {
     super(Type.v128, node, "");
   }
 
@@ -752,7 +869,11 @@ export class SIMDType extends ConcreteType {
   }
 
   override getName(): string {
-    return "v128";
+    return `v128<${this.laneType.getName()}>`;
+  }
+
+  override llvmType(LLVM: Module, LLVMUtil: typeof import("llvm-js")): LLVMTypeRef | null {
+    return LLVM._LLVMVectorType(this.laneType.llvmType(LLVM, LLVMUtil)!, Number(16n / this.laneType.size));
   }
 }
 
@@ -805,5 +926,23 @@ export class VoidType extends ConcreteType {
 
   override getName(): string {
     return "void";
+  }
+}
+
+export class PointerType extends ConcreteType {
+  constructor(public pointingToType: ConcreteType, node: AstNode) {
+    super(Type.usize, node, "pointer");
+  }
+
+  get isNumeric(): boolean {
+    return true;
+  }
+
+  getName(): string {
+    return "Pointer<" + this.pointingToType.name + ">";
+  }
+
+  override llvmType(LLVM: Module, LLVMUtil: typeof import("llvm-js")): LLVMTypeRef | null {
+    return LLVM._LLVMPointerType(this.pointingToType.llvmType(LLVM, LLVMUtil)!, 32);
   }
 }

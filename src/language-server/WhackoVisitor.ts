@@ -67,6 +67,7 @@ import {
   DeclareFunction,
   BuiltinDeclaration,
   RootIdentifier,
+  BuiltinTypeDeclaration,
 } from "./generated/ast";
 import { createWhackoServices, WhackoServices } from "./whacko-module";
 
@@ -213,9 +214,14 @@ export class WhackoVisitor {
         return this.visitIdentifier(node);
       case "RootIdentifier":
         return this.visitRootIdentifier(node);
-
+      case "NamespaceDeclaration":
+        return this.visitNamespaceDeclaration(node);
+      case "BuiltinTypeDeclaration":
+        return this.visitBuiltinTypeDeclaration(node);
+      // case "TypeCastExpression":
+      //   return this.visitTypeCastExpression(node);
       default:
-        assert(false, "Unhandled node type: " + node.type);
+        assert(false, "Unhandled node type: " + node.$type);
     }
   }
 
@@ -223,6 +229,12 @@ export class WhackoVisitor {
     this.visitAll(node.imports);
     this.visitAll(node.declarations);
     this.visitAll(node.exports);
+  }
+
+  visitBuiltinTypeDeclaration(node: BuiltinTypeDeclaration) {
+    this.visitAll(node.decorators);
+    this.visit(node.name);
+    this.visitAll(node.typeParameters);
   }
 
   visitNamespaceDeclaration(node: NamespaceDeclaration) {
@@ -505,6 +517,11 @@ export class WhackoVisitor {
   }
 
   visitIdentifier(expression: ID) {}
+
+  // visitTypeCastExpression(expression: TypeCastExpression) {
+  //   this.visit(expression.expression);
+  //   this.visit(expression.type);
+  // }
 
   replace(node: AstNode, contents: string): void {
     let replacer: AstNode;

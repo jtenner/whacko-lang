@@ -1,6 +1,7 @@
 import { assert } from "./util";
 import { AstNode } from "langium";
 import {
+  BuiltinTypeDeclaration,
   ClassDeclaration,
   DeclareDeclaration,
   DeclareFunction,
@@ -47,6 +48,16 @@ import {
   DeclareDeclarationType,
   NamespaceDeclarationType,
   DeclareFunctionType,
+  i32x4Type,
+  i8x16Type,
+  u8x16Type,
+  i16x8Type,
+  u16x8Type,
+  u32x4Type,
+  f32x4Type,
+  i64x2Type,
+  u64x2Type,
+  f64x2Type,
 } from "./types";
 import { getFileName, getModule } from "./passes/ModuleCollectionPass";
 import { LLVMValueRef } from "llvm-js";
@@ -173,6 +184,15 @@ export class ExecutionContext {
         return this.resolveClass(element, concreteTypeParameters);
       if (element.node.$type === "TypeDeclaration")
         return this.resolveTypeDeclaration(element, concreteTypeParameters);
+      if (element.node.$type === "BuiltinTypeDeclaration") {
+        const builtinType = assert(element.builtinType, "The builtin type must be defined.");
+        return builtinType({
+          ast: typeExpression,
+          ctx: this,
+          module: element.mod,
+          typeParameters: concreteTypeParameters,
+        });
+      }
     } else if (typeExpression.$type === "ID") {
       const id = typeExpression as ID;
       const name = id.name;
@@ -208,8 +228,54 @@ export class ExecutionContext {
           return new FloatType(Type.f64, null, typeExpression);
         case "void":
           return new VoidType(typeExpression);
+        case "i8x16": return new i8x16Type(typeExpression);
+        case "u8x16": return new u8x16Type(typeExpression);
+        case "i16x8": return new i16x8Type(typeExpression);
+        case "u16x8": return new u16x8Type(typeExpression);
+        case "i32x4": return new i32x4Type(typeExpression);
+        case "u32x4": return new u32x4Type(typeExpression);
+        case "f32x4": return new f32x4Type(typeExpression);
+        case "i64x2": return new i64x2Type(typeExpression);
+        case "u64x2": return new u64x2Type(typeExpression);
+        case "f64x2": return new f64x2Type(typeExpression);
+        case "string":
+          return new StringType(null, typeExpression);
+      }
+
+      if (scope.has(name)) {
+        const element = scope.get(name)!;
+        const node = element.node as BuiltinTypeDeclaration;
+        if (element.builtinType) {
+          if (element instanceof DynamicTypeScopeElement) {
+            const typeParameters = [] as ConcreteType[];
+
+            for (const typeParameter of id.typeParameters) {
+              const resolvedType = this.resolve(typeParameter, typeMap, scope);
+              if (resolvedType) {
+                typeParameters.push(resolvedType);
+              } else {
+                element.mod.error(`Type`, typeParameter, `Cannot resolve type.`);
+                return null;
+              }
+            }
+            return element.builtinType({
+              ast: typeExpression,
+              ctx: this,
+              module: element.mod,
+              typeParameters,
+            });
+          } else {
+            return element.builtinType({
+              ast: typeExpression,
+              ctx: this,
+              module: element.mod,
+              typeParameters: [],
+            });
+          }
+        }
       }
     }
+
     // something happened?
     return null;
   }
@@ -347,6 +413,12 @@ export class RuntimeValue extends ExecutionContextValue {
 export abstract class CompileTimeValue<T> extends ExecutionContextValue {
   constructor(public value: T, type: ConcreteType) {
     super(type);
+  }
+}
+
+export class CompileTimeVoid extends CompileTimeValue<number> {
+  constructor(node: AstNode) {
+    super(0, new VoidType(node));
   }
 }
 

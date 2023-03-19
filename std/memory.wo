@@ -1,0 +1,12 @@
+
+export namespace memory {
+  @name("MemCopy") export builtin copy(src: usize, dest: usize, bytes: usize): void;
+
+  export fn alloc(bytes: usize): usize {
+    return Malloc(bytes);
+  }
+  export fn free(ptr: usize): void {
+    Free(ptr);
+    return;
+  }
+}

@@ -1,16 +1,12 @@
 // declare lunatic {
 //   fn connect(ptr: i32, len: i32): i32;
 // } from "lunatic";
-// 
 
-fn someBool(): bool {
-  return true;
+class A {
+  constructor() {}
 }
 
-export fn main(): void {
-  let a = someBool() && true;
-  if (a) {
-    someBool();
-  }
+export fn _start(): void {
+  let test = new A();
   return;
 }

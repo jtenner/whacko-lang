@@ -9,6 +9,7 @@ entry Program:
     | declarations+=ClassDeclaration
     | declarations+=TypeDeclaration
     | declarations+=NamespaceDeclaration
+    | declarations+=BuiltinTypeDeclaration
 )*;
 
 NamespaceDeclaration:
@@ -19,7 +20,11 @@ NamespaceDeclaration:
     | declarations+=ClassDeclaration
     | declarations+=TypeDeclaration
     | declarations+=NamespaceDeclaration
-    | declarations+=BuiltinDeclaration)* "}";
+    | declarations+=BuiltinDeclaration
+    | declarations+=BuiltinTypeDeclaration)* "}";
+
+BuiltinTypeDeclaration:
+    Decorators (export?="export") "builtintype" Name NamedTypeParameters ";";
 
 BuiltinDeclaration:
     Decorators (export?="export")? "builtin" Name NamedTypeParameters Parameters ":" ReturnType ";";
@@ -171,26 +176,28 @@ ProductExpression:
     ExponentiationExpression ({infer BinaryExpression.lhs=current} op=("*" | "/" | "%") rhs=ExponentiationExpression)*;
 
 ExponentiationExpression: 
-    LeftUnaryExpression ({infer BinaryExpression.lhs=current} op="**" rhs=LeftUnaryExpression)*;
+    Epsilon ({infer BinaryExpression.lhs=current} op="**" rhs=Epsilon)*;
+
+Epsilon:
+    NewExpression AwaitExpression | HoldExpression | NewExpression | LeftUnaryExpression | PathExpression | PrimaryExpression;
 
 LeftUnaryExpression:
-    op=("!" | "-" | "+" | "~") expression=LeftUnaryExpression
-    | AwaitExpression;
+    op=("!" | "-" | "+" | "~") expression=LeftUnaryExpression;
 
 AwaitExpression:
-    "await" expression=LeftUnaryExpression
-    | HoldExpression;
+    "await" expression=LeftUnaryExpression;
 
 HoldExpression:
-    "hold" expression=LeftUnaryExpression
-    | NewExpression;
+    "hold" expression=LeftUnaryExpression;
 
 NewExpression:
-    "new" expression=NewExpression TypeParameters CallParameters
-    | PathExpression;
+    "new" expression=NewPath TypeParameters CallParameters;
+
+NewPath:
+    ID ({infer MemberAccessExpression.memberRoot=current} "." member=ID)*;
 
 PathExpression:
-    PrimaryExpression (
+    ID (
         {infer CallExpression.callRoot=current} TypeParameters CallParameters
         | {infer MemberAccessExpression.memberRoot=current} "." member=ID
         | {infer ArrayAccessExpression.arrayRoot=current} "[" indexExpression=Expression "]"

@@ -2,6 +2,7 @@ import { assert } from "../util";
 import { AstNode } from "langium";
 import {
   BuiltinDeclaration,
+  BuiltinTypeDeclaration,
   ClassDeclaration,
   DeclareDeclaration,
   DeclareFunction,
@@ -48,6 +49,31 @@ export class ExportsPass extends WhackoPass {
     assert(this.stack.length === 0, "Stack must be zero by this point.");
   }
 
+  override visitBuiltinTypeDeclaration(node: BuiltinTypeDeclaration): void {
+    const element = this.defineExportableType(node);
+    const name = assert(
+      consumeDecorator("name", node.decorators),
+      "Builtin type must be defined with a name."
+    );
+
+    const valid =
+      name.parameters.length === 1 && isStringLiteral(name.parameters[0]);
+    if (valid) {
+      const builtinTypeName = (name.parameters[0] as any).value as string;
+      const builtinType = assert(
+        this.program.builtinTypes.get(builtinTypeName),
+        "Builtin " + builtinTypeName + " must be defined already."
+      );
+      element.builtinType = builtinType;
+    } else {
+      this.error(
+        "Semantic",
+        node.name,
+        `Invalid decorator for builtin type, must have a single parameter string to define the name of the builtin.`
+      );
+    }
+  }
+
   override visitClassDeclaration(node: ClassDeclaration): void {
     this.defineExportableType(node);
     super.visitClassDeclaration(node);
@@ -55,35 +81,26 @@ export class ExportsPass extends WhackoPass {
 
   override visitBuiltinDeclaration(node: BuiltinDeclaration): void {
     const element = this.defineExportableType(node);
-    const name = consumeDecorator("name", node.decorators);
-    if (!name) {
+    const name = assert(
+      consumeDecorator("name", node.decorators),
+      "Builtin must be defined."
+    );
+
+    const valid =
+      name.parameters.length === 1 && isStringLiteral(name.parameters[0]);
+    if (valid) {
+      const builtinName = (name.parameters[0] as any).value as string;
+      const builtin = assert(
+        this.program.builtins.get(builtinName),
+        "Builtin " + builtinName + " must be defined already."
+      );
+      element.builtin = builtin;
+    } else {
       this.error(
         "Semantic",
         node.name,
-        `Invalid builtin, must have a name defined.`
+        `Invalid decorator for builtin, must have a single parameter string to define the name of the builtin.`
       );
-    } else {
-      const valid =
-        name.parameters.length === 1 && isStringLiteral(name.parameters[0]);
-      if (valid) {
-        const builtinName = (name.parameters[0] as any).value as string;
-        const builtin = this.program.builtins.get(builtinName);
-        if (builtin) {
-          element.builtin = builtin;
-        } else {
-          this.error(
-            "Semantic",
-            name.parameters[0],
-            `Invalid builtin name, must be already be defined in the program.`
-          );
-        }
-      } else {
-        this.error(
-          "Semantic",
-          node.name,
-          `Invalid decorator for builtin, must have a single parameter string to define the name of the builtin.`
-        );
-      }
     }
   }
 

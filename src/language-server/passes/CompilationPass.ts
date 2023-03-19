@@ -14,6 +14,7 @@ import {
   CompileTimeDeclareDeclarationReference,
   CompileTimeNamespaceDeclarationReference,
   CompileTimeDeclareFunctionReference,
+  CompileTimeVoid,
 } from "../execution-context";
 import {
   BinaryExpression,
@@ -48,6 +49,8 @@ import {
   IfElseStatement,
   TrueLiteral,
   FalseLiteral,
+  LeftUnaryExpression,
+  // TypeCastExpression,
 } from "../generated/ast";
 import { WhackoModule } from "../module";
 import {
@@ -84,7 +87,7 @@ import type {
   Module,
 } from "llvm-js";
 import { WhackoProgram } from "../program";
-import { getFileName, getModule } from "./ModuleCollectionPass";
+import { getFileName, getRelativeFileName, getModule } from "./ModuleCollectionPass";
 import { AstNode } from "langium";
 
 export function getAttributesForDeclareDeclaration(
@@ -114,8 +117,17 @@ export function getFullyQualifiedFunctionName(
   typeParameters: ConcreteType[]
 ): string | null {
   if (isFunctionDeclaration(node)) {
+
+    if (node.export && node.name.name === "main" && assert(getModule(node), "Module must be defined at this point").entry) {
+      return "__main_void";
+    }
+
+    if (node.export && node.name.name === "_start" && assert(getModule(node), "Module must be defined at this point").entry) {
+      return "_start";
+    }
+
     if (node.typeParameters.length === typeParameters.length) {
-      return `${getFileName(node)}~${node.name.name}${
+      return `${getRelativeFileName(node)}~${node.name.name}${
         typeParameters.length
           ? "<" + typeParameters.map((e) => e.getName()) + ">"
           : ""
@@ -128,7 +140,7 @@ export function getFullyQualifiedFunctionName(
       typeParameters.length === 0,
       "There should be no type parameters here."
     );
-    return `${getFileName(node)}~${node.$container.name.name}.${
+    return `${getRelativeFileName(node)}~${node.$container.name.name}.${
       node.name.name
     }`;
   } else return null;
@@ -174,7 +186,7 @@ export class CompilationPass extends WhackoPass {
   private currentBlock!: LLVMBasicBlockRef;
   builder!: LLVMBuilderRef;
   private compiledStrings = new Map<string, CompiledString>();
-  private cachedFunctions = new Map<string, ConcreteFunction>();
+  cachedFunctions = new Map<string, ConcreteFunction>();
   private tmp: bigint = 0n;
   LLVM!: Module;
 
@@ -191,7 +203,13 @@ export class CompilationPass extends WhackoPass {
           const { node, mod } = moduleExport;
           if (isFunctionDeclaration(node)) {
             if (moduleExport instanceof StaticTypeScopeElement) {
-              this.compileFunction(node, [], mod, []);
+              if (node.name.name === "__main_void") {
+                this.compileFunction(node, [], mod, []);
+              } else {
+                this.compileFunction(node, [], mod, [
+                  ["target-features", "+simd128"]
+                ]);
+              }
             } else {
               mod.warning(
                 "Type",
@@ -205,21 +223,6 @@ export class CompilationPass extends WhackoPass {
     }
 
     this.exhaustQueue();
-    const strRef = this.LLVM._LLVMPrintModuleToString(this.program.llvmModule);
-    const str = this.program.LLVMUtil.lift(strRef);
-    console.log(str);
-
-    const errorPointer = this.LLVM._malloc<LLVMStringRef[]>(4);
-    this.LLVM._LLVMVerifyModule(
-      this.program.llvmModule,
-      1 as LLVMVerifierFailureAction,
-      errorPointer
-    );
-
-    const stringPtr = this.LLVM.HEAPU32[errorPointer >>> 2] as LLVMStringRef;
-    const errorString =
-      stringPtr === 0 ? null : this.program.LLVMUtil.lift(stringPtr);
-    console.error(errorString);
   }
 
   /**
@@ -268,6 +271,7 @@ export class CompilationPass extends WhackoPass {
     const parameterTypes = node.parameters.map(
       (e) => this.ctx.resolve(e.type) ?? new InvalidType(e.type)
     );
+
     const returnType =
       this.ctx.resolve(node.returnType) ?? new InvalidType(node.returnType);
 
@@ -284,7 +288,10 @@ export class CompilationPass extends WhackoPass {
     const llvmParameterTypes = parameterTypes.map(
       (e) => e.llvmType(this.LLVM!, this.program.LLVMUtil)!
     );
-    const llvmReturnType = returnType.llvmType(this.LLVM, this.program.LLVMUtil)!;
+    const llvmReturnType = returnType.llvmType(
+      this.LLVM,
+      this.program.LLVMUtil
+    )!;
     const llvmFuncType = this.LLVM._LLVMFunctionType(
       llvmReturnType,
       // this is the problem here
@@ -396,9 +403,20 @@ export class CompilationPass extends WhackoPass {
   override visitIfElseStatement(node: IfElseStatement): void {
     // this.LLVM._LLVMBuildBr()
     this.visit(node.condition);
-    const condition = assert(this.ctx.stack.pop(), "Condition must be on the stack.");
+    const condition = assert(
+      this.ctx.stack.pop(),
+      "Condition must be on the stack."
+    );
 
-    if (condition instanceof CompileTimeBool || condition instanceof CompileTimeInteger) {
+    if (condition instanceof CompileTimeVoid) {
+      this.error(`Type`, node.condition, `Expression returns void, cannot be used as if condition.`);
+      return;
+    }
+
+    if (
+      condition instanceof CompileTimeBool ||
+      condition instanceof CompileTimeInteger
+    ) {
       // we can just visit the falsy or the truthy branches without jumps
       if (condition.value) {
         this.visit(node.truthy);
@@ -412,25 +430,42 @@ export class CompilationPass extends WhackoPass {
     const compiledCondition = this.ensureCompiled(condition);
 
     if (
-      !(compiledCondition.ty instanceof IntegerType)
-      && !(compiledCondition.ty instanceof BoolType)
+      !(compiledCondition.ty instanceof IntegerType) &&
+      !(compiledCondition.ty instanceof BoolType)
     ) {
       this.error("Type", node, `Invalid conditional expression.`);
       return;
     }
 
     const truthyLabelName = this.program.LLVMUtil.lower(this.getTempName());
-    const truthyLabel = this.LLVM._LLVMAppendBasicBlockInContext(this.program.llvmContext, this.func.funcRef, truthyLabelName);
+    const truthyLabel = this.LLVM._LLVMAppendBasicBlockInContext(
+      this.program.llvmContext,
+      this.func.funcRef,
+      truthyLabelName
+    );
 
     const falsyLabelName = this.program.LLVMUtil.lower(this.getTempName());
-    const falsyLabel = this.LLVM._LLVMAppendBasicBlockInContext(this.program.llvmContext, this.func.funcRef, falsyLabelName);
+    const falsyLabel = this.LLVM._LLVMAppendBasicBlockInContext(
+      this.program.llvmContext,
+      this.func.funcRef,
+      falsyLabelName
+    );
 
     const nextLabelName = this.program.LLVMUtil.lower(this.getTempName());
-    const nextLabel = this.LLVM._LLVMAppendBasicBlockInContext(this.program.llvmContext, this.func.funcRef, falsyLabelName);
+    const nextLabel = this.LLVM._LLVMAppendBasicBlockInContext(
+      this.program.llvmContext,
+      this.func.funcRef,
+      falsyLabelName
+    );
 
     // now we can create the jump instruction
-    this.LLVM._LLVMBuildCondBr(this.builder, compiledCondition.ref, truthyLabel, falsyLabel);
- 
+    this.LLVM._LLVMBuildCondBr(
+      this.builder,
+      compiledCondition.ref,
+      truthyLabel,
+      falsyLabel
+    );
+
     // next we position the builder and compile all the truthy statements
     this.LLVM._LLVMPositionBuilderAtEnd(this.builder, truthyLabel);
     this.visit(node.truthy);
@@ -469,6 +504,11 @@ export class CompilationPass extends WhackoPass {
       // we should always visit the expression
       this.visit(expression);
       const value = assert(this.ctx.stack.pop(), "Element must exist.");
+
+      if (value instanceof CompileTimeVoid) {
+        this.error(`Type`, value.ty.node, `Function returns void, cannot assign void to variable.`);
+        continue;
+      }
 
       if (type) {
         const variableType = this.ctx.resolve(type);
@@ -519,12 +559,12 @@ export class CompilationPass extends WhackoPass {
 
   override visitRootIdentifier(expression: RootIdentifier): void {
     const variable = this.ctx.vars.get(expression.root.name);
-
+    const scope = getScope(expression)!;
     if (variable) {
       this.ctx.stack.push(variable.value);
       return;
-    } else if (this.ctx.scope.has(expression.root.name)) {
-      const scopeItem = this.ctx.scope.get(expression.root.name);
+    } else if (scope.has(expression.root.name)) {
+      const scopeItem = scope.get(expression.root.name);
       if (scopeItem) {
         this.pushScopeItemToStack(scopeItem, expression);
       } else {
@@ -532,6 +572,8 @@ export class CompilationPass extends WhackoPass {
       }
       return;
     }
+    console.error(expression.root.name);
+    console.error(scope);
     // we didn't really find it
     this.ctx.stack.push(new CompileTimeInvalid(expression));
   }
@@ -634,7 +676,10 @@ export class CompilationPass extends WhackoPass {
         this.LLVM._LLVMBuildRet(
           this.builder,
           this.LLVM._LLVMGetPoison(
-            assert(returnType.llvmType(this.LLVM, this.program.LLVMUtil), "Must have valid LLVM type")
+            assert(
+              returnType.llvmType(this.LLVM, this.program.LLVMUtil),
+              "Must have valid LLVM type"
+            )
           )
         );
       }
@@ -687,9 +732,8 @@ export class CompilationPass extends WhackoPass {
       case "=":
         return this.compileAssignmentExpression(node);
       case "&&":
-        return this.compileLogicalAndExpression(node);
       case "||":
-        return this.compileLogicalOrExpression(node);
+        return this.compileLogicalExpression(node);
       default: {
         this.visit(node.lhs);
         this.visit(node.rhs);
@@ -711,8 +755,9 @@ export class CompilationPass extends WhackoPass {
     const callParameterValues = [] as ExecutionContextValue[];
     for (const callParameterExpression of node.parameters) {
       this.visit(callParameterExpression);
+      const paramValue = this.ctx.stack.pop();
       const callParamaterValue = assert(
-        this.ctx.stack.pop(),
+        paramValue,
         "The call parameter expression must exist."
       );
       callParameterValues.push(callParamaterValue);
@@ -734,24 +779,32 @@ export class CompilationPass extends WhackoPass {
 
     // now we need to see what's on the stack and do type inference
     if (
-      callRootValue instanceof CompileTimeFunctionReference
-      && callTypeParameters.length === 0
-      && ((callRootValue.value as ScopeTypeElement).node as FunctionDeclaration).typeParameters.length > 0
+      callRootValue instanceof CompileTimeFunctionReference &&
+      callTypeParameters.length === 0 &&
+      ((callRootValue.value as ScopeTypeElement).node as FunctionDeclaration)
+        .typeParameters.length > 0
     ) {
       const element = callRootValue.value as ScopeTypeElement;
       const functionDeclaration = element.node as FunctionDeclaration;
-      
-      outer: for (let i = 0; i < functionDeclaration.typeParameters.length; i++) {
+
+      outer: for (
+        let i = 0;
+        i < functionDeclaration.typeParameters.length;
+        i++
+      ) {
         // for each type parameter, we need to find a type provided by the signature
         const typeParameter = functionDeclaration.typeParameters[i];
 
         for (let j = 0; j < functionDeclaration.parameters.length; j++) {
           const parameter = functionDeclaration.parameters[j];
-          if (isID(parameter.type) && parameter.type.name === typeParameter.name) {
+          if (
+            isID(parameter.type) &&
+            parameter.type.name === typeParameter.name
+          ) {
             // we found it, now we need to use the j index
             callTypeParameters.push(callParameterValues[j].ty);
             continue outer;
-          } 
+          }
         }
 
         // we didn't find it
@@ -764,7 +817,8 @@ export class CompilationPass extends WhackoPass {
     // now we need to do parameter type checking, first let's obtain the element parameters
     let elementParameters: Parameter[] | null = null;
     let splicedTypeMap = new Map<string, ConcreteType>();
-    let functionToBeCompiled: FunctionDeclaration | DeclareFunction | null = null;
+    let functionToBeCompiled: FunctionDeclaration | DeclareFunction | null =
+      null;
     let attributes: [string, string][] = [];
     let builtin: BuiltinFunction | null = null;
 
@@ -772,17 +826,31 @@ export class CompilationPass extends WhackoPass {
       // type parameters are invalid for declare functions
       if (callTypeParameters.length > 0) {
         this.ctx.stack.push(new CompileTimeInvalid(node));
-        this.error("Semantic", node, "Calls to declared functions should have no type parameters.");
+        this.error(
+          "Semantic",
+          node,
+          "Calls to declared functions should have no type parameters."
+        );
         return;
       }
 
-      functionToBeCompiled = (callRootValue.value.node as DeclareFunction)
+      functionToBeCompiled = callRootValue.value.node as DeclareFunction;
       elementParameters = functionToBeCompiled.parameters;
 
-      const nameDecorator = consumeDecorator("name", functionToBeCompiled.decorators);
-      attributes.push(["wasm-import-module", functionToBeCompiled.$container.namespace.value]);
-      // @ts-ignore
-      attributes.push(["wasm-import-name", (nameDecorator?.parameters[0] as StringLiteral)?.value ?? functionToBeCompiled.name.name]);
+      const nameDecorator = consumeDecorator(
+        "name",
+        functionToBeCompiled.decorators
+      );
+      attributes.push([
+        "wasm-import-module",
+        functionToBeCompiled.$container.namespace.value,
+      ]);
+      attributes.push([
+        "wasm-import-name",
+        // @ts-ignore
+        (nameDecorator?.parameters[0] as StringLiteral)?.value ??
+          functionToBeCompiled.name.name,
+      ]);
     }
 
     if (callRootValue instanceof CompileTimeFunctionReference) {
@@ -792,46 +860,77 @@ export class CompilationPass extends WhackoPass {
         // type parameters are invalid for declare functions
         if (callTypeParameters.length !== element.typeParameters.length) {
           this.ctx.stack.push(new CompileTimeInvalid(node));
-          this.error("Semantic", node, "Type parameter count does not match signature.");
+          this.error(
+            "Semantic",
+            node,
+            "Type parameter count does not match signature."
+          );
           return;
         }
 
         // add each type here to the new type map because they need to be re-used
         for (let i = 0; i < callTypeParameters.length; i++) {
-          splicedTypeMap.set(element.typeParameters[i], callParameterValues[i].ty);
+          splicedTypeMap.set(element.typeParameters[i], callTypeParameters[i]);
         }
-
       } else {
         // static scope type elements don't have type parameters
         if (callTypeParameters.length > 0) {
           this.ctx.stack.push(new CompileTimeInvalid(node));
-          this.error("Semantic", node, "Calls to functions with no type parameters should have no type parameters.");
+          this.error(
+            "Semantic",
+            node,
+            "Calls to functions with no type parameters should have no type parameters."
+          );
           return;
         }
       }
-      
+
       functionToBeCompiled = element.node as FunctionDeclaration;
       elementParameters = functionToBeCompiled.parameters;
       builtin = element.builtin;
     }
-
+    
     if (elementParameters && functionToBeCompiled) {
       // we are good for parameter type checking
       for (let i = 0; i < elementParameters.length; i++) {
         const elementParameter = elementParameters[i];
         const scope = assert(getScope(elementParameter));
-        const ty = this.ctx.resolve(elementParameter.type, splicedTypeMap, scope);
+        const ty = this.ctx.resolve(
+          elementParameter.type,
+          splicedTypeMap,
+          scope
+        );
         if (ty) {
           if (!callParameterValues[i].ty.isAssignableTo(ty)) {
             this.ctx.stack.push(new CompileTimeInvalid(node));
-            this.error("Type", node, "Parameter is not assignable to expression type.");
+            this.error(
+              "Type",
+              node,
+              "Parameter is not assignable to expression type."
+            );
             return;
           }
         } else {
-          this.ctx.stack.push(new CompileTimeInvalid(node));
-          this.error("Type", node, "Could not resolve parameter type.");
+          this.ctx.stack.push(new CompileTimeInvalid(elementParameter));
+          this.error(
+            "Type",
+            elementParameter,
+            "Could not resolve parameter type."
+          );
           return;
         }
+      }
+      
+      const returnType = this.ctx.resolve(
+        functionToBeCompiled.returnType,
+        splicedTypeMap,
+        assert(getScope(functionToBeCompiled.returnType), "Scope must exist at this point."),
+      );
+
+      if (returnType instanceof InvalidType || returnType === null) {
+        this.error(`Type`, functionToBeCompiled.returnType, `Invalid return type.`);
+        this.ctx.stack.push(new CompileTimeInvalid(functionToBeCompiled.returnType));
+        return;
       }
 
       // if we are a builtin, we need to call the builtin and return, because there's no function compilation
@@ -845,6 +944,10 @@ export class CompilationPass extends WhackoPass {
           pass: this,
           program: this.program,
         });
+        const last = assert(this.ctx.stack.at(-1), "There must be an item on the top.");
+        if (!last.ty.isAssignableTo(returnType)) {
+          this.error("Type", node, `Builtin call did not result in the expected type.`);
+        }
         return;
       }
 
@@ -854,16 +957,14 @@ export class CompilationPass extends WhackoPass {
           functionToBeCompiled,
           callTypeParameters,
           assert(getModule(functionToBeCompiled), "Module must exist"),
-          attributes,
+          attributes
         ),
-        "The function should be compiled at this point.",
+        "The function should be compiled at this point."
       );
 
-      const loweredExpressions = this.program
-        .LLVMUtil
-        .lowerPointerArray(
-          callParameterValues.map(e => this.ensureCompiled(e).ref)
-        );
+      const loweredExpressions = this.program.LLVMUtil.lowerPointerArray(
+        callParameterValues.map((e) => this.ensureCompiled(e).ref)
+      );
       const name = this.program.LLVMUtil.lower(this.getTempName());
       // now that the function is garunteed to be compiled, we can make the llvm call
       const ref = this.LLVM._LLVMBuildCall2(
@@ -872,14 +973,24 @@ export class CompilationPass extends WhackoPass {
         func.funcRef,
         loweredExpressions,
         callParameterValues.length,
-        name,
+        func.ty.returnType instanceof VoidType ? (0 as LLVMStringRef) : name
       );
       this.LLVM._free(loweredExpressions);
       this.LLVM._free(name);
-      this.ctx.stack.push(new RuntimeValue(ref, func.ty.returnType));
+      //
+      if (func.ty.returnType instanceof VoidType) {
+        this.ctx.stack.push(new CompileTimeVoid(node));
+      } else {
+        this.ctx.stack.push(new RuntimeValue(ref, func.ty.returnType));
+      }
+
+      // this.LLVM._LLVMSetAlignment(ref, Number(func.ty.returnType.size));
       return;
     }
 
+    if (functionToBeCompiled === null) {
+      console.error(callRootValue);
+    }
 
     this.ctx.stack.push(new CompileTimeInvalid(node));
     this.error("Semantic", node, "Call expression not supported.");
@@ -1151,7 +1262,9 @@ export class CompilationPass extends WhackoPass {
             break;
           case "**":
           default:
-            ref = this.LLVM._LLVMGetPoison(lhs.ty.llvmType(this.LLVM, this.program.LLVMUtil)!);
+            ref = this.LLVM._LLVMGetPoison(
+              lhs.ty.llvmType(this.LLVM, this.program.LLVMUtil)!
+            );
         }
 
         this.ctx.stack.push(
@@ -1206,7 +1319,11 @@ export class CompilationPass extends WhackoPass {
       );
       return new RuntimeValue(inst, new StringType(value.value, value.ty.node));
     } else if (value instanceof CompileTimeBool) {
-      const ref = this.LLVM._LLVMConstInt(value.ty.llvmType(this.LLVM, this.program.LLVMUtil)!, value.value ? 1n : 0n, 0);
+      const ref = this.LLVM._LLVMConstInt(
+        value.ty.llvmType(this.LLVM, this.program.LLVMUtil)!,
+        value.value ? 1n : 0n,
+        0
+      );
       return new RuntimeValue(ref, new BoolType(null, value.ty.node));
     }
     this.error(
@@ -1215,7 +1332,9 @@ export class CompilationPass extends WhackoPass {
       `Cannot ensure expression is compiled, expression is not supported.`
     );
     return new RuntimeValue(
-      this.LLVM._LLVMGetPoison(value.ty.llvmType(this.LLVM, this.program.LLVMUtil)!),
+      this.LLVM._LLVMGetPoison(
+        value.ty.llvmType(this.LLVM, this.program.LLVMUtil)!
+      ),
       value.ty
     );
   }
@@ -1228,33 +1347,54 @@ export class CompilationPass extends WhackoPass {
     this.ctx.stack.push(new CompileTimeBool(false, expression));
   }
 
-  private compileLogicalAndExpression(node: BinaryExpression) {
+  private compileLogicalExpression(node: BinaryExpression) {
     this.visit(node.lhs);
-    const lhsValue = assert(this.ctx.stack.pop(), "LHS must exist on the stack.");
+    const lhsValue = assert(
+      this.ctx.stack.pop(),
+      "LHS must exist on the stack."
+    );
     this.visit(node.rhs);
-    const rhsValue = assert(this.ctx.stack.pop(), "RHS must exist on the stack.");
+    const rhsValue = assert(
+      this.ctx.stack.pop(),
+      "RHS must exist on the stack."
+    );
     // If any values are invalid, the top of the stack should be invalid
     if (
-      lhsValue instanceof CompileTimeInvalid
-      || rhsValue instanceof CompileTimeInvalid
+      lhsValue instanceof CompileTimeInvalid ||
+      rhsValue instanceof CompileTimeInvalid
     ) {
       this.ctx.stack.push(new CompileTimeInvalid(node));
       return;
     }
 
     if (
-      (lhsValue instanceof CompileTimeInteger || lhsValue instanceof CompileTimeBool) 
-      && (rhsValue instanceof CompileTimeInteger || rhsValue instanceof CompileTimeBool)
+      (lhsValue instanceof CompileTimeInteger ||
+        lhsValue instanceof CompileTimeBool) &&
+      (rhsValue instanceof CompileTimeInteger ||
+        rhsValue instanceof CompileTimeBool)
     ) {
-      const result = Boolean(lhsValue.value) && Boolean(rhsValue.value);
+      let result: boolean;
+      switch (node.op) {
+        case "&&":
+          result = Boolean(lhsValue.value) && Boolean(rhsValue.value);
+          break;
+        case "||":
+          result = Boolean(lhsValue.value) || Boolean(rhsValue.value);
+          break;
+        default: {
+          this.ctx.stack.push(new CompileTimeInvalid(node));
+          this.error("Semantic", node, `Operation not supported.`);
+          return;
+        }
+      }
       this.ctx.stack.push(new CompileTimeBool(result, node));
       return;
     }
     // we need to check the types if either of them are runtime
     if (
-      (lhsValue instanceof RuntimeValue || rhsValue instanceof RuntimeValue)
-      && (lhsValue.ty instanceof IntegerType || lhsValue.ty instanceof BoolType)
-      && (rhsValue.ty instanceof IntegerType || rhsValue.ty instanceof BoolType)
+      (lhsValue instanceof RuntimeValue || rhsValue instanceof RuntimeValue) &&
+      (lhsValue.ty instanceof IntegerType || lhsValue.ty instanceof BoolType) &&
+      (rhsValue.ty instanceof IntegerType || rhsValue.ty instanceof BoolType)
     ) {
       const compiledLHS = this.ensureCompiled(lhsValue);
       const compiledRHS = this.ensureCompiled(rhsValue);
@@ -1267,14 +1407,22 @@ export class CompilationPass extends WhackoPass {
         this.builder,
         this.program.LLVMUtil.LLVMIntPredicate.Ne,
         compiledLHS.ref,
-        this.LLVM._LLVMConstInt(lhsValue.ty.llvmType(this.LLVM, this.program.LLVMUtil)!, 0n, 0),
+        this.LLVM._LLVMConstInt(
+          lhsValue.ty.llvmType(this.LLVM, this.program.LLVMUtil)!,
+          0n,
+          0
+        ),
         lhsNE0Name
       );
       const rhsNE0 = this.LLVM._LLVMBuildICmp(
         this.builder,
         this.program.LLVMUtil.LLVMIntPredicate.Ne,
         compiledRHS.ref,
-        this.LLVM._LLVMConstInt(rhsValue.ty.llvmType(this.LLVM, this.program.LLVMUtil)!, 0n, 0),
+        this.LLVM._LLVMConstInt(
+          rhsValue.ty.llvmType(this.LLVM, this.program.LLVMUtil)!,
+          0n,
+          0
+        ),
         rhsNE0Name
       );
 
@@ -1287,24 +1435,44 @@ export class CompilationPass extends WhackoPass {
         lhsNE0,
         boolType.llvmType(this.LLVM, this.program.LLVMUtil)!,
         0,
-        lhsCastName,
+        lhsCastName
       );
       const rhsCast = this.LLVM._LLVMBuildIntCast2(
         this.builder,
         rhsNE0,
         boolType.llvmType(this.LLVM, this.program.LLVMUtil)!,
         0,
-        rhsCastName,
+        rhsCastName
       );
 
       // finally perform and
       const resultName = this.program.LLVMUtil.lower(this.getTempName());
-      const result = this.LLVM._LLVMBuildAnd(
-        this.builder,
-        lhsCast,
-        rhsCast,
-        resultName
-      );
+      let result: LLVMValueRef;
+      switch (node.op) {
+        case "&&": {
+          result = this.LLVM._LLVMBuildAnd(
+            this.builder,
+            lhsCast,
+            rhsCast,
+            resultName
+          );
+          break;
+        }
+        case "||": {
+          result = this.LLVM._LLVMBuildOr(
+            this.builder,
+            lhsCast,
+            rhsCast,
+            resultName
+          );
+          break;
+        }
+        default:
+          this.ctx.stack.push(new CompileTimeInvalid(node));
+          this.error("Semantic", node, `Operation not supported.`);
+          return;
+        // not supported!
+      }
 
       this.ctx.stack.push(new RuntimeValue(result, new BoolType(null, node)));
       this.LLVM._free(lhsNE0Name);
@@ -1314,28 +1482,50 @@ export class CompilationPass extends WhackoPass {
       this.LLVM._free(resultName);
       return;
     }
-    
 
     this.ctx.stack.push(new CompileTimeInvalid(node));
     this.error("Semantic", node, `Operation not supported.`);
   }
 
-  private compileLogicalOrExpression(node: BinaryExpression) {
-    this.visit(node.lhs);
-    const lhsValue = assert(this.ctx.stack.pop(), "LHS must exist on the stack.");
-    this.visit(node.rhs);
-    const rhsValue = assert(this.ctx.stack.pop(), "RHS must exist on the stack.");
+  override visitStringLiteral(expression: StringLiteral): void {
+    this.ctx.stack.push(new CompileTimeString(expression.value, expression));
+  }
 
-    // If any values are invalid, the top of the stack should be invalid
-    if (lhsValue instanceof CompileTimeInvalid || rhsValue instanceof CompileTimeInvalid) {
-      this.ctx.stack.push(new CompileTimeInvalid(node));
-      return;
+  override visitLeftUnaryExpression(node: LeftUnaryExpression): void {
+    this.visit(node.expression);
+    const expr = assert(this.ctx.stack.pop(), "Expression must exist at this point.");
+    switch (node.op) {
+      case "!": return this.compileLogicalNotExpression(node, expr);
     }
 
-    // TODO: Body of logical or
-
-
+    this.error(`Type`, node, "Operation not supported.");
     this.ctx.stack.push(new CompileTimeInvalid(node));
-    this.error("Semantic", node, `Operation not supported.`);
   }
+
+  compileLogicalNotExpression(node: LeftUnaryExpression, expr: ExecutionContextValue) {
+    if (expr instanceof CompileTimeBool) {
+      this.ctx.stack.push(new CompileTimeBool(!expr.value, node));
+    } else if (expr instanceof RuntimeValue && expr.ty instanceof BoolType) {
+      const notName = this.program.LLVMUtil.lower(this.getTempName());
+      const notRef = this.LLVM._LLVMBuildNot(this.builder, expr.ref, notName);
+      this.LLVM._free(notName);
+      this.ctx.stack.push(new RuntimeValue(notRef, new BoolType(null, node)));
+    } else {
+      this.error(`Type`, node, "Operation not supported.");
+      this.ctx.stack.push(new CompileTimeInvalid(node));
+    }
+  }
+
+  // override visitTypeCastExpression(node: TypeCastExpression): void {
+  //   this.visit(node.expression);
+  //   const value = assert(this.ctx.stack.pop(), "Value must be on the stack.");
+  //   const type = this.ctx.resolve(node.type);
+  //   if (type && value.ty.isAssignableTo(type)) {
+  //     // TODO: compile time casting, simd casting
+  //     
+  //   }
+  //   this.ctx.stack.push(new CompileTimeInvalid(node));
+  //   this.error("Type", node, "Invalid cast.");
+  //   
+  // }
 }

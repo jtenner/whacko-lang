@@ -1,4 +1,5 @@
 import { AstNode } from "langium";
+import path from "node:path";
 import { ImportDeclaration, Program } from "../generated/ast";
 import { WhackoModule } from "../module";
 import { WhackoProgram } from "../program";
@@ -6,6 +7,10 @@ import { WhackoPass } from "./WhackoPass";
 
 const fileNames = new WeakMap<AstNode, string>();
 const modules = new WeakMap<AstNode, WhackoModule>();
+
+export function getRelativeFileName(node: AstNode) {
+  return path.relative(process.cwd(), getFileName(node)!);
+}
 
 export function getFileName(node: AstNode) {
   while (node.$container) node = node.$container;

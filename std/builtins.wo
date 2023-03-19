@@ -1,3 +1,4 @@
+@name("Log") export builtin Log(val: string): void;
 
 @name("i8") export builtin i8<T>(val: T): i8;
 @name("i8") export builtin u8<T>(val: T): u8;
@@ -9,18 +10,18 @@
 @name("u64") export builtin u64<T>(val: T): u64;
 @name("isize") export builtin isize<T>(val: T): isize;
 @name("usize") export builtin usize<T>(val: T): usize;
+
+// compiler intrinsics
 @name("AShr") export builtin AShr<T>(value: T, bits: T): T; // AShr(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
-// @name("Add") export builtin Add(): void; // Add(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
+@name("Add") export builtin Add<T>(lhs: T, rhs: T): T; // Add(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("AddrSpaceCast") export builtin AddrSpaceCast(): void; // AddrSpaceCast(Builder: LLVMBuilderRef, Val: LLVMValueRef, DestTy: LLVMTypeRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("AggregateRet") export builtin AggregateRet(): void; // AggregateRet(Builder: LLVMBuilderRef, RetVals: Pointer<LLVMValueRef[]>, N: number): LLVMValueRef;
-// @name("Alloca") export builtin Alloca(): void; // Alloca(Builder: LLVMBuilderRef, Ty: LLVMTypeRef, Name: LLVMStringRef): LLVMValueRef;
-// @name("And") export builtin And(): void; // And(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
+@name("Alloca") export builtin Alloca<T>(): usize; // Alloca(Builder: LLVMBuilderRef, Ty: LLVMTypeRef, Name: LLVMStringRef): LLVMValueRef;
+@name("And") export builtin And<T>(lhs: T, rhs: T): T; // And(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("AtomicCmpXchg") export builtin AtomicCmpXchg(): void; // AtomicCmpXchg(Builder: LLVMBuilderRef, Ptr: LLVMValueRef, Cmp: LLVMValueRef, New: LLVMValueRef, SuccessOrdering: LLVMAtomicOrdering, FailureOrdering: LLVMAtomicOrdering, SingleThread: LLVMBool): LLVMValueRef;
 // @name("AtomicRMW") export builtin AtomicRMW(): void; // AtomicRMW(Builder: LLVMBuilderRef, op: LLVMAtomicRMWBinOp, PTR: LLVMValueRef, Val: LLVMValueRef, ordering: LLVMAtomicOrdering, singleThread: LLVMBool): LLVMValueRef;
 // @name("BinOp") export builtin BinOp(): void; // BinOp(Builder: LLVMBuilderRef, Op: LLVMOpcode, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("BitCast") export builtin BitCast(): void; // BitCast(Builder: LLVMBuilderRef, Val: LLVMValueRef, DestTy: LLVMTypeRef, Name: LLVMStringRef): LLVMValueRef;
-// @name("Br") export builtin Br(): void; // Br(Builder: LLVMBuilderRef, Dest: LLVMBasicBlockRef): LLVMValueRef;
-// @name("Call2") export builtin Call2(): void; // Call2(Builder: LLVMBuilderRef, Type: LLVMTypeRef, Fn: LLVMValueRef, Args: Pointer<LLVMValueRef[]>, NumArgs: number, Name: LLVMStringRef): LLVMValueRef;
 // @name("Cast") export builtin Cast(): void; // Cast(Builder: LLVMBuilderRef, Op: LLVMOpcode, Val: LLVMValueRef, DestTy: LLVMTypeRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("CatchPad") export builtin CatchPad(): void; // CatchPad(Builder: LLVMBuilderRef, ParentPad: LLVMValueRef, Args: Pointer<LLVMValueRef[]>, NumArgs: number, Name: LLVMStringRef): LLVMValueRef;
 // @name("CatchRet") export builtin CatchRet(): void; // CatchRet(Builder: LLVMBuilderRef, CatchPad: LLVMValueRef, BB: LLVMBasicBlockRef): LLVMValueRef;
@@ -32,7 +33,7 @@
 // @name("ExactUDiv") export builtin ExactUDiv(): void; // ExactUDiv(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("ExtractElement") export builtin ExtractElement(): void; // ExtractElement(Builder: LLVMBuilderRef, VecVal: LLVMValueRef, Index: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("ExtractValue") export builtin ExtractValue(): void; // ExtractValue(Builder: LLVMBuilderRef, AggVal: LLVMValueRef, Index: number, Name: LLVMStringRef): LLVMValueRef;
-// @name("FAdd") export builtin FAdd(): void; // FAdd(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
+@name("FAdd") export builtin FAdd<T>(lhs: T, rhs: T): T; // FAdd(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("FCmp") export builtin FCmp(): void; // FCmp(Builder: LLVMBuilderRef, Op: LLVMRealPredicate, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("FDiv") export builtin FDiv(): void; // FDiv(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("FMul") export builtin FMul(): void; // FMul(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
@@ -45,7 +46,8 @@
 // @name("FRem") export builtin FRem(): void; // FRem(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("FSub") export builtin FSub(): void; // FSub(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("Fence") export builtin Fence(): void; // Fence(Builder: LLVMBuilderRef, ordering: LLVMAtomicOrdering, singleThread: LLVMBool, Name: LLVMStringRef): LLVMValueRef;
-// @name("Free") export builtin Free(): void; // Free(Builder: LLVMBuilderRef, PointerVal: LLVMValueRef): LLVMValueRef;
+@name("Malloc") export builtin Malloc<T>(): usize;
+@name("Free") export builtin Free<T>(ptr: T): void; 
 // @name("Freeze") export builtin Freeze(): void; // Freeze(Builder: LLVMBuilderRef, Val: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("GEP2") export builtin GEP2(): void; // GEP2(Builder: LLVMBuilderRef, Ty: LLVMTypeRef, Pointer: LLVMValueRef, Indices: Pointer<LLVMValueRef[]>, NumIndices: number, Name: LLVMStringRef): LLVMValueRef;
 // @name("ICmp") export builtin ICmp(): void; // ICmp(Builder: LLVMBuilderRef, Op: LLVMIntPredicate, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
@@ -62,11 +64,9 @@
 // @name("LShr") export builtin LShr(): void; // LShr(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("LandingPad") export builtin LandingPad(): void; // LandingPad(Builder: LLVMBuilderRef, Ty: LLVMTypeRef, PersFn: LLVMValueRef, NumClauses: number, Name: LLVMStringRef): LLVMValueRef;
 // @name("Load2") export builtin Load2(): void; // Load2(Builder: LLVMBuilderRef, Ty: LLVMTypeRef, PointerVal: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
-// @name("Malloc") export builtin Malloc(): void; // Malloc(Builder: LLVMBuilderRef, Ty: LLVMTypeRef, Name: LLVMStringRef): LLVMValueRef;
-// @name("MemCpy") export builtin MemCpy(): void; // MemCpy(Builder: LLVMBuilderRef, Dst: LLVMValueRef, DstAlign: number, Src: LLVMValueRef, SrcAlign: number, Size: LLVMValueRef): LLVMValueRef;
 // @name("MemMove") export builtin MemMove(): void; // MemMove(Builder: LLVMBuilderRef, Dst: LLVMValueRef, DstAlign: number, Src: LLVMValueRef, SrcAlign: number, Size: LLVMValueRef): LLVMValueRef;
 // @name("MemSet") export builtin MemSet(): void; // MemSet(Builder: LLVMBuilderRef, Ptr: LLVMValueRef, Val: LLVMValueRef, Len: LLVMValueRef, Align: number): LLVMValueRef;
-// @name("Mul") export builtin Mul(): void; // Mul(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
+@name("Mul") export builtin Mul<T>(lhs: T, rhs: T): T; // Mul(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("NSWAdd") export builtin NSWAdd(): void; // NSWAdd(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("NSWMul") export builtin NSWMul(): void; // NSWMul(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("NSWNeg") export builtin NSWNeg(): void; // NSWNeg(Builder: LLVMBuilderRef, V: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
@@ -93,9 +93,9 @@
 @name("Select") export builtin Select<T>(cond: bool, then: T, otherwise: T): T; // Select(Builder: LLVMBuilderRef, If: LLVMValueRef, Then: LLVMValueRef, Else: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("Shl") export builtin Shl(): void; // Shl(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("ShuffleVector") export builtin ShuffleVector(): void; // ShuffleVector(Builder: LLVMBuilderRef, V1: LLVMValueRef, V2: LLVMValueRef, Mask: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
-// @name("Store") export builtin Store(): void; // Store(Builder: LLVMBuilderRef, Val: LLVMValueRef, Ptr: LLVMValueRef): LLVMValueRef;
+@name("Store") export builtin Store<T>(ptr: usize, value: T): void; // Store(Builder: LLVMBuilderRef, Val: LLVMValueRef, Ptr: LLVMValueRef): LLVMValueRef;
 // @name("StructGEP2") export builtin StructGEP2(): void; // StructGEP2(Builder: LLVMBuilderRef, Ty: LLVMTypeRef, Pointer: LLVMValueRef, Idx: number, Name: LLVMStringRef): LLVMValueRef;
-// @name("Sub") export builtin Sub(): void; // Sub(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
+@name("Sub") export builtin Sub<T>(lhs: T, rhs: T): T; // Sub(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("Switch") export builtin Switch(): void; // Switch(Builder: LLVMBuilderRef, V: LLVMValueRef, Else: LLVMBasicBlockRef, NumCases: number): LLVMValueRef;
 // @name("Trunc") export builtin Trunc(): void; // Trunc(Builder: LLVMBuilderRef, Val: LLVMValueRef, DestTy: LLVMTypeRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("TruncOrBitCast") export builtin TruncOrBitCast(): void; // TruncOrBitCast(Builder: LLVMBuilderRef, Val: LLVMValueRef, DestTy: LLVMTypeRef, Name: LLVMStringRef): LLVMValueRef;
@@ -108,3 +108,4 @@
 // @name("ZExt") export builtin ZExt(): void; // ZExt(Builder: LLVMBuilderRef, Val: LLVMValueRef, DestTy: LLVMTypeRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("ZExtOrBitCast") export builtin ZExtOrBitCast(): void; // ZExtOrBitCast(Builder: LLVMBuilderRef, Val: LLVMValueRef, DestTy: LLVMTypeRef, Name: LLVMStringRef): LLVMValueRef;
 
+@name("isString") export builtin isString<T>(val: T): bool;
