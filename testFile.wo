@@ -2,11 +2,15 @@
 //   fn connect(ptr: i32, len: i32): i32;
 // } from "lunatic";
 
-class A {
-  constructor() {}
+class A<T> {
+  a: i32 = i32(42);
+  b: T;
+  constructor(b: T) {
+    this.b = b;
+  }
 }
 
 export fn _start(): void {
-  let test = new A();
+  let test = new A(i32(1));
   return;
 }

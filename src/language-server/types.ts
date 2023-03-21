@@ -1,23 +1,46 @@
-import assert from "assert";
 import { AstNode } from "langium";
 import {} from "./types";
-import { ExecutionContext, ExecutionContextValue } from "./execution-context";
+import { CompileTimeValue, ExecutionContext, ExecutionContextValue, ExecutionVariable, RuntimeValue } from "./execution-context";
 import {
+  ClassDeclaration,
+  ConstructorClassMember,
   DeclareDeclaration,
   DeclareFunction,
   Decorator,
+  Expression,
   FunctionDeclaration,
+  isConstructorClassMember,
   NamespaceDeclaration,
   VariableDeclarator,
 } from "./generated/ast";
-import { CompilationPass } from "./passes/CompilationPass";
+import { CompilationPass, getFullyQualifiedName } from "./passes/CompilationPass";
 import { WhackoProgram } from "./program";
 import { WhackoModule } from "./module";
 import type { Module, LLVMValueRef, LLVMTypeRef } from "llvm-js";
-import { getFileName } from "./passes/ModuleCollectionPass";
-function getPath(node: AstNode): string {
-  // @ts-ignore the `parse` function sets this symbol for later use
-  return node.$document!.parseResult.value[Symbol.for("fullPath")] as string;
+import { getFileName, getModule } from "./passes/ModuleCollectionPass";
+import { assert } from "./util";
+
+export const CLASS_HEADER_OFFSET = 8n; // [size, type?]
+
+export function getPtrWithOffset(ptr: LLVMValueRef, offset: bigint, pass: CompilationPass): LLVMValueRef {
+  const { LLVM, program: { LLVMUtil }, builder } = pass;
+  const llvmIntType = LLVM._LLVMIntType(32);
+  const voidPtrType = LLVM._LLVMPointerType(LLVM._LLVMVoidType(), 0);
+  const gepIndicies = LLVMUtil.lowerPointerArray([
+    LLVM._LLVMConstInt(llvmIntType, offset, 0),
+  ]);
+  const gepName = pass.getTempNameRef();
+  const ptrPlusOffset = LLVM._LLVMBuildGEP2(
+    builder,
+    voidPtrType,
+    ptr,
+    gepIndicies,
+    1,
+    gepName
+  );
+  LLVM._free(gepIndicies);
+  LLVM._free(gepName);
+  return ptrPlusOffset;
 }
 
 export abstract class ScopeElement {
@@ -283,6 +306,146 @@ export class ConcreteFunction {
   constructor(public funcRef: LLVMValueRef, public ty: FunctionType) {}
 }
 
+export interface ConcreteClassCompileParameters {
+  parameters: ExecutionContextValue[];
+  pass: CompilationPass;
+
+}
+
+export class ConcreteClass extends ConcreteType {
+  static id = 0n;
+
+  id = ++ConcreteClass.id;
+
+  constructor(
+    public typeParameters: Map<string, ConcreteType>,
+    public fields: Field[],
+    public element: ClassDeclaration,
+    public offset: bigint,
+  ) {
+    super(Type.usize, element, element.name.name);
+  }
+
+  getName(): string {
+    return getFullyQualifiedName(
+      this.element,
+      assert(this.getClassTypeParameters(), "Type parameters must exist at this point"),
+    )!;
+  }
+
+  get isNumeric(): boolean {
+    return false;
+  }
+
+  getClassTypeParameters(): ConcreteType[] | null {
+    const ctx = new ExecutionContext(
+      assert(getScope(this.element), "The scope must exist at this point."),
+      this.typeParameters,
+    );
+    const constructorParameterTypes = [] as ConcreteType[];
+
+    for (let i = 0; i < this.element.typeParameters.length; i++) {
+      const constructorParameter = this.element.typeParameters[i];
+      const resolved = ctx.resolve(constructorParameter);
+      if (resolved) {
+        constructorParameterTypes.push(resolved);
+      } else {
+        return null;
+      }
+    }
+    return constructorParameterTypes;
+  }
+
+  override llvmType(LLVM: Module, LLVMUtil: typeof import("llvm-js")): LLVMTypeRef | null {
+    return LLVM._LLVMPointerType(LLVM._LLVMVoidType(), 0);
+  }
+
+  constructorFunc: ConcreteFunction | null = null;
+
+  compileConstructor(pass: CompilationPass): ConcreteFunction | null {
+    if (this.constructorFunc) return this.constructorFunc;
+
+    const constructorElement = 
+      assert(
+        this.element.members.find(e => isConstructorClassMember(e)) as ConstructorClassMember,
+        "Constructor element must exist"
+      );
+
+    const constructorParameterTypes = assert(this.getClassTypeParameters(), "We must be able to resolve the parameters.");
+
+    const func = assert(
+      pass.compileFunction(
+        this.element,
+        constructorParameterTypes,
+        getModule(this.element)!,
+        [],
+        this,
+        // previsit
+        ({ pass }) => {
+          const { LLVM, program: { LLVMUtil }, builder } = pass;
+          const offset = this.offset + CLASS_HEADER_OFFSET;
+          const intType = new IntegerType(Type.i32, null, this.node);
+          const llvmIntType = intType.llvmType(LLVM, LLVMUtil)!;
+          const voidPtr = this.llvmType(LLVM, LLVMUtil)!;
+          const offsetRefInt = LLVM._LLVMConstInt(
+            llvmIntType,
+            offset,
+            0
+          );
+
+          const selfRefName = pass.getTempNameRef(); 
+          const ref = LLVM._LLVMBuildArrayMalloc(
+            builder,
+            voidPtr,
+            offsetRefInt,
+            selfRefName,
+          );
+          LLVM._free(selfRefName);
+
+          pass.ctx.vars.set("&self", new ExecutionVariable(true, "&self", new RuntimeValue(ref, this), this));
+          // initialize all the fields including refType and size
+
+          // Store offset at beginning of reference
+          LLVM._LLVMBuildStore(builder, offsetRefInt, ref);
+
+          // Store int type on ref at offset 4
+          const idRef = LLVM._LLVMConstInt(llvmIntType, this.id, 0);
+          const ptrPlusOffset = getPtrWithOffset(ref, 4n, pass);
+          LLVM._LLVMBuildStore(builder, idRef, ptrPlusOffset);
+          
+
+          for (const field of this.fields) {
+            const ptr = getPtrWithOffset(ref, CLASS_HEADER_OFFSET + field.offset, pass);
+            let value: LLVMValueRef;
+
+            if (field.initializer) {
+              pass.visit(field.initializer);
+              const stackValue = assert(pass.ctx.stack.pop(), "Value must exist on the stack at this point.");
+              const compiledValue = pass.ensureCompiled(stackValue);
+              value = compiledValue.ref;
+            } else {
+              // there's no initializer so we need to 0 out the reference
+              const intType = LLVM._LLVMIntType(Number(field.ty.size * 8n));
+              value = LLVM._LLVMConstInt(intType, 0n, 0);
+            }
+            LLVM._LLVMBuildStore(builder, value, ptr);
+          }
+        },
+        // post visit
+        ({ pass }) => {
+          const { LLVM, program: { LLVMUtil }, builder } = pass;
+          const self = assert(pass.ctx.vars.get("&self"), "Self must be defined.");
+          LLVM._LLVMBuildRet(builder, (self.value as RuntimeValue).ref);
+        }
+      ),
+      "This function must be compilable"
+    );
+
+    this.constructorFunc = func;
+    return func;
+  }
+}
+
 export class ArrayType extends ConcreteType {
   constructor(
     public childType: ConcreteType,
@@ -361,48 +524,12 @@ export class FunctionType extends ConcreteType {
   }
 }
 
-export class MethodType extends ConcreteType {
-  constructor(
-    public thisType: ClassType,
-    public parameterTypes: ConcreteType[],
-    public returnType: ConcreteType,
-    node: AstNode,
-    name: string
-  ) {
-    super(Type.method, node, name);
-  }
 
-  override get isNumeric() {
-    return false;
-  }
-
-  override isEqual(other: ConcreteType) {
-    return (
-      other instanceof MethodType &&
-      other.thisType.isEqual(this.thisType) &&
-      other.parameterTypes.length === this.parameterTypes.length &&
-      this.parameterTypes.reduce(
-        (acc, param, i) => param.isEqual(other.parameterTypes[i]),
-        true
-      ) &&
-      this.returnType.isEqual(this.returnType)
-    );
-  }
-
-  override getName(): string {
-    return this.parameterTypes.length
-      ? `Method(this ${this.thisType.getName()}, ${this.parameterTypes.map(
-          (e) => e.getName()
-        )}): ${this.returnType.getName()}`
-      : `Method(this ${this.thisType.getName()}, ${this.parameterTypes.map(
-          (e) => e.getName()
-        )}): ${this.returnType.getName()}`;
-  }
-}
 
 export class Field {
   constructor(
     public name: string,
+    public initializer: Expression | null,
     public ty: ConcreteType,
     public offset: bigint
   ) {}
@@ -471,67 +598,6 @@ export class DeclareDeclarationType extends ConcreteType {
   }
 }
 
-export class ClassType extends ConcreteType {
-  public methods = new Map<string, MethodType>();
-  public fields = new Map<string, Field>();
-  public prototypes = new Map<string, PrototypeMethod>();
-  constructor(
-    public extendsClass: ClassType | null = null,
-    public typeParameters: ConcreteType[],
-    node: AstNode,
-    name: string
-  ) {
-    super(Type.usize, node, name);
-  }
-
-  override get isNumeric() {
-    return false;
-  }
-
-  addPrototypeMethod(name: string, method: PrototypeMethod) {
-    assert(!this.prototypes.has(name));
-    this.prototypes.set(name, method);
-  }
-
-  addMethod(name: string, method: MethodType) {
-    assert(!this.methods.has(name));
-    this.methods.set(name, method);
-  }
-
-  addField(field: Field) {
-    assert(!this.fields.has(field.name));
-    this.fields.set(field.name, field);
-  }
-
-  get offset() {
-    return Array.from(this.fields.values()).reduce(
-      (left, right) => left + right.ty.size!,
-      0n
-    );
-  }
-
-  override isEqual(other: ConcreteType): boolean {
-    return other === this;
-  }
-
-  override isAssignableTo(other: ClassType): boolean {
-    let self = this;
-    while (true) {
-      if (other === self) return true;
-      if (self.extendsClass) {
-        other = self.extendsClass;
-        continue;
-      }
-      return false;
-    }
-  }
-
-  override getName(): string {
-    return this.typeParameters.length
-      ? `${this.name}<${this.typeParameters.map((e) => e.getName()).join(",")}>`
-      : this.name;
-  }
-}
 
 export class StringType extends ConcreteType {
   constructor(public value: string | null = null, node: AstNode) {
@@ -544,6 +610,10 @@ export class StringType extends ConcreteType {
 
   override getName(): string {
     return "string";
+  }
+
+  override llvmType(LLVM: Module, LLVMUtil: typeof import("llvm-js")): LLVMTypeRef | null {
+    return LLVM._LLVMPointerType(LLVM._LLVMIntType(8), 0);
   }
 }
 
@@ -944,5 +1014,17 @@ export class PointerType extends ConcreteType {
 
   override llvmType(LLVM: Module, LLVMUtil: typeof import("llvm-js")): LLVMTypeRef | null {
     return LLVM._LLVMPointerType(this.pointingToType.llvmType(LLVM, LLVMUtil)!, 32);
+  }
+}
+
+export class CompileTimeFieldReference extends CompileTimeValue<Field> {
+  constructor(field: Field, public ref: LLVMValueRef) {
+    super(field, field.ty);
+  }
+}
+
+export class CompileTimeVariableReference extends CompileTimeValue<ExecutionVariable> {
+  constructor(variable: ExecutionVariable) {
+    super(variable, variable.type);
   }
 }

@@ -1,0 +1,32 @@
+{
+  '$type': 'Program',
+  declarations: [
+    {
+      '$type': 'FunctionDeclaration',
+      returnType: { '$type': 'ID', name: 'void', typeParameters: [ [length]: 0 ] },
+      name: {
+        '$type': 'ID',
+        name: '_start',
+        typeParameters: [ [length]: 0 ]
+      },
+      export: true,
+      block: {
+        '$type': 'BlockStatement',
+        statements: [
+          {
+            '$type': 'ExpressionStatement',
+            expression: { '$type': 'IntegerLiteral', value: '1' }
+          },
+          [length]: 1
+        ]
+      },
+      decorators: [ [length]: 0 ],
+      parameters: [ [length]: 0 ],
+      typeParameters: [ [length]: 0 ]
+    },
+    [length]: 1
+  ],
+  exports: [ [length]: 0 ],
+  imports: [ [length]: 0 ],
+  [Symbol(fullPath)]: 'test/ast/IntegerLiteral.wo'
+}

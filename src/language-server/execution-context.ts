@@ -37,7 +37,6 @@ import {
   StaticTypeScopeElement,
   DynamicTypeScopeElement,
   ScopeTypeElement,
-  ClassType,
   getScope,
   Type,
   Field,
@@ -58,6 +57,7 @@ import {
   i64x2Type,
   u64x2Type,
   f64x2Type,
+  ConcreteClass,
 } from "./types";
 import { getFileName, getModule } from "./passes/ModuleCollectionPass";
 import { LLVMValueRef } from "llvm-js";
@@ -283,91 +283,9 @@ export class ExecutionContext {
   private resolveClass(
     element: ScopeTypeElement,
     typeParameters: ConcreteType[]
-  ): ClassType | null {
-    assert(
-      element.node.$type === "ClassDeclaration",
-      "Element must a class declaration."
-    );
-    const node = element.node as ClassDeclaration;
-    const concreteTypeMap = new Map<string, ConcreteType>();
-
-    // assign all the types into a map
-    for (let i = 0; i < typeParameters.length; i++) {
-      concreteTypeMap.set(node.typeParameters[i].name, typeParameters[i]);
-    }
-
-    // resolve the class extends
-    let nodeExtends: ClassType | null = null;
-    const scope = getScope(node)!;
-    if (node.extends) {
-      assert(scope);
-      // we must resolve the extends class
-      const nodeExtendsType = this.resolve(
-        node.extends,
-        concreteTypeMap,
-        scope
-      );
-      if (nodeExtendsType instanceof ClassType) {
-        nodeExtends = nodeExtendsType;
-      } else {
-        // we can't extend non-classes
-        return null;
-      }
-    }
-
-    const fileName = getFileName(node) as string;
-    const classType = new ClassType(
-      nodeExtends,
-      typeParameters,
-      node,
-      `${fileName}~${node.name.name}`
-    );
-
-    // we now need to check the ScopeElement for cached classes that match this type
-    if (element instanceof DynamicTypeScopeElement) {
-      const name = classType.getName();
-      if (element.cachedConcreteTypes.has(name))
-        return element.cachedConcreteTypes.get(name)! as ClassType;
-      // we aren't cached, because both static and dynamic checks failed
-      element.cachedConcreteTypes.set(name, classType);
-    }
-
-    // now we actually need to resolve and calculate each member now
-    let offset = 0n;
-
-    for (const member of node.members) {
-      if (isFieldClassMember(member)) {
-        const type = this.resolve(member.type, concreteTypeMap, scope);
-        if (type) {
-          const field = new Field(member.name.name, type, offset);
-          offset += type.size;
-          classType.addField(field);
-        } else {
-          element.mod.error(
-            "Type",
-            member.type,
-            `Cannot resolve type for field ${member.name.name}.`
-          );
-        }
-      } else if (isGetterClassMember(member)) {
-        // TODO: check for setters of the same name, compare types if they exist
-        element.mod.error("Type", member, "Getters not supported.");
-      } else if (isSetterClassMember(member)) {
-        // TODO: check for getters of the same name, compare types if they exist
-        element.mod.error("Type", member, "Setters not supported.");
-      } else if (isMethodClassMember(member)) {
-        classType.addPrototypeMethod(
-          member.name.name,
-          new PrototypeMethod(member, concreteTypeMap)
-        );
-      } else if (isConstructorClassMember(member)) {
-        element.mod.error("Type", member, "Constructors are not supported.");
-        // classType.addMethod("constructor", this.resolveConstructor(member, concreteTypeMap, scope));
-      }
-    }
-
-    return classType;
-    // TODO: resolve classes
+  ): ConcreteClass | null {
+    assert(false, "Cannot resolve classes yet");
+    return null;
   }
 
   private resolveTypeDeclaration(
@@ -446,6 +364,13 @@ export class CompileTimeNamespaceDeclarationReference extends CompileTimeValue<S
 export class CompileTimeDeclareFunctionReference extends CompileTimeValue<ScopeElement> {
   constructor(value: ScopeElement) {
     super(value, new DeclareFunctionType(value.node as DeclareFunction));
+  }
+}
+
+/** The type of this CompileTimeClassReference cannot have a valid type until the class type is resolved in the NewExpression. */
+export class CompileTimeClassReference extends CompileTimeValue<ScopeElement> {
+  constructor(value: ScopeElement) {
+    super(value, new InvalidType(value.node));
   }
 }
 

@@ -43,7 +43,6 @@ import {
   AwaitExpression,
   HoldExpression,
   NewExpression,
-  GroupLiteral,
   FloatLiteral,
   BinaryLiteral,
   HexLiteral,
@@ -184,8 +183,6 @@ export class WhackoVisitor {
         return this.visitMemberAccessExpression(node);
       case "ArrayAccessExpression":
         return this.visitArrayAccessExpression(node);
-      case "GroupLiteral":
-        return this.visitGroupLiteral(node);
       case "FloatLiteral":
         return this.visitFloatLiteral(node);
       case "IntegerLiteral":
@@ -337,7 +334,7 @@ export class WhackoVisitor {
   }
 
   visitFieldClassMember(node: FieldClassMember) {
-    this.visit(node.decorators);
+    this.visitAll(node.decorators);
     this.visit(node.name);
     this.visit(node.type);
     if (node.initializer) this.visit(node.initializer);
@@ -479,10 +476,6 @@ export class WhackoVisitor {
     this.visitAll(expression.parameters);
     this.visit(expression.returnType);
     this.visit(expression.block);
-  }
-
-  visitGroupLiteral(expression: GroupLiteral) {
-    this.visit(expression.expression);
   }
 
   visitFloatLiteral(expression: FloatLiteral) {}

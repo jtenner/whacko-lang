@@ -24,6 +24,7 @@ import type {
   LLVMBuilderRef,
   LLVMContextRef,
   LLVMModuleRef,
+  LLVMMemoryBufferRef,
   LLVMVerifierFailureAction,
   LLVMTypeRef,
   LLVMValueRef,
@@ -194,14 +195,40 @@ export class WhackoProgram {
     const bufrefStart = this.LLVM.HEAPU32[bufref >>> 2];
     const bufrefEnd = this.LLVM.HEAPU32[(bufref >>> 2) + 1];
 
-    this.LLVM._LLVMDisposeMemoryBuffer(bufref);
     this.LLVM._LLVMDisposeBuilder(compilationPass.builder);
     this.LLVM._LLVMDisposeModule(this.llvmModule);
     this.LLVM._LLVMDisposeTargetMachine(machine);
     this.LLVM._LLVMContextDispose(this.llvmContext);
-    return new Map([
+
+    const messagePtr = this.LLVM._malloc<LLVMStringRef[]>(4);
+    const objBufferPtr = this.LLVM._malloc<LLVMMemoryBufferRef[]>(4);
+    // const objFileSuccess = this.LLVM._LLVMTargetMachineEmitToMemoryBuffer(
+    //   machine,
+    //   this.llvmModule,
+    //   this.LLVMUtil.LLVMCodeGenFileType.LLVMObjectFile,
+    //   // pointer to an error message
+    //   messagePtr,
+    //   objBufferPtr,
+    // );
+
+    // const derefObjBufferPtr = this.LLVM.HEAPU32[objBufferPtr >>> 2];
+    // const objBufrefStart = this.LLVM.HEAPU32[derefObjBufferPtr >>> 2];
+    // const objBufrefEnd = this.LLVM.HEAPU32[(derefObjBufferPtr >>> 2) + 1];
+
+    const result = [
       ["test.bc", Buffer.from(this.LLVM.HEAPU8.buffer, bufrefStart, bufrefEnd - bufrefStart)],
       ["test.ll", Buffer.from(str)],
-    ]);
+    ] as [string, Buffer][];
+
+    this.LLVM._LLVMDisposeMemoryBuffer(bufref);
+    // this.LLVM._LLVMDisposeMemoryBuffer(derefObjBufferPtr as any);
+    this.LLVM._free(messagePtr);
+    this.LLVM._free(objBufferPtr);
+
+    // console.log(objFileSuccess)
+    // if (objFileSuccess) {
+    //   result.push(["test.o", Buffer.from(this.LLVM.HEAPU8.buffer, objBufrefStart, objBufrefEnd - objBufrefStart)]);
+    // }
+    return new Map(result);
   }
 }

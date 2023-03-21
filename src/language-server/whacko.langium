@@ -128,85 +128,87 @@ VariableDeclarator:
 ExpressionStatement:
     expression=Expression ";";
 
-Expression: TupleExpression;
+Expression infers Expression: TupleExpression;
 
-TupleExpression:
-    "(" expressions+=Expression "," (expressions+=Expression ("," expressions+=Expression)* )? ")"
+TupleExpression infers Expression:
+    {infer TupleExpression} "(" expressions+=Expression "," (expressions+=Expression ("," expressions+=Expression)* )? ")"
     | YieldExpression;
 
-YieldExpression:
-    "yield" expression=YieldExpression
+YieldExpression infers Expression:
+    {infer YieldExpression} "yield" expression=YieldExpression
     | TernaryExpression;
 
-TernaryExpression:
-    condition=AssignmentExpression "?" truthy=TernaryExpression ":" falsy=TernaryExpression
+TernaryExpression infers Expression:
+    {infer TernaryExpression} condition=AssignmentExpression "?" truthy=TernaryExpression ":" falsy=TernaryExpression
     | AssignmentExpression;
 
-AssignmentExpression:
+AssignmentExpression infers Expression:
     LogicalOrExpression ({infer BinaryExpression.lhs=current} op=("=" | "+=" | "-=" | "**=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | ">>>=" | "&=" | "^=" | "|=" | "&&=" | "||=" | "??=") rhs=LogicalOrExpression)*;
 
-LogicalOrExpression:
+LogicalOrExpression infers Expression:
     LogicalAndExpression ({infer BinaryExpression.lhs=current} op=("||") rhs=LogicalAndExpression)*;
 
-LogicalAndExpression:
+LogicalAndExpression infers Expression:
     BitwiseOrExpression ({infer BinaryExpression.lhs=current} op=("&&") rhs=BitwiseOrExpression)*;
 
-BitwiseOrExpression:
+BitwiseOrExpression infers Expression:
     BitwiseXOrExpression ({infer BinaryExpression.lhs=current} op=("|") rhs=BitwiseXOrExpression)*;
 
-BitwiseXOrExpression:
+BitwiseXOrExpression infers Expression:
     BitwiseAndExpression ({infer BinaryExpression.lhs=current} op=("^") rhs=BitwiseAndExpression)*;
 
-BitwiseAndExpression:
+BitwiseAndExpression infers Expression:
     EqualityExpression ({infer BinaryExpression.lhs=current} op=("&") rhs=EqualityExpression)*;
 
-EqualityExpression:
+EqualityExpression infers Expression:
     ComaprisonExpression ({infer BinaryExpression.lhs=current} op=("==" | "!=") rhs=ComaprisonExpression)*;
 
-ComaprisonExpression:
+ComaprisonExpression infers Expression:
     BitShiftExpression ({infer BinaryExpression.lhs=current} op=("<=" | "<" | ">=" | ">") rhs=BitShiftExpression)*;
 
-BitShiftExpression:
+BitShiftExpression infers Expression:
     SumExpression ({infer BinaryExpression.lhs=current} op=("<<" | ">>") rhs=SumExpression)*;
 
-SumExpression:
+SumExpression infers Expression:
     ProductExpression ({infer BinaryExpression.lhs=current} op=("+" | "-") rhs=ProductExpression)*;
 
-ProductExpression:
+ProductExpression infers Expression:
     ExponentiationExpression ({infer BinaryExpression.lhs=current} op=("*" | "/" | "%") rhs=ExponentiationExpression)*;
 
-ExponentiationExpression: 
-    Epsilon ({infer BinaryExpression.lhs=current} op="**" rhs=Epsilon)*;
+ExponentiationExpression infers Expression: 
+    LeftUnaryExpression ({infer BinaryExpression.lhs=current} op="**" rhs=LeftUnaryExpression)*;
 
-Epsilon:
-    NewExpression | AwaitExpression | HoldExpression | NewExpression | LeftUnaryExpression | PathExpression | PrimaryExpression;
+LeftUnaryExpression infers Expression: ({infer LeftUnaryExpression} op=("!" | "-" | "+" | "~") expression=LeftUnaryExpression) | Epsilon;
 
-LeftUnaryExpression:
-    op=("!" | "-" | "+" | "~") expression=LeftUnaryExpression;
+Epsilon infers Expression:
+    AwaitExpression | HoldExpression | NewExpression | PathExpression | PrimaryExpression;
 
 AwaitExpression:
-    "await" expression=LeftUnaryExpression;
+    "await" expression=Expression;
 
 HoldExpression:
-    "hold" expression=LeftUnaryExpression;
+    "hold" expression=Expression;
 
 NewExpression:
     "new" expression=NewPath TypeParameters CallParameters;
 
 NewPath:
-    ID ({infer MemberAccessExpression.memberRoot=current} "." member=ID)*;
+    RootIdentifier ({infer MemberAccessExpression.memberRoot=current} "." member=ID)*;
 
 PathExpression:
-    ID (
+    RootIdentifier (
         {infer CallExpression.callRoot=current} TypeParameters CallParameters
         | {infer MemberAccessExpression.memberRoot=current} "." member=ID
         | {infer ArrayAccessExpression.arrayRoot=current} "[" indexExpression=Expression "]"
     )*;
 
-PrimaryExpression: FunctionLiteral | GroupLiteral | RootIdentifier | FloatLiteral | IntegerLiteral | HexLiteral | BinaryLiteral | OctalLiteral | StringLiteral | FalseLiteral | TrueLiteral | NullLiteral | ThisLiteral | SuperLiteral | AsyncBlockLiteral;
+PrimaryExpression infers Expression: FunctionLiteral | GroupLiteral | FloatLiteral | IntegerLiteral | HexLiteral | BinaryLiteral | OctalLiteral | StringLiteral | FalseLiteral | TrueLiteral | NullLiteral | AsyncBlockLiteral;
+
+GroupLiteral infers Expression:
+    "(" Expression ")";
 
 RootIdentifier:
-    root=ID;
+    root=(ID | ThisLiteral | SuperLiteral);
 
 FunctionLiteral:
     TypeParameters Parameters ":" ReturnType "=>" block=BlockStatement;
@@ -234,9 +236,6 @@ fragment Decorators:
 
 Decorator:
     "@" name=ID CallParameters?;
-
-GroupLiteral:
-    "(" expression=Expression ")";
 
 FloatLiteral:
     value=Float;
