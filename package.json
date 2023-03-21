@@ -61,7 +61,8 @@
     "langium": "~1.0.0",
     "vscode-languageclient": "^8.0.2",
     "vscode-languageserver": "^8.0.2",
-    "vscode-uri": "^3.0.2"
+    "vscode-uri": "^3.0.2",
+    "llvm-js": "https://github.com/jtenner/llvm-js/archive/refs/heads/master.tar.gz"
   },
   "devDependencies": {
     "@types/colors": "^1.2.1",
