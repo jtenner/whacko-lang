@@ -167,7 +167,7 @@ ComaprisonExpression infers Expression:
     BitShiftExpression ({infer BinaryExpression.lhs=current} op=("<=" | "<" | ">=" | ">") rhs=BitShiftExpression)*;
 
 BitShiftExpression infers Expression:
-    SumExpression ({infer BinaryExpression.lhs=current} op=("<<" | ">>") rhs=SumExpression)*;
+    SumExpression ({infer BinaryExpression.lhs=current} op=("<<" | ">>>" | ">>") rhs=SumExpression)*;
 
 SumExpression infers Expression:
     ProductExpression ({infer BinaryExpression.lhs=current} op=("+" | "-") rhs=ProductExpression)*;

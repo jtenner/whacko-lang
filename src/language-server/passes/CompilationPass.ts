@@ -115,6 +115,50 @@ export interface FunctionVisitParams {
   pass: CompilationPass;
 }
 
+export function getIntegerPredicate(node: BinaryExpression, signed: boolean, pass: CompilationPass) {
+  if (signed) {
+    switch (node.op) {
+      case ">":  return pass.program.LLVMUtil.LLVMIntPredicate.Sgt;
+      case "<":  return pass.program.LLVMUtil.LLVMIntPredicate.Slt;
+      case "<=": return pass.program.LLVMUtil.LLVMIntPredicate.Sle;
+      case ">=": return pass.program.LLVMUtil.LLVMIntPredicate.Sge;
+      case "==": return pass.program.LLVMUtil.LLVMIntPredicate.Eq;
+      case "!=": return pass.program.LLVMUtil.LLVMIntPredicate.Ne;
+    }
+  } else {
+    switch (node.op) {
+      case ">":  return pass.program.LLVMUtil.LLVMIntPredicate.Ugt;
+      case "<":  return pass.program.LLVMUtil.LLVMIntPredicate.Ult;
+      case "<=": return pass.program.LLVMUtil.LLVMIntPredicate.Ule;
+      case ">=": return pass.program.LLVMUtil.LLVMIntPredicate.Uge;
+      case "==": return pass.program.LLVMUtil.LLVMIntPredicate.Eq;
+      case "!=": return pass.program.LLVMUtil.LLVMIntPredicate.Ne;
+    }
+  }
+
+  throw new Error("Invalid integer predicate.");
+}
+
+export function getRealPredicate(node: BinaryExpression, pass: CompilationPass) {
+  switch (node.op) {
+    case ">":  return pass.program.LLVMUtil.LLVMRealPredicate.Ogt;
+    case "<":  return pass.program.LLVMUtil.LLVMRealPredicate.Olt;
+    case "<=": return pass.program.LLVMUtil.LLVMRealPredicate.Ole;
+    case ">=": return pass.program.LLVMUtil.LLVMRealPredicate.Oge;
+    case "==": return pass.program.LLVMUtil.LLVMRealPredicate.Oeq;
+    case "!=": return pass.program.LLVMUtil.LLVMRealPredicate.One;
+  }
+  throw new Error("Invalid real predicate.");
+}
+
+export function getBoolPredicate(node: BinaryExpression, pass: CompilationPass) {
+  switch (node.op) {
+    case "!=": return pass.program.LLVMUtil.LLVMIntPredicate.Ne;
+    case "==": return pass.program.LLVMUtil.LLVMIntPredicate.Eq;
+  }
+  throw new Error("Invalid bool predicate.");
+}
+
 export function obtainValue(expression: AstNode, pass: CompilationPass) {
   const length = pass.ctx.stack.length;
   pass.visit(expression);
@@ -312,6 +356,7 @@ export class CompilationPass extends WhackoPass {
         attributes.push(decorator.parameters.map(e => (e as StringLiteral).value) as [string, string]);
       }
     }
+
     if (isClassDeclaration(node)) {
       // we are compiling a constructor that may or may not exist
       const constructorClassMember = (node.members.find(e => isConstructorClassMember(e)) ?? null) as ConstructorClassMember | null;
@@ -545,11 +590,7 @@ export class CompilationPass extends WhackoPass {
 
   override visitIfElseStatement(node: IfElseStatement): void {
     // this.LLVM._LLVMBuildBr()
-    this.visit(node.condition);
-    const condition = assert(
-      this.ctx.stack.pop(),
-      "Condition must be on the stack."
-    );
+    const condition = this.ensureDereferenced(obtainValue(node.condition, this));
 
     if (condition instanceof CompileTimeVoid) {
       this.error(`Type`, node.condition, `Expression returns void, cannot be used as if condition.`);
@@ -645,8 +686,7 @@ export class CompilationPass extends WhackoPass {
       }
 
       // we should always visit the expression
-      this.visit(expression);
-      const value = assert(this.ctx.stack.pop(), "Element must exist.");
+      const value = this.ensureDereferenced(obtainValue(expression, this));
 
       if (value instanceof CompileTimeVoid) {
         this.error(`Type`, value.ty.node, `Function returns void, cannot assign void to variable.`);
@@ -749,11 +789,7 @@ export class CompilationPass extends WhackoPass {
   }
 
   override visitMemberAccessExpression(node: MemberAccessExpression): void {
-    this.visit(node.memberRoot);
-    const rootValue = assert(
-      this.ctx.stack.pop(),
-      "There must be an item on the stack at this point."
-    );
+    const rootValue = obtainValue(node.memberRoot, this);
 
     if (
       rootValue instanceof CompileTimeNamespaceDeclarationReference ||
@@ -795,7 +831,7 @@ export class CompilationPass extends WhackoPass {
       }
 
       const methodElement = ty.element.members
-        .find(e => e.$type === "MethodClassMember" && e.name.name === node.member.name) as MethodClassMember | undefined;
+        .find(e => isMethodClassMember(e) && e.name.name === node.member.name) as MethodClassMember | undefined;
 
       if (methodElement) {
         this.ctx.stack.push(new CompileTimeMethodReference(methodElement, ty, ref));
@@ -820,13 +856,9 @@ export class CompilationPass extends WhackoPass {
       this.LLVM._LLVMBuildRetVoid(this.builder);
     } else {
       if (node.expression) {
-        this.visit(node.expression);
-        const value = assert(
-          this.ctx.stack.pop(),
-          "Return value must be on the stack at this point."
-        );
-        const compiledValue = this.ensureCompiled(value) as RuntimeValue;
-        if (value.ty.isAssignableTo(returnType)) {
+
+        const compiledValue = this.ensureCompiled(obtainValue(node.expression, this));
+        if (compiledValue.ty.isAssignableTo(returnType)) {
           this.LLVM._LLVMBuildRet(this.builder, compiledValue.ref);
         } else {
           this.error(
@@ -894,45 +926,574 @@ export class CompilationPass extends WhackoPass {
   }
 
   override visitBinaryExpression(node: BinaryExpression): void {
+    // we need to visit both sides and compile them to some kind of reference/value
+    const lhs = obtainValue(node.lhs, this);
+    // we always want to dereference the rhs, because we need to operate on deref values
+    const rhs = this.ensureDereferenced(obtainValue(node.rhs, this));
+
+    // first, we need to make sure that both sides are assignable to each other
+    if (!lhs.ty.isAssignableTo(rhs.ty)) {
+      // uhoh, binary expressions require assignability
+      this.ctx.stack.push(new CompileTimeInvalid(node));
+      this.error("Type", node, `Operation not supported, lhs and rhs binary operators are not assignable to each other.`);
+      return;
+    }
+
+    let value: ExecutionContextValue | null = null;
+
     switch (node.op) {
-      case "+":
-        return this.compileAdditionExpression(node);
-      case "-":
-      case "/":
+      case "!=":
+      case "%":
+      case "%=":
+      case "&":
+      case "&&":
+      case "&&=":
+      case "&=":
       case "*":
       case "**":
-        return this.compileMathExpresion(node);
-      case "=":
-        return this.compileAssignmentExpression(node);
-      case "&&":
+      case "**=":
+      case "*=":
+      case "+":
+      case "+=":
+      case "-":
+      case "-=":
+      case "/":
+      case "/=":
+      case "<":
+      case "<<":
+      case "<<=":
+      case ">>>":
+      case ">>>=":
+      case "<=":
+      case "==":
+      case ">":  
+      case ">=":  
+      case ">>":  
+      case ">>=":
+      case "^":
+      case "^=":
+      case "|":
+      case "|=":
       case "||":
-        return this.compileLogicalExpression(node);
-      default: {
-        this.visit(node.lhs);
-        this.visit(node.rhs);
-        this.ctx.stack.pop();
-        this.ctx.stack.pop();
-        this.ctx.stack.push(new CompileTimeInvalid(node));
-        this.error("Type", node, `Operator not supported: "${node.op}"`);
+      case "||=":
+        value = this.compileBinaryExpression(
+          node,
+          this.ensureDereferenced(lhs),
+          rhs
+        );
+        break;
+      case "=":
+        value = rhs;
+        break;
+    }
+
+    // if the value cannot be calculated because we don't support the operator...
+    // then we need to invalidate the stack
+    if (!value) {
+      this.ctx.stack.push(new CompileTimeInvalid(node));
+      this.error("Semantic", node, `Binary expression not supported.`);
+      return;
+    }
+
+    // if we are an assignment operator we need to perform the assignment
+    switch (node.op) {
+      case "%=":
+      case "&&=":
+      case "&=":
+      case "**=":
+      case "*=":
+      case "+=":
+      case "-=":
+      case "*=":
+      case "/=":
+      case "<<=":
+      case ">>=":
+      case "=":
+      case "^=":
+      case "|=":
+      case "||=":
+        this.compileAssignmentExpression(node, lhs, value);
+    }
+
+    // finally push value to the stack
+    this.ctx.stack.push(value);
+  }
+
+  compileAssignmentExpression(node: AstNode, lhs: ExecutionContextValue, value: ExecutionContextValue) {
+    if (lhs instanceof CompileTimeVariableReference) {
+      const variable = lhs.value;
+      if (variable.immutable) {
+        this.error("Sematic", node, `Cannot assign to immutable variable.`);
+      } else {
+        if (value.ty.isAssignableTo(variable.ty)) {
+          // we can actually perform the assignment
+          variable.value = value;
+        } else {
+          this.error("Type", node, `Cannot assign to variable ${variable.name}, invalid type.`);
+        }
       }
+    } else if (lhs instanceof CompileTimeFieldReference) {
+      if (value.ty.isAssignableTo(lhs.value.ty)) {
+        const compiledValue = this.ensureCompiled(value);
+        // we can generate the store at the given offset
+        this.LLVM._LLVMBuildStore(
+          this.builder,
+          compiledValue.ref,
+          getPtrWithOffset(lhs.ref, CLASS_HEADER_OFFSET + lhs.value.offset, this),
+        );
+      } else {
+        this.error("Type", node, `Cannot assign to property ${lhs.value.name}, invalid type.`);
+      }
+    } else {
+      // TODO: Fix this
+      this.error("Semantic", node, `Invalid left hand assignment, operation not supported.`);
     }
   }
 
-  override visitCallExpression(node: CallExpression): void {
-    this.visit(node.callRoot);
-    const callRootValue = assert(
-      this.ctx.stack.pop()!,
-      "The call root value must exist."
-    );
+  compileBinaryExpression(node: BinaryExpression, lhs: ExecutionContextValue, rhs: ExecutionContextValue): ExecutionContextValue {
+    if (lhs.ty instanceof FloatType && rhs.ty instanceof FloatType) return this.compileBinaryFloatExpression(node, lhs, rhs);
+    if (lhs.ty instanceof IntegerType && rhs.ty instanceof IntegerType) return this.compileBinaryIntegerExpression(node, lhs, rhs);
+    if (lhs.ty instanceof BoolType && rhs.ty instanceof BoolType) return this.compileBinaryBoolExpression(node, lhs, rhs);
+    if (lhs.ty instanceof ConcreteClass && rhs.ty instanceof ConcreteClass) return this.compileBinaryClassOverloadExpression(node, lhs, rhs);
+    
+    // TODO: Support operator overloads
+    this.error("Type", node, `Invalid binary expression, operator not supported for this type.`);
+    // This operation is not supported
+    return new CompileTimeInvalid(node); 
+  }
 
+  compileBinaryClassOverloadExpression(node: BinaryExpression, lhs: ExecutionContextValue, rhs: ExecutionContextValue): ExecutionContextValue {
+    this.error("Type", node, `Cannot compile operator ${node.op} for class ${lhs.ty.getName()}`);
+    return new CompileTimeInvalid(node);
+  }
+
+  compileBinaryBoolExpression(node: BinaryExpression, lhs: ExecutionContextValue, rhs: ExecutionContextValue): ExecutionContextValue {
+    assert(lhs.ty instanceof BoolType, "LHS must be bool type");
+    assert(rhs.ty instanceof BoolType, "RHS must be bool type");
+
+    // the types are equal!
+    if (lhs instanceof CompileTimeBool && rhs instanceof CompileTimeBool) {
+      let value: boolean | null = null;
+
+      switch (node.op) {
+        case "!=": value = lhs.value !== rhs.value; break;
+        case "==": value = lhs.value === rhs.value; break;
+        case "|":
+        case "|=":
+        case "||":
+        case "||=": value = lhs.value || rhs.value; break;
+        case "&":
+        case "&=":
+        case "&&":
+        case "&&=": value = lhs.value && rhs.value; break;
+      }
+
+      if (value === null) {
+        this.error("Type", node, `Invalid compile time bool operation.`);
+        return new CompileTimeInvalid(node);
+      }
+      return new CompileTimeBool(value, node);
+    }
+
+    // TODO: Short circuit compile with some assumptions if either side is a compile time bool
+    
+    lhs = this.ensureCompiled(lhs);
+    rhs = this.ensureCompiled(rhs);
+    let operation: LLVMValueRef | null = null;
+    const name = this.getTempNameRef();
+
+    switch (node.op) {
+      case "!=": 
+      case "==":
+        operation = this.LLVM._LLVMBuildICmp(
+          this.builder,
+          getBoolPredicate(node, this),
+          (lhs as RuntimeValue).ref,
+          (rhs as RuntimeValue).ref,
+          name
+        );
+        break;
+      case "|":
+      case "|=":
+        operation = this.LLVM._LLVMBuildOr(
+          this.builder,
+          (lhs as RuntimeValue).ref,
+          (rhs as RuntimeValue).ref,
+          name
+        );
+        break;
+      case "&":
+      case "&=":
+        operation = this.LLVM._LLVMBuildAnd(
+          this.builder,
+          (lhs as RuntimeValue).ref,
+          (rhs as RuntimeValue).ref,
+          name
+        );
+        break;
+    }
+
+    this.LLVM._free(name);
+
+    if (operation === null) {
+      this.error("Type", node, `Invalid runtime bool operation.`);
+      return new CompileTimeInvalid(node);
+    }
+
+    return new RuntimeValue(operation, new BoolType(null, node));
+  }
+
+  compileBinaryFloatExpression(node: BinaryExpression, lhs: ExecutionContextValue, rhs: ExecutionContextValue): ExecutionContextValue {
+    // some things that need to be checked
+    assert(lhs.ty instanceof FloatType, "LHS must be float type.");
+    assert(rhs.ty instanceof FloatType, "RHS must be float type.");
+    assert(lhs.ty.ty === rhs.ty.ty, "The float types must be equal at this point.");
+  
+    // we can perform a compile time operation
+    if (lhs instanceof CompileTimeFloat && rhs instanceof CompileTimeFloat) {
+      let value: number | null = null;
+      switch (node.op) {
+        case ">": return new CompileTimeBool(lhs.value > rhs.value, node);
+        case "<": return new CompileTimeBool(lhs.value < rhs.value, node);
+        case "<=": return new CompileTimeBool(lhs.value <= rhs.value, node);
+        case ">=": return new CompileTimeBool(lhs.value >= rhs.value, node);
+        case "==": return new CompileTimeBool(lhs.value == rhs.value, node);
+        case "!=": return new CompileTimeBool(lhs.value != rhs.value, node);
+        case "*":
+        case "*=": value = lhs.value * rhs.value; break;
+        case "**=":
+        case "**": value = lhs.value ** rhs.value; break;
+        case "+":
+        case "+=": value = lhs.value + rhs.value; break;
+        case "-":
+        case "-=": value = lhs.value - rhs.value; break;
+        case "/":
+        case "/=": value = lhs.value / rhs.value; break;
+      }
+
+      if (value === null) {
+        // not supported
+        this.error("Type", node, `Compile time float operation not supported.`);
+        return new CompileTimeInvalid(node);
+      } else {
+        return new CompileTimeFloat(value, new FloatType(lhs.ty as any, value, node));
+      }
+    }
+
+    // we are definitely a runtime operation
+    lhs = this.ensureCompiled(lhs);
+    rhs = this.ensureCompiled(rhs);
+
+    let operation: LLVMValueRef | null = null;
+    const name = this.getTempNameRef();
+
+    // create the instructions for each op
+    switch (node.op) {
+      case ">": 
+      case "<":
+      case "<=":
+      case ">=":
+      case "==":
+      case "!=": {
+        const result = new RuntimeValue(
+          this.LLVM._LLVMBuildFCmp(
+            this.builder,
+            getRealPredicate(node, this),
+            (lhs as RuntimeValue).ref,
+            (rhs as RuntimeValue).ref,
+            name,
+          ),
+          new BoolType(null, node)
+        );
+        this.LLVM._free(name);
+        return result;
+      }
+      case "*":
+      case "*=":
+        operation = this.LLVM._LLVMBuildFMul(
+          this.builder,
+          (lhs as RuntimeValue).ref,
+          (rhs as RuntimeValue).ref,
+          name,
+        );
+        break;
+      case "**=":
+      case "**":
+        // TODO: Math pow
+        // 1. Ensure libm double pow(double, double) is declared
+        // 2. cast both sides to doubles
+        // 3. Build a call instruction operation
+        // 4. cast back to float type
+        break; // not supported?
+      case "+":
+      case "+=":
+        operation = this.LLVM._LLVMBuildFAdd(
+          this.builder,
+          (lhs as RuntimeValue).ref,
+          (rhs as RuntimeValue).ref,
+          name,
+        );
+        break;
+      case "-":
+      case "-=":
+        operation = this.LLVM._LLVMBuildFSub(
+          this.builder,
+          (lhs as RuntimeValue).ref,
+          (rhs as RuntimeValue).ref,
+          name,
+        );
+        break;
+      case "/":
+      case "/=":
+        operation = this.LLVM._LLVMBuildFDiv(
+          this.builder,
+          (lhs as RuntimeValue).ref,
+          (rhs as RuntimeValue).ref,
+          name,
+        );
+        break;
+    }
+
+    this.LLVM._free(name);
+    if (operation === null) {
+      this.error("Type", node, `Runtime float operation not supported.`);
+      return new CompileTimeInvalid(node);
+    }
+
+    return new RuntimeValue(operation, new FloatType(lhs.ty as any, null, node));
+  }
+
+  compileBinaryIntegerExpression(node: BinaryExpression, lhs: ExecutionContextValue, rhs: ExecutionContextValue): ExecutionContextValue {
+    // some things that need to be checked
+    assert(lhs.ty instanceof IntegerType, "LHS must be float type.");
+    assert(rhs.ty instanceof IntegerType, "RHS must be float type.");
+    assert(lhs.ty.ty === rhs.ty.ty, "The integer types must be equal at this point.");
+
+    if (lhs instanceof CompileTimeInteger && rhs instanceof CompileTimeInteger) {
+      let value: bigint | null = null;
+
+      switch (node.op) {
+        case "!=": return new CompileTimeBool(lhs.value !== rhs.value, node);
+        case "==": return new CompileTimeBool(lhs.value === rhs.value, node);
+        case "<":  return new CompileTimeBool(lhs.value < rhs.value, node);
+        case "<=": return new CompileTimeBool(lhs.value <= rhs.value, node);
+        case ">":  return new CompileTimeBool(lhs.value > rhs.value, node);
+        case ">=": return new CompileTimeBool(lhs.value >= rhs.value, node);
+        case "+":
+        case "+=": value = lhs.value + rhs.value; break;
+        case "-":
+        case "-=": value = lhs.value - rhs.value; break;
+        case "*":
+        case "*=": value = lhs.value * rhs.value; break;
+        case "/": 
+        case "/=": {
+          if (rhs.value === 0n) {
+            this.error("Semantic", node, "Divide by zero.");
+            return new CompileTimeInvalid(node);
+          }
+          value = lhs.value / rhs.value;
+          break;
+        }
+        case "**":
+        case "**=": {
+          if (rhs.value < 0n) {
+            this.error("Semantic", node, "Exponent cannot be negative.");
+            return new CompileTimeInvalid(node);
+          }
+          value = lhs.value ** rhs.value;
+          break;
+        }
+        case "&":
+        case "&=": value = lhs.value & rhs.value; break;
+        case "|":
+        case "|=": value = lhs.value | rhs.value; break;
+        case "%":
+        case "%=": {
+          if (rhs.value === 0n) {
+            this.error("Semantic", node, "Divide by zero.");
+            return new CompileTimeInvalid(node);
+          }
+          value = lhs.value % rhs.value;
+          break;
+        }
+        case "<<":
+        case "<<=": value = lhs.value << rhs.value; break;
+        case ">>>":
+        case ">>>=":
+        case ">>":
+        case ">>=": value = lhs.value >> rhs.value; break;
+        case "^":
+        case "^=": value = lhs.value ^ rhs.value; break;
+      }
+
+      if (value === null) {
+        this.error("Type", node, `Invalid compile time integer operation, not supported.`);
+        return new CompileTimeInvalid(node);
+      }
+
+      value = lhs.ty.isSigned
+        ? BigInt.asIntN(Number(lhs.ty.size) * 8, value)
+        : BigInt.asUintN(Number(lhs.ty.size) * 8, value);
+
+      return new CompileTimeInteger(value, new IntegerType(lhs.ty.ty as any, value, node));
+    }
+
+    lhs = this.ensureCompiled(lhs);
+    rhs = this.ensureCompiled(rhs);
+    
+    let operation: LLVMValueRef | null = null;
+    const name = this.getTempNameRef();
+    switch (node.op) {
+      case "!=": 
+      case "==": 
+      case "<":  
+      case "<=": 
+      case ">":  
+      case ">=":
+        operation = this.LLVM._LLVMBuildICmp(
+          this.builder,
+          getIntegerPredicate(node, lhs.ty.isSigned, this),
+          (lhs as RuntimeValue).ref,
+          (rhs as RuntimeValue).ref,
+          name
+        );
+        break;
+      case "+":
+      case "+=":
+        operation = this.LLVM._LLVMBuildAdd(
+          this.builder,
+          (lhs as RuntimeValue).ref,
+          (rhs as RuntimeValue).ref,
+          name,
+        );
+        break;
+      case "-":
+      case "-=":
+        operation = this.LLVM._LLVMBuildSub(
+          this.builder,
+          (lhs as RuntimeValue).ref,
+          (rhs as RuntimeValue).ref,
+          name,
+        );
+        break;
+      case "*":
+      case "*=":
+        operation = this.LLVM._LLVMBuildMul(
+          this.builder,
+          (lhs as RuntimeValue).ref,
+          (rhs as RuntimeValue).ref,
+          name,
+        );
+        break;
+      case "/":
+      case "/=":
+        operation = lhs.ty.isSigned
+          ? this.LLVM._LLVMBuildSDiv(
+              this.builder,
+              (lhs as RuntimeValue).ref,
+              (rhs as RuntimeValue).ref,
+              name,
+            )
+          : this.LLVM._LLVMBuildUDiv(
+            this.builder,
+            (lhs as RuntimeValue).ref,
+            (rhs as RuntimeValue).ref,
+            name,
+          );
+        break;
+      case "**":
+      case "**=": {
+        // TODO: Support integer power operation
+        break;
+      }
+      case "&":
+      case "&=":
+        operation = this.LLVM._LLVMBuildAnd(
+          this.builder,
+          (lhs as RuntimeValue).ref,
+          (rhs as RuntimeValue).ref,
+          name
+        );
+        break;
+      case "|":
+      case "|=":
+        operation = this.LLVM._LLVMBuildAnd(
+          this.builder,
+          (lhs as RuntimeValue).ref,
+          (rhs as RuntimeValue).ref,
+          name
+        );
+        break;
+      case "%":
+      case "%=":
+        operation = lhs.ty.isSigned
+          ? this.LLVM._LLVMBuildSRem(
+              this.builder,
+              (lhs as RuntimeValue).ref,
+              (rhs as RuntimeValue).ref,
+              name
+            )
+          : this.LLVM._LLVMBuildURem(
+              this.builder,
+              (lhs as RuntimeValue).ref,
+              (rhs as RuntimeValue).ref,
+              name
+            );
+        break;
+      case "<<":
+      case "<<=":
+        operation = this.LLVM._LLVMBuildShl(
+          this.builder,
+          (lhs as RuntimeValue).ref,
+          (rhs as RuntimeValue).ref,
+          name
+        );
+        break;
+      case ">>":
+      case ">>=":
+        operation = this.LLVM._LLVMBuildAShr(
+          this.builder,
+          (lhs as RuntimeValue).ref,
+          (rhs as RuntimeValue).ref,
+          name
+        );
+        break;
+      case ">>>":
+      case ">>>=":
+        operation = this.LLVM._LLVMBuildLShr(
+          this.builder,
+          (lhs as RuntimeValue).ref,
+          (rhs as RuntimeValue).ref,
+          name
+        );
+        break;
+      case "^":
+      case "^=":
+        operation = this.LLVM._LLVMBuildXor(
+          this.builder,
+          (lhs as RuntimeValue).ref,
+          (rhs as RuntimeValue).ref,
+          name
+        );
+        break;
+    }
+
+    this.LLVM._free(name);
+    if (operation === null) {
+      this.error("Type", node, "Runtime integer operation not supported.");
+      return new CompileTimeInvalid(node);
+    }
+
+    return new RuntimeValue(operation, new IntegerType(lhs.ty.ty as any, null, node));
+  }
+
+  override visitCallExpression(node: CallExpression): void {
+    const callRootValue = obtainValue(node.callRoot, this);
+
+    // evaluate each expression in the call expression
     const callParameterValues = [] as ExecutionContextValue[];
     for (const callParameterExpression of node.parameters) {
-      this.visit(callParameterExpression);
-      const paramValue = this.ctx.stack.pop();
-      const callParamaterValue = assert(
-        paramValue,
-        "The call parameter expression must exist."
-      );
+      const callParamaterValue = obtainValue(callParameterExpression, this);
       callParameterValues.push(callParamaterValue);
     }
 
@@ -1211,147 +1772,22 @@ export class CompilationPass extends WhackoPass {
     // TODO: Redo calls because lots of things could be on the stack
   }
 
-  private compileAssignmentExpression(node: BinaryExpression) {
-    const lhs = obtainValue(node.lhs, this);
-    const rhs = obtainValue(node.rhs, this);
-    if (lhs instanceof CompileTimeFieldReference) {
-      // we are performing a store
-      
-      const storePtr = getPtrWithOffset(lhs.ref, lhs.value.offset + CLASS_HEADER_OFFSET, this);
-      const compiledRhs = this.ensureCompiled(rhs);
-
-      if (compiledRhs.ty.isAssignableTo(lhs.ty)) {
-        const stackElement = this.LLVM._LLVMBuildStore(this.builder, compiledRhs.ref, storePtr);
-        this.ctx.stack.push(new RuntimeValue(stackElement, compiledRhs.ty));
-      } else {
-        this.error("Type", node.rhs, `Invalid rhs type, not assignable to field type.`);
-        this.ctx.stack.push(compiledRhs);
-      }
-    } else if (lhs instanceof CompileTimeVariableReference) {
-      const variable = lhs.value;
-      const compiledRhs = this.ensureCompiled(rhs);
-      if (variable.immutable) {
-        // we can't support storing the variable
-        this.error("Semantic", node.lhs, `Variable is immutable, cannot store value.`);
-      } else {
-        variable.value = compiledRhs;
-      }
-      this.ctx.stack.push(compiledRhs);
-    } else {
-      this.error("Semantic", node, `Operation is not supported.`);
-      this.ctx.stack.push(new CompileTimeInvalid(node));
-    }
-  }
-
-  private compileAdditionExpression(node: BinaryExpression) {
-    // compile both sides and return the expressions
-    super.visitBinaryExpression(node);
-    // rhs is on top
-    const rhs = this.ensureDereferenced(
-      assert(this.ctx.stack.pop(), "Value must exist on the stack")
-    );
-    const lhs = this.ensureDereferenced(
-      assert(this.ctx.stack.pop(), "Value must exist on the stack")
-    );
-    // if the types are equal, and the sides are valid
-    if (lhs.ty.isEqual(rhs.ty) && rhs.valid && lhs.valid && lhs.ty.isNumeric) {
-      // we can perform the operation
-      if (
-        lhs instanceof CompileTimeInteger &&
-        rhs instanceof CompileTimeInteger
-      ) {
-        // integer types are the same
-        const ty = lhs.ty as IntegerType;
-        const bits = ty.bits;
-        const signed = ty.signed;
-        const addedValue = lhs.value + rhs.value;
-        const value = signed
-          ? BigInt.asIntN(bits, addedValue)
-          : BigInt.asUintN(bits, addedValue);
-        this.ctx.stack.push(
-          new CompileTimeInteger(
-            value,
-            new IntegerType(ty.ty as IntegerEnumType, value, node)
-          )
-        );
-        return;
-      } else if (
-        lhs instanceof CompileTimeFloat &&
-        rhs instanceof CompileTimeFloat
-      ) {
-        // add the floats
-        const value = lhs.value + rhs.value;
-        this.ctx.stack.push(
-          new CompileTimeFloat(value, new FloatType(value, lhs.ty.ty, node))
-        );
-        return;
-      } else if (
-        lhs instanceof CompileTimeString &&
-        rhs instanceof CompileTimeString
-      ) {
-        const value = lhs.value + rhs.value;
-        // concatenate the strings manually
-        this.ctx.stack.push(new CompileTimeString(value, node));
-        return;
-      } else if (lhs instanceof RuntimeValue || rhs instanceof RuntimeValue) {
-        if (lhs.ty instanceof StringType) {
-          this.error("Type", node, `Addition operation not supported.`);
-          this.ctx.stack.push(new CompileTimeInvalid(node));
-          return;
-        } else {
-          const compiledlhs = this.ensureCompiled(lhs) as RuntimeValue;
-          const compiledrhs = this.ensureCompiled(rhs) as RuntimeValue;
-          const lhsType = this.LLVM._LLVMTypeOf(compiledlhs.ref);
-          const rhsType = this.LLVM._LLVMTypeOf(compiledlhs.ref);
-          assert(lhsType === rhsType, "Types do not match at this point.");
-          const tmpname = this.getTempName();
-
-          // const lhsStrRef = this.LLVM._LLVMPrintValueToString(compiledlhs.ref);
-          // const rhsStrRef = this.LLVM._LLVMPrintValueToString(compiledrhs.ref);
-          // const lhsStr = this.program.LLVMUtil.lift(lhsStrRef);
-          // const rhsStr = this.program.LLVMUtil.lift(rhsStrRef);
-          const inst =
-            compiledlhs.ty instanceof FloatType
-              ? this.LLVM._LLVMBuildFAdd(
-                  this.builder,
-                  compiledlhs.ref,
-                  compiledrhs.ref,
-                  this.program.LLVMUtil.lower(tmpname)
-                )
-              : this.LLVM._LLVMBuildAdd(
-                  this.builder,
-                  compiledlhs.ref,
-                  compiledrhs.ref,
-                  this.program.LLVMUtil.lower(tmpname)
-                );
-          const addedValue = new RuntimeValue(inst, lhs.ty);
-          this.ctx.stack.push(addedValue);
-          return;
-        }
-      }
-    }
-    this.error("Type", node, `Addition operation not supported.`);
-    this.ctx.stack.push(new CompileTimeInvalid(node));
-  }
-
   getTempName() {
     return "tmp" + (this.tmp++).toString() + "~";
   }
 
   override visitNewExpression(node: NewExpression): void {
-    this.visit(node.expression);
-    const classElement = assert(this.ctx.stack.pop(), "The class element must exist at this point.");
+    const classElement = obtainValue(node.expression, this);
     if (classElement instanceof CompileTimeClassReference) {
       // we can resolve it!
       const scopeElement = classElement.value.node as ClassDeclaration;
-      const constructorMember = scopeElement.members.find(e => e.$type === "ConstructorClassMember") as ConstructorClassMember;
+      const constructorMember = scopeElement.members.find(isConstructorClassMember) as ConstructorClassMember | undefined;
       const constructorMemberParameters = constructorMember?.parameters ?? [];
 
       // evaluate the parameters
       const constructorParameterValues = [] as ExecutionContextValue[];
       for (const expression of node.parameters) {
-        this.visit(expression);
-        const value = assert(this.ctx.stack.pop(), "Paramater expression must exist on the stack.");
+        const value = obtainValue(expression, this);
         constructorParameterValues.push(value);
       }
 
@@ -1477,160 +1913,6 @@ export class CompilationPass extends WhackoPass {
     return classRef;
   }
 
-
-  private compileMathExpresion(node: BinaryExpression) {
-    // compile both sides and return the expressions
-    super.visitBinaryExpression(node);
-    // rhs is on top
-    const rhs = assert(this.ctx.stack.pop(), "Value must exist on the stack");
-    const lhs = assert(this.ctx.stack.pop(), "Value must exist on the stack");
-    // if the types are equal, and the sides are valid
-    if (lhs.ty.isEqual(rhs.ty) && rhs.valid && lhs.valid && lhs.ty.isNumeric) {
-      // we can perform the operation
-      if (
-        lhs instanceof CompileTimeInteger &&
-        rhs instanceof CompileTimeInteger
-      ) {
-        // integer types are the same
-        const ty = lhs.ty as IntegerType;
-        const bits = ty.bits;
-        const signed = ty.signed;
-        let intValue: bigint = 0n;
-        switch (node.op) {
-          case "-":
-            intValue = lhs.value - rhs.value;
-            break;
-          case "*":
-            intValue = lhs.value * rhs.value;
-            break;
-          case "/":
-            intValue = lhs.value / rhs.value;
-            break;
-          case "**":
-            intValue = lhs.value ** rhs.value;
-          default:
-            assert(false, "Invalid call to compile math expression.");
-        }
-        const value = signed
-          ? BigInt.asIntN(bits, intValue)
-          : BigInt.asUintN(bits, intValue);
-        this.ctx.stack.push(
-          new CompileTimeInteger(
-            value,
-            new IntegerType(ty.ty as IntegerEnumType, value, node)
-          )
-        );
-      } else if (
-        lhs instanceof CompileTimeFloat &&
-        rhs instanceof CompileTimeFloat
-      ) {
-        // add the floats
-        let value: number = 0;
-        switch (node.op) {
-          case "-":
-            value = lhs.value - rhs.value;
-            break;
-          case "*":
-            value = lhs.value * rhs.value;
-            break;
-          case "/":
-            value = lhs.value / rhs.value;
-            break;
-          case "**":
-            value = lhs.value ** rhs.value;
-            break;
-          default:
-            assert(false, "Invalid call to compile math expression.");
-        }
-        this.ctx.stack.push(
-          new CompileTimeFloat(value, new FloatType(value, lhs.ty.ty, node))
-        );
-      } else if (lhs instanceof RuntimeValue || rhs instanceof RuntimeValue) {
-        const compiledlhs = this.ensureCompiled(lhs) as RuntimeValue;
-        const compiledrhs = this.ensureCompiled(rhs) as RuntimeValue;
-        const tmpname = this.getTempName();
-
-        let ty: ConcreteType = new InvalidType(node);
-        if (lhs.ty instanceof FloatType) {
-          ty = new FloatType(lhs.ty.ty as Type.f32 | Type.f64, null, node);
-        } else if (lhs.ty instanceof IntegerType) {
-          ty = new IntegerType(lhs.ty.ty as IntegerEnumType, null, node);
-        } else {
-          this.error("Type", node, "Invalid add type.");
-        }
-        let ref: LLVMValueRef;
-        switch (node.op) {
-          case "-":
-            ref =
-              lhs.ty instanceof FloatType
-                ? this.LLVM._LLVMBuildFSub(
-                    this.builder,
-                    compiledlhs.ref,
-                    compiledrhs.ref,
-                    this.program.LLVMUtil.lower(this.getTempName())
-                  )
-                : this.LLVM._LLVMBuildSub(
-                    this.builder,
-                    compiledlhs.ref,
-                    compiledrhs.ref,
-                    this.program.LLVMUtil.lower(this.getTempName())
-                  );
-            break;
-          case "*":
-            ref =
-              lhs.ty instanceof FloatType
-                ? this.LLVM._LLVMBuildFMul(
-                    this.builder,
-                    compiledlhs.ref,
-                    compiledrhs.ref,
-                    this.program.LLVMUtil.lower(this.getTempName())
-                  )
-                : this.LLVM._LLVMBuildMul(
-                    this.builder,
-                    compiledlhs.ref,
-                    compiledrhs.ref,
-                    this.program.LLVMUtil.lower(this.getTempName())
-                  );
-            break;
-          case "/":
-            ref =
-              lhs.ty instanceof FloatType
-                ? this.LLVM._LLVMBuildFDiv(
-                    this.builder,
-                    compiledlhs.ref,
-                    compiledrhs.ref,
-                    this.program.LLVMUtil.lower(this.getTempName())
-                  )
-                : compiledlhs.ty.isSigned
-                ? this.LLVM._LLVMBuildSDiv(
-                    this.builder,
-                    compiledlhs.ref,
-                    compiledrhs.ref,
-                    this.program.LLVMUtil.lower(this.getTempName())
-                  )
-                : this.LLVM._LLVMBuildUDiv(
-                    this.builder,
-                    compiledlhs.ref,
-                    compiledrhs.ref,
-                    this.program.LLVMUtil.lower(this.getTempName())
-                  );
-            break;
-          case "**":
-          default:
-            ref = this.LLVM._LLVMGetPoison(
-              lhs.ty.llvmType(this.LLVM, this.program.LLVMUtil)!
-            );
-        }
-
-        this.ctx.stack.push(
-          new RuntimeValue(ref, new FloatType(lhs.ty.ty as any, null, node))
-        );
-      }
-    } else {
-      this.error("Type", node, `Math operation not supported.`);
-      this.ctx.stack.push(new CompileTimeInvalid(node));
-    }
-  }
 
   ensureDereferenced(value: ExecutionContextValue): ExecutionContextValue {
     if (value instanceof CompileTimeVariableReference) {
@@ -1765,153 +2047,12 @@ export class CompilationPass extends WhackoPass {
     this.ctx.stack.push(new CompileTimeBool(false, expression));
   }
 
-  private compileLogicalExpression(node: BinaryExpression) {
-    this.visit(node.lhs);
-    const lhsValue = assert(
-      this.ctx.stack.pop(),
-      "LHS must exist on the stack."
-    );
-    this.visit(node.rhs);
-    const rhsValue = assert(
-      this.ctx.stack.pop(),
-      "RHS must exist on the stack."
-    );
-    // If any values are invalid, the top of the stack should be invalid
-    if (
-      lhsValue instanceof CompileTimeInvalid ||
-      rhsValue instanceof CompileTimeInvalid
-    ) {
-      this.ctx.stack.push(new CompileTimeInvalid(node));
-      return;
-    }
-
-    if (
-      (lhsValue instanceof CompileTimeInteger ||
-        lhsValue instanceof CompileTimeBool) &&
-      (rhsValue instanceof CompileTimeInteger ||
-        rhsValue instanceof CompileTimeBool)
-    ) {
-      let result: boolean;
-      switch (node.op) {
-        case "&&":
-          result = Boolean(lhsValue.value) && Boolean(rhsValue.value);
-          break;
-        case "||":
-          result = Boolean(lhsValue.value) || Boolean(rhsValue.value);
-          break;
-        default: {
-          this.ctx.stack.push(new CompileTimeInvalid(node));
-          this.error("Semantic", node, `Operation not supported.`);
-          return;
-        }
-      }
-      this.ctx.stack.push(new CompileTimeBool(result, node));
-      return;
-    }
-    // we need to check the types if either of them are runtime
-    if (
-      (lhsValue instanceof RuntimeValue || rhsValue instanceof RuntimeValue) &&
-      (lhsValue.ty instanceof IntegerType || lhsValue.ty instanceof BoolType) &&
-      (rhsValue.ty instanceof IntegerType || rhsValue.ty instanceof BoolType)
-    ) {
-      const compiledLHS = this.ensureCompiled(lhsValue);
-      const compiledRHS = this.ensureCompiled(rhsValue);
-
-      const lhsNE0Name = this.program.LLVMUtil.lower(this.getTempName());
-      const rhsNE0Name = this.program.LLVMUtil.lower(this.getTempName());
-
-      // check if the value equals 0
-      const lhsNE0 = this.LLVM._LLVMBuildICmp(
-        this.builder,
-        this.program.LLVMUtil.LLVMIntPredicate.Ne,
-        compiledLHS.ref,
-        this.LLVM._LLVMConstInt(
-          lhsValue.ty.llvmType(this.LLVM, this.program.LLVMUtil)!,
-          0n,
-          0
-        ),
-        lhsNE0Name
-      );
-      const rhsNE0 = this.LLVM._LLVMBuildICmp(
-        this.builder,
-        this.program.LLVMUtil.LLVMIntPredicate.Ne,
-        compiledRHS.ref,
-        this.LLVM._LLVMConstInt(
-          rhsValue.ty.llvmType(this.LLVM, this.program.LLVMUtil)!,
-          0n,
-          0
-        ),
-        rhsNE0Name
-      );
-
-      // next we need to cast to int1
-      const lhsCastName = this.program.LLVMUtil.lower(this.getTempName());
-      const rhsCastName = this.program.LLVMUtil.lower(this.getTempName());
-      const boolType = new BoolType(null, node);
-      const lhsCast = this.LLVM._LLVMBuildIntCast2(
-        this.builder,
-        lhsNE0,
-        boolType.llvmType(this.LLVM, this.program.LLVMUtil)!,
-        0,
-        lhsCastName
-      );
-      const rhsCast = this.LLVM._LLVMBuildIntCast2(
-        this.builder,
-        rhsNE0,
-        boolType.llvmType(this.LLVM, this.program.LLVMUtil)!,
-        0,
-        rhsCastName
-      );
-
-      // finally perform and
-      const resultName = this.program.LLVMUtil.lower(this.getTempName());
-      let result: LLVMValueRef;
-      switch (node.op) {
-        case "&&": {
-          result = this.LLVM._LLVMBuildAnd(
-            this.builder,
-            lhsCast,
-            rhsCast,
-            resultName
-          );
-          break;
-        }
-        case "||": {
-          result = this.LLVM._LLVMBuildOr(
-            this.builder,
-            lhsCast,
-            rhsCast,
-            resultName
-          );
-          break;
-        }
-        default:
-          this.ctx.stack.push(new CompileTimeInvalid(node));
-          this.error("Semantic", node, `Operation not supported.`);
-          return;
-        // not supported!
-      }
-
-      this.ctx.stack.push(new RuntimeValue(result, new BoolType(null, node)));
-      this.LLVM._free(lhsNE0Name);
-      this.LLVM._free(rhsNE0Name);
-      this.LLVM._free(lhsCastName);
-      this.LLVM._free(rhsCastName);
-      this.LLVM._free(resultName);
-      return;
-    }
-
-    this.ctx.stack.push(new CompileTimeInvalid(node));
-    this.error("Semantic", node, `Operation not supported.`);
-  }
-
   override visitStringLiteral(expression: StringLiteral): void {
     this.ctx.stack.push(new CompileTimeString(expression.value, expression));
   }
 
   override visitLeftUnaryExpression(node: LeftUnaryExpression): void {
-    this.visit(node.expression);
-    const expr = assert(this.ctx.stack.pop(), "Expression must exist at this point.");
+    const expr = obtainValue(node.expression, this);
     switch (node.op) {
       case "!": return this.compileLogicalNotExpression(node, expr);
     }

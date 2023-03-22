@@ -1083,6 +1083,6 @@ export class CompileTimeMethodReference extends CompileTimeValue<MethodClassMemb
 
 export class CompileTimeVariableReference extends CompileTimeValue<ExecutionVariable> {
   constructor(variable: ExecutionVariable) {
-    super(variable, variable.type);
+    super(variable, variable.ty);
   }
 }
