@@ -301,6 +301,17 @@ export class CompilationPass extends WhackoPass {
       : [];
     let nodeParameters: Parameter[];
     let nodeReturnType!: ConcreteType;
+
+    for (const decorator of node.decorators) {
+      if (
+        decorator.name.name === "attribute"
+        && decorator.parameters.length === 2
+        && isStringLiteral(decorator.parameters[0])
+        && isStringLiteral(decorator.parameters[1])
+      ) {
+        attributes.push(decorator.parameters.map(e => (e as StringLiteral).value) as [string, string]);
+      }
+    }
     if (isClassDeclaration(node)) {
       // we are compiling a constructor that may or may not exist
       const constructorClassMember = (node.members.find(e => isConstructorClassMember(e)) ?? null) as ConstructorClassMember | null;
