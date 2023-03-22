@@ -60,6 +60,8 @@ import {
   isConstructorClassMember,
   ThisLiteral,
   isThisLiteral,
+  MethodClassMember,
+  isMethodClassMember,
   // TypeCastExpression,
 } from "../generated/ast";
 import { WhackoModule } from "../module";
@@ -69,6 +71,7 @@ import {
   BuiltinFunction,
   CLASS_HEADER_OFFSET,
   CompileTimeFieldReference,
+  CompileTimeMethodReference,
   CompileTimeVariableReference,
   ConcreteClass,
   ConcreteFunction,
@@ -83,6 +86,7 @@ import {
   IntegerEnumType,
   IntegerType,
   InvalidType,
+  MethodType,
   NamespaceTypeScopeElement,
   PointerType,
   ScopeElement,
@@ -219,7 +223,7 @@ export class CompiledString {
 
 export interface QueuedFunctionCompilation {
   ctx: ExecutionContext;
-  node: FunctionDeclaration | ClassDeclaration;
+  node: FunctionDeclaration | ClassDeclaration | MethodClassMember;
   func: ConcreteFunction;
   typeParameters: ConcreteType[];
   module: WhackoModule;
@@ -252,9 +256,9 @@ export class CompilationPass extends WhackoPass {
           if (isFunctionDeclaration(node)) {
             if (moduleExport instanceof StaticTypeScopeElement) {
               if (node.name.name === "__main_void") {
-                this.compileFunction(node, [], mod, []);
+                this.compileCallable(node, [], mod, []);
               } else {
-                this.compileFunction(node, [], mod, [
+                this.compileCallable(node, [], mod, [
                   ["target-features", "+simd128"]
                 ]);
               }
@@ -283,8 +287,8 @@ export class CompilationPass extends WhackoPass {
    * @param module
    * @returns
    */
-  compileFunction(
-    node: FunctionDeclaration | DeclareFunction | ClassDeclaration,
+  compileCallable(
+    node: FunctionDeclaration | DeclareFunction | ClassDeclaration | MethodClassMember,
     typeParameters: ConcreteType[],
     module: WhackoModule,
     attributes: [string, string][],
@@ -292,7 +296,7 @@ export class CompilationPass extends WhackoPass {
     previsit: ((previsitParams: FunctionVisitParams) => void) | null = null,
     postvisit: ((previsitParams: FunctionVisitParams) => void) | null = null,
   ): ConcreteFunction | null {
-    const nodeTypeParameters = isFunctionDeclaration(node) || isClassDeclaration(node)
+    const nodeTypeParameters = isFunctionDeclaration(node) || isClassDeclaration(node) || isMethodClassMember(node)
       ? node.typeParameters
       : [];
     let nodeParameters: Parameter[];
@@ -311,11 +315,25 @@ export class CompilationPass extends WhackoPass {
     }
 
     if (nodeTypeParameters?.length !== typeParameters.length) return null;
-    const name = getFullyQualifiedName(node, typeParameters)! + (isClassDeclaration(node) ? ".constructor" : "");
+
+    let name: string;
+    if (isMethodClassMember(node)) {
+      console.log("Hit!");
+      name = assert(classType, "Class should exist at this point.").getName()
+        + "." 
+        + node.name.name
+        + (typeParameters.length ? `<${typeParameters.map(e => e.getName()).join(",")}>` : "");
+
+    } else {
+      name = getFullyQualifiedName(node, typeParameters)! + (isClassDeclaration(node) ? ".constructor" : "");
+    }
+
     if (this.cachedFunctions.has(name)) return this.cachedFunctions.get(name)!;
 
     // splice the types into a map
-    const map = new Map<string, ConcreteType>();
+    const map = isMethodClassMember(node)
+      ? new Map(classType!.typeParameters)
+      : new Map<string, ConcreteType>();
 
     for (let i = 0; i < typeParameters.length; i++) {
       const nodeTypeParameter = nodeTypeParameters[i].name;
@@ -338,34 +356,35 @@ export class CompilationPass extends WhackoPass {
 
     if (isFunctionDeclaration(node) || isDeclareFunction(node)) {
       nodeReturnType = this.ctx.resolve(node.returnType) ?? new InvalidType(node.returnType);
+    } else if (isMethodClassMember(node)) {
+      nodeReturnType = this.ctx.resolve(
+        node.returnType,
+        map,
+        assert(getScope(node.returnType), "The scope must exist at this point")
+      ) ?? new InvalidType(node.returnType);
     }
 
     nodeReturnType = assert(nodeReturnType, "Node return type must be defined at this point");
 
-    // check for a cached function... which means we need to get a function type
-    const funcType = new FunctionType(
-      parameterTypes,
-      parameterNames,
-      nodeReturnType,
-      node,
-      node.name.name
-    );
+    // create the function/method type
+    const funcType = isMethodClassMember(node)
+      ? new MethodType(
+        classType!,
+        parameterTypes,
+        parameterNames,
+        nodeReturnType,
+        node,
+        node.name.name
+      )
+      : new FunctionType(
+        parameterTypes,
+        parameterNames,
+        nodeReturnType,
+        node,
+        node.name.name
+      );
 
-    // next we need to define the function types in llvm and create a concrete function
-    const llvmParameterTypes = parameterTypes.map(
-      (e) => e.llvmType(this.LLVM!, this.program.LLVMUtil)!
-    );
-    const llvmReturnType = nodeReturnType.llvmType(
-      this.LLVM,
-      this.program.LLVMUtil
-    )!;
-    const llvmFuncType = this.LLVM._LLVMFunctionType(
-      llvmReturnType,
-      // this is the problem here
-      this.program.LLVMUtil.lowerPointerArray<LLVMTypeRef>(llvmParameterTypes),
-      llvmParameterTypes.length,
-      0
-    );
+    const llvmFuncType = funcType.llvmType(this.LLVM, this.program.LLVMUtil)!;
     const llvmFunc = this.LLVM._LLVMAddFunction(
       this.program.llvmModule,
       this.program.LLVMUtil.lower(name),
@@ -373,26 +392,59 @@ export class CompilationPass extends WhackoPass {
     );
     const func = new ConcreteFunction(llvmFunc, funcType);
 
-    // next we need to initialize the context with some parameter variables
-    for (let i = 0; i < parameterNames.length; i++) {
-      const parameterName = parameterNames[i];
-      const parameterType = parameterTypes[i];
-
-      const ref = this.LLVM._LLVMGetParam(func.funcRef, i);
-      // const strRef = this.LLVM._LLVMPrintValueToString(ref);
-      // const str = this.program.LLVMUtil.lift(strRef);
-      // console.log(str);
-
+    if (isMethodClassMember(node)) {
+      // first parameter is always this
       ctx.vars.set(
-        parameterName,
+        "&self",
         new ExecutionVariable(
-          false,
-          parameterName,
-          new RuntimeValue(ref, parameterType),
-          parameterType
-        )
+          true,
+          "&self",
+          new RuntimeValue(
+            this.LLVM._LLVMGetParam(func.funcRef, 0),
+            classType!,
+          ),
+          classType!,
+        ),
       );
+      // next we need to initialize the context with some parameter variables
+      for (let i = 0; i < parameterNames.length; i++) {
+        const parameterName = parameterNames[i];
+        const parameterType = parameterTypes[i];
+  
+        // the rest of the parameters are at index + 1
+        const ref = this.LLVM._LLVMGetParam(func.funcRef, i + 1);
+  
+        ctx.vars.set(
+          parameterName,
+          new ExecutionVariable(
+            false,
+            parameterName,
+            new RuntimeValue(ref, parameterType),
+            parameterType
+          )
+        );
+      }
+    } else {
+      // next we need to initialize the context with some parameter variables
+      for (let i = 0; i < parameterNames.length; i++) {
+        const parameterName = parameterNames[i];
+        const parameterType = parameterTypes[i];
+  
+        const ref = this.LLVM._LLVMGetParam(func.funcRef, i);
+  
+        ctx.vars.set(
+          parameterName,
+          new ExecutionVariable(
+            // self is always immutable
+            parameterName === "&self",
+            parameterName,
+            new RuntimeValue(ref, parameterType),
+            parameterType
+          )
+        );
+      }
     }
+
 
     for (let i = 0; i < attributes.length; i++) {
       const [key, value] = attributes[i];
@@ -406,7 +458,7 @@ export class CompilationPass extends WhackoPass {
       );
     }
 
-    if (isFunctionDeclaration(node) || isClassDeclaration(node)) {
+    if (isFunctionDeclaration(node) || isClassDeclaration(node) || isMethodClassMember(node)) {
       this.queue.push({
         ctx,
         func,
@@ -427,7 +479,7 @@ export class CompilationPass extends WhackoPass {
   private exhaustQueue() {
     while (true) {
       const { ctx, func, node, typeParameters, module, previsit, postvisit } = this.queue.pop()!;
-      if (isFunctionDeclaration(node) || isClassDeclaration(node)) {
+      if (isFunctionDeclaration(node) || isClassDeclaration(node) || isMethodClassMember(node)) {
         this.entry = this.LLVM._LLVMAppendBasicBlockInContext(
           this.program.llvmContext,
           func.funcRef,
@@ -443,7 +495,7 @@ export class CompilationPass extends WhackoPass {
         if (previsit) previsit({ pass: this });
         if (isClassDeclaration(node)) {
           const constructorClassMember = (node as ClassDeclaration).members.find(e => isConstructorClassMember(e));
-          // console.log("we have a constructor", constructorClassMember);
+
           if (constructorClassMember) {
             this.visit(constructorClassMember);
           }
@@ -727,7 +779,15 @@ export class CompilationPass extends WhackoPass {
       const fieldReference = ty.fields.find(e => e.name === node.member.name);
 
       if (fieldReference) {
-        this.ctx.stack.push(new CompileTimeFieldReference(fieldReference, ref))
+        this.ctx.stack.push(new CompileTimeFieldReference(fieldReference, compiledRootValue.ref));
+        return;
+      }
+
+      const methodElement = ty.element.members
+        .find(e => e.$type === "MethodClassMember" && e.name.name === node.member.name) as MethodClassMember | undefined;
+
+      if (methodElement) {
+        this.ctx.stack.push(new CompileTimeMethodReference(methodElement, ty, ref));
         return;
       }
     }
@@ -881,7 +941,7 @@ export class CompilationPass extends WhackoPass {
 
     // now we need to see what's on the stack and do type inference
     if (
-      callRootValue instanceof CompileTimeFunctionReference &&
+      (callRootValue instanceof CompileTimeFunctionReference || callRootValue instanceof CompileTimeMethodReference) &&
       callTypeParameters.length === 0 &&
       ((callRootValue.value as ScopeTypeElement).node as FunctionDeclaration)
         .typeParameters.length > 0
@@ -919,8 +979,16 @@ export class CompilationPass extends WhackoPass {
     // now we need to do parameter type checking, first let's obtain the element parameters
     let elementParameters: Parameter[] | null = null;
     let splicedTypeMap = new Map<string, ConcreteType>();
-    let functionToBeCompiled: FunctionDeclaration | DeclareFunction | null =
+
+    if (callRootValue instanceof CompileTimeMethodReference) {
+      // we need to replace the type map
+      assert(callRootValue.ty instanceof ConcreteClass, "The type must be a concrete class");
+      splicedTypeMap = new Map((callRootValue.ty as ConcreteClass).typeParameters);
+    }
+
+    let functionToBeCompiled: FunctionDeclaration | DeclareFunction | MethodClassMember | null =
       null;
+    let classType: ConcreteClass | null = null;
     let attributes: [string, string][] = [];
     let builtin: BuiltinFunction | null = null;
 
@@ -991,6 +1059,20 @@ export class CompilationPass extends WhackoPass {
       elementParameters = functionToBeCompiled.parameters;
       builtin = element.builtin;
     }
+
+    let selfParameter: LLVMValueRef = 0 as LLVMValueRef;
+    if (callRootValue instanceof CompileTimeMethodReference) {
+      functionToBeCompiled = callRootValue.value;
+      classType = callRootValue.ty as ConcreteClass;
+      elementParameters = functionToBeCompiled.parameters;
+      selfParameter = callRootValue.ref;
+
+      // add each type here to the new type map because they need to be re-used
+      for (let i = 0; i < callTypeParameters.length; i++) {
+        const name = functionToBeCompiled.typeParameters[i].name;
+        splicedTypeMap.set(name, callTypeParameters[i]);
+      }
+    }
     
     if (elementParameters && functionToBeCompiled) {
       // we are good for parameter type checking
@@ -1054,27 +1136,46 @@ export class CompilationPass extends WhackoPass {
       }
 
       // now that all the type checking is good, we can generate the llvm function
+      const callable = this.compileCallable(
+        functionToBeCompiled,
+        callTypeParameters,
+        assert(getModule(functionToBeCompiled), "Module must exist"),
+        attributes,
+        classType,
+      );
+      if (!callable) {
+        console.log(classType);
+      }
       const func = assert(
-        this.compileFunction(
-          functionToBeCompiled,
-          callTypeParameters,
-          assert(getModule(functionToBeCompiled), "Module must exist"),
-          attributes
-        ),
+        callable,
         "The function should be compiled at this point."
       );
 
-      const loweredExpressions = this.program.LLVMUtil.lowerPointerArray(
-        callParameterValues.map((e) => this.ensureCompiled(e).ref)
-      );
+      let loweredExpressions;
+      let loweredExpressionsLength: number = 0;
+      if (selfParameter) {
+        loweredExpressions = this.program.LLVMUtil.lowerPointerArray(
+          [selfParameter].concat(
+            callParameterValues.map((e) => this.ensureCompiled(e).ref)
+          )
+        );
+        loweredExpressionsLength = callParameterValues.length + 1;
+      } else {
+        loweredExpressions = this.program.LLVMUtil.lowerPointerArray(
+          callParameterValues.map((e) => this.ensureCompiled(e).ref)
+        );
+        loweredExpressionsLength = callParameterValues.length;
+      }
+
       const name = this.program.LLVMUtil.lower(this.getTempName());
+      
       // now that the function is garunteed to be compiled, we can make the llvm call
       const ref = this.LLVM._LLVMBuildCall2(
         this.builder,
         func.ty.llvmType(this.LLVM, this.program.LLVMUtil)!,
         func.funcRef,
         loweredExpressions,
-        callParameterValues.length,
+        loweredExpressionsLength,
         func.ty.returnType instanceof VoidType ? (0 as LLVMStringRef) : name
       );
       this.LLVM._free(loweredExpressions);
@@ -1104,6 +1205,7 @@ export class CompilationPass extends WhackoPass {
     const rhs = obtainValue(node.rhs, this);
     if (lhs instanceof CompileTimeFieldReference) {
       // we are performing a store
+      
       const storePtr = getPtrWithOffset(lhs.ref, lhs.value.offset + CLASS_HEADER_OFFSET, this);
       const compiledRhs = this.ensureCompiled(rhs);
 
@@ -1134,8 +1236,12 @@ export class CompilationPass extends WhackoPass {
     // compile both sides and return the expressions
     super.visitBinaryExpression(node);
     // rhs is on top
-    const rhs = assert(this.ctx.stack.pop(), "Value must exist on the stack");
-    const lhs = assert(this.ctx.stack.pop(), "Value must exist on the stack");
+    const rhs = this.ensureDereferenced(
+      assert(this.ctx.stack.pop(), "Value must exist on the stack")
+    );
+    const lhs = this.ensureDereferenced(
+      assert(this.ctx.stack.pop(), "Value must exist on the stack")
+    );
     // if the types are equal, and the sides are valid
     if (lhs.ty.isEqual(rhs.ty) && rhs.valid && lhs.valid && lhs.ty.isNumeric) {
       // we can perform the operation
@@ -1513,6 +1619,15 @@ export class CompilationPass extends WhackoPass {
       this.error("Type", node, `Math operation not supported.`);
       this.ctx.stack.push(new CompileTimeInvalid(node));
     }
+  }
+
+  ensureDereferenced(value: ExecutionContextValue): ExecutionContextValue {
+    if (value instanceof CompileTimeVariableReference) {
+      return value.value.value;
+    } else if (value instanceof CompileTimeFieldReference) {
+      return this.ensureCompiled(value);
+    }
+    return value;
   }
 
   ensureCompiled(value: ExecutionContextValue): RuntimeValue {

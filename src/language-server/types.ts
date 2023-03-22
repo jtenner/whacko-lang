@@ -10,6 +10,7 @@ import {
   Expression,
   FunctionDeclaration,
   isConstructorClassMember,
+  MethodClassMember,
   NamespaceDeclaration,
   VariableDeclarator,
 } from "./generated/ast";
@@ -374,7 +375,7 @@ export class ConcreteClass extends ConcreteType {
     const constructorParameterTypes = assert(this.getClassTypeParameters(), "We must be able to resolve the parameters.");
 
     const func = assert(
-      pass.compileFunction(
+      pass.compileCallable(
         this.element,
         constructorParameterTypes,
         getModule(this.element)!,
@@ -517,6 +518,57 @@ export class FunctionType extends ConcreteType {
       this.returnType.llvmType(LLVM, LLVMUtil)!,
       loweredParameterTypes,
       this.parameterTypes.length,
+      0
+    );
+    LLVM._free(loweredParameterTypes);
+    return result;
+  }
+}
+
+export class MethodType extends ConcreteType {
+  constructor(
+    public thisType: ConcreteType,
+    public parameterTypes: ConcreteType[],
+    public parameterNames: string[],
+    public returnType: ConcreteType,
+    node: AstNode,
+    name: string
+  ) {
+    super(Type.method, node, name);
+  }
+
+  override get isNumeric() {
+    return false;
+  }
+
+  override isEqual(other: ConcreteType) {
+    return (
+      other instanceof FunctionType &&
+      this.parameterTypes.reduce(
+        (acc, param, i) => param.isEqual(other.parameterTypes[i]),
+        true
+      ) &&
+      this.returnType.isEqual(this.returnType)
+    );
+  }
+
+  override getName() {
+    const parameterNames = this.parameterTypes.map((e) => e.getName());
+    return `Function(${parameterNames.join(",")})`;
+  }
+
+  override llvmType(
+    LLVM: Module,
+    LLVMUtil: typeof import("llvm-js")
+  ): LLVMTypeRef | null {
+    const parameterTypes = [this.thisType].concat(this.parameterTypes);
+    const parameterLLVMTypes = parameterTypes.map((e) => e.llvmType(LLVM, LLVMUtil)!);
+
+    const loweredParameterTypes = LLVMUtil.lowerPointerArray(parameterLLVMTypes);
+    const result = LLVM._LLVMFunctionType(
+      this.returnType.llvmType(LLVM, LLVMUtil)!,
+      loweredParameterTypes,
+      parameterTypes.length,
       0
     );
     LLVM._free(loweredParameterTypes);
@@ -1020,6 +1072,12 @@ export class PointerType extends ConcreteType {
 export class CompileTimeFieldReference extends CompileTimeValue<Field> {
   constructor(field: Field, public ref: LLVMValueRef) {
     super(field, field.ty);
+  }
+}
+
+export class CompileTimeMethodReference extends CompileTimeValue<MethodClassMember> {
+  constructor(method: MethodClassMember, ty: ConcreteClass, public ref: LLVMValueRef) {
+    super(method, ty);
   }
 }
 

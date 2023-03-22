@@ -82,7 +82,7 @@ FieldClassMember:
     Decorators (private?="private")? Name ":" type=TypeExpression ("=" initializer=Expression)? ";";
 
 MethodClassMember:
-    Decorators (private?="private")? Name Parameters ":" ReturnType block=BlockStatement;
+    Decorators (private?="private")? Name NamedTypeParameters Parameters ":" ReturnType block=BlockStatement;
 
 GetterClassMember:
     Decorators (private?="private")? "get" Name ":" ReturnType block=BlockStatement;
