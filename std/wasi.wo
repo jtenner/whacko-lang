@@ -1,0 +1,194 @@
+// This file is based upon assembly/bindings/wasi_snapshot_preview1.ts in
+// AssemblyScript/wasi-shim
+
+export namespace wasi {
+  export namespace types {
+    // TODO: A lot of these types are actually enums and classes.
+    export type errno = u16;
+    export type timestamp = u64;
+    export type fd = u32;
+    export type filesize = u32;
+    export type advice = u8;
+    export type fdstat = usize;
+    export type fdflags = u16;
+    export type rights = u64;
+    export type filestat = usize;
+    export type fstflags = u16;
+    export type iovec = usize;
+    export type prestat = usize;
+    export type dirent = usize;
+    export type dircookie = u64;
+    export type filedelta = i64;
+    export type whence = u8;
+    export type lookupflags = u32;
+    export type oflags = u16;
+    export type subscription = usize;
+    export type event = usize;
+    export type signal = u8;
+    export type riflags = u16;
+    export type roflags = u16;
+    export type siflags = u16;
+    export type sdflags = u8;
+  }
+
+  export declare functions {
+    fn args_get(argv: usize, argv_buf: usize): types.errno;
+    fn args_sizes_get(argc: usize, argv_buf_size: usize): types.errno;
+    fn clock_res_get(clock: types.clockid, resolution: usize): types.errno;
+    fn clock_time_get(clock: types.clockid, precision: types.timestamp, time: usize): types.errno;
+    fn environ_get(environ: usize, environ_buf: usize): types.errno;
+    fn environ_sizes_get(environ_count: usize, environ_buf_size: usize): types.errno;
+    fn fd_advise(
+      fd: types.fd,
+      offset: types.filesize,
+      len: types.filesize,
+      advice: types.advice
+    ): types.errno;
+    fn fd_allocate(fd: types.fd, offset: types.filesize, len: types.filesize): types.errno;
+    fn fd_close(fd: types.fd): types.errno;
+    fn fd_datasync(fd: types.fd): types.errno;
+    fn fd_fdstat_get(fd: types.fd, buf: types.fdstat): types.errno;
+    fn fd_fdstat_set_flags(fd: types.fd, flags: types.fdflags): types.errno;
+    fn fd_fdstat_set_rights(fd: types.fd, fs_rights_base: types.rights, fs_rights_inheriting: types.rights): types.errno;
+    fn fd_filestat_get(fd: types.fd, buf: types.filestat): types.errno;
+    fn fd_filestat_set_size(fd: types.fd, size: types.filesize): types.errno;
+    fn fd_filestat_set_times(
+      fd: types.fd,
+      st_atim: types.timestamp,
+      st_mtim: types.timestamp,
+      fstflags: types.fstflags
+    ): types.errno;
+    fn fd_pread(
+      fd: types.fd,
+      iovs: usize,
+      iovs_len: usize,
+      offset: types.filesize,
+      nread: usize
+    ): types.errno;
+    fn fd_prestat_get(fd: types.fd, buf: types.prestat): types.errno;
+    fn fd_prestat_dir_name(fd: types.fd, path: usize, path_len: usize): types.errno;
+    fn fd_pwrite(
+      fd: types.fd,
+      iovs: usize,
+      iovs_len: usize,
+      offset: types.filesize,
+      nwritten: usize
+    ): types.errno;
+    fn fd_read(
+      fd: types.fd,
+      iovs: usize,
+      iovs_len: usize,
+      nread: usize
+    ): types.errno;
+    fn fd_readdir(
+      fd: types.fd,
+      buf: usize,
+      buf_len: usize,
+      cookie: types.dircookie,
+      buf_used: usize
+    ): types.errno;
+    fn fd_renumber(from_: types.fd, to: types.fd): types.errno;
+    fn fd_seek(
+      fd: types.fd,
+      offset: types.filedelta,
+      whence: types.whence,
+      newoffset: usize
+    ): types.errno;
+    fn fd_sync(fd: types.fd): types.errno;
+    fn fd_tell(fd: types.fd, newoffset: usize): types.errno;
+    fn fd_write(
+      fd: types.fd,
+      iovs: usize,
+      iovs_len: usize,
+      nwritten: usize
+    ): types.errno;
+    fn path_create_directory(fd: types.fd, path: usize, path_len: usize): types.errno;
+    fn path_filestat_get(
+      fd: types.fd,
+      flags: types.lookupflags,
+      path: usize,
+      path_len: usize,
+      buf: types.filestat
+    ): types.errno;
+    fn path_filestat_set_times(
+      fd: types.fd,
+      flags: types.lookupflags,
+      path: usize,
+      path_len: usize,
+      st_atim: types.timestamp,
+      st_mtin: types.timestamp,
+      fstflags: types.fstflags
+    ): types.errno;
+    fn path_link(
+      old_fd: types.fd,
+      old_flags: types.lookupflags,
+      old_path: usize,
+      old_path_len: usize,
+      new_fd: types.fd,
+      new_path: usize,
+      new_path_len: usize
+    ): types.errno;
+    fn path_open(
+      dirfd: types.fd,
+      dirflags: types.lookupflags,
+      path: usize,
+      path_len: usize,
+      oflags: types.oflags,
+      fs_rights_base: types.rights,
+      fs_rights_inheriting: types.rights,
+      fs_flags: types.fdflags,
+      fd: usize
+    ): types.errno;
+    fn path_readlink(
+      fd: types.fd,
+      path: usize,
+      path_len: usize,
+      buf: usize,
+      buf_len: usize,
+      buf_used: usize
+    ): types.errno;
+    fn path_remove_directory(fd: types.fd, path: usize, path_len: usize): types.errno;
+    fn path_rename(
+      old_fd: types.fd,
+      old_path: usize,
+      old_path_len: usize,
+      new_fd: types.fd,
+      new_path: usize,
+      new_path_len: usize
+    ): types.errno;
+    fn path_symlink(
+      old_path: usize,
+      old_path_len: usize,
+      fd: types.fd,
+      new_path: usize,
+      new_path_len: usize
+    ): types.errno;
+    fn path_unlink_file(fd: types.fd, path: usize, path_len: usize): types.errno;
+    fn poll_oneoff(
+      in: usize,
+      out: usize,
+      nsubscriptions: usize,
+      nevents: usize
+    ): types.errno;
+    fn proc_exit(rval: u32): void;
+    fn proc_raise(sig: types.signal): types.errno;
+    fn random_get(buf: usize, buf_len: usize): types.errno;
+    fn sched_yield(): types.errno;
+    fn sock_recv(
+      sock: types.fd,
+      ri_data: usize,
+      ri_data_len: usize,
+      ri_flags: types.riflags,
+      ro_datalen: usize,
+      ro_flags: usize
+    ): types.errno;
+    fn sock_send(
+      sock: types.fd,
+      si_data: usize,
+      si_data_len: usize,
+      si_flags: types.siflags,
+      so_datalen: usize
+    ): types.errno;
+    fn sock_shutdown(sock: types.fd, how: types.sdflags): types.errno;
+  } from "wasi_snapshot_preview1";
+}
