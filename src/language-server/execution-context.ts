@@ -145,6 +145,7 @@ export class ExecutionContext {
 
       // now we have the namespace elements
       const element = scopeElements.get(elementName)! as ScopeTypeElement;
+
       // we must be a ScopeTypeElement
       if (!(element instanceof ScopeTypeElement)) return null;
 
@@ -180,6 +181,8 @@ export class ExecutionContext {
           else return null;
         }
       }
+
+
       if (element.node.$type === "ClassDeclaration")
         return this.resolveClass(element, concreteTypeParameters);
       if (element.node.$type === "TypeDeclaration")
@@ -298,7 +301,7 @@ export class ExecutionContext {
     );
     const node = element.node;
     const types = new Map<string, ConcreteType>();
-    const typeDeclaration = element.node as TypeExpression;
+    const typeDeclaration = element.node as TypeDeclaration;
 
     if (element instanceof DynamicTypeScopeElement) {
       for (let i = 0; i < element.typeParameters.length; i++) {
@@ -310,7 +313,7 @@ export class ExecutionContext {
     const scope = getScope(node)!;
     assert(scope, "Scope must exist at this point.");
 
-    return this.resolve(typeDeclaration, types, scope);
+    return this.resolve(typeDeclaration.type, types, scope);
   }
 }
 

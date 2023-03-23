@@ -570,6 +570,12 @@ export class CompilationPass extends WhackoPass {
     }
   }
 
+  override visitExpressionStatement(node: ExpressionStatement): void {
+    this.visit(node.expression);
+    assert(this.ctx.stack.length === 1, "There should be an item on the stack.");
+    this.ctx.stack.pop();
+  }
+
   override visitFunctionDeclaration(node: FunctionDeclaration): void {
     for (let i = 0; i < node.parameters.length; i++) {
       const parameter = node.parameters[i];
@@ -1716,9 +1722,7 @@ export class CompilationPass extends WhackoPass {
         attributes,
         classType,
       );
-      if (!callable) {
-        console.log(classType);
-      }
+
       const func = assert(
         callable,
         "The function should be compiled at this point."

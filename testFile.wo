@@ -1,9 +1,9 @@
 export fn _start(): void {
   let config_id = lunatic.process.create_config();
-  if (config_id == -1) { Unreachable(); }
+  // if (config_id == -1) { Unreachable(); }
   lunatic.process.drop_config(u64(config_id));
 
   let errno = wasi.functions.environ_sizes_get(usize(12), usize(34));
-  if (errno != 0) { Unreachable(); }
+ // if (errno != 0) { Unreachable(); }
   return;
 }

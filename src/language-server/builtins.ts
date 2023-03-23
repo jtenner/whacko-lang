@@ -61,25 +61,40 @@ const simdInitialize = (typeEnum: Type) =>
 
 const integerCast =
   (size: number, ty: IntegerEnumType, signed: boolean) =>
-  ({ ctx, ast, parameters, typeParameters }: BuiltinFunctionProps) => {
+  ({ ctx, ast, parameters, typeParameters, pass }: BuiltinFunctionProps) => {
     const [value] = parameters;
     const [parameterType] = typeParameters;
+    const intType = new IntegerType(ty, null, ast);
+
     if (
       parameters.length === 1 &&
       typeParameters.length === 1 &&
       value.ty.isEqual(parameterType) &&
       parameterType instanceof IntegerType
     ) {
-      if (value instanceof CompileTimeInteger) {
+      const derefedValue = pass.ensureDereferenced(value);
+      if (derefedValue instanceof CompileTimeInteger) {
         // we are good to go
         const intValue = signed
-          ? BigInt.asIntN(size, value.value)
-          : BigInt.asUintN(size, value.value);
+          ? BigInt.asIntN(size, derefedValue.value)
+          : BigInt.asUintN(size, derefedValue.value);
         ctx.stack.push(
-          new CompileTimeInteger(intValue, new IntegerType(ty, intValue, ast))
+          new CompileTimeInteger(intValue, intType)
         );
+      } else if (derefedValue instanceof RuntimeValue && derefedValue.ty instanceof IntegerType) {
+        const name = pass.getTempNameRef();
+        const ref = pass.LLVM._LLVMBuildIntCast2(
+          pass.builder,
+          derefedValue.ref,
+          intType.llvmType(pass.LLVM, pass.program.LLVMUtil)!,
+          intType.isSigned ? 1 : 0,
+          name,
+        );
+        ctx.stack.push(new RuntimeValue(ref, intType));
+        pass.LLVM._free(name);
       } else {
-        // TODO: Implement runtime casting
+        pass.error("Type", ast, `Cannot cast non-integer value to integer.`);
+        ctx.stack.push(new CompileTimeInvalid(ast));
       }
     } else {
       ctx.stack.push(new CompileTimeInvalid(ast));
