@@ -1,22 +1,9 @@
-class A {
-  a: i32 = i32(42);
-
-  constructor() {
-  }
-
-  doStuff<U>(a: U): void {
-    a + a;
-    return;
-  }
-}
-
-export fn someVal(): i32 {
-  return i32(42);
-}
-
 export fn _start(): void {
-  let test = new A();
-  test = new A();
-  test.a = someVal() + i32(0);
+  let config_id = lunatic.process.create_config();
+  if (config_id == -1) { Unreachable(); }
+  lunatic.process.drop_config(u64(config_id));
+
+  let errno = wasi.functions.environ_sizes_get(usize(12), usize(34));
+  if (errno != 0) { Unreachable(); }
   return;
 }
