@@ -815,8 +815,9 @@ export class CompilationPass extends WhackoPass {
           `Cannot find exported scope element ${node.member.name}.`
         );
         this.ctx.stack.push(new CompileTimeInvalid(node));
-        return;
       }
+
+      return;
     } else if (rootValue.ty instanceof ConcreteClass) {
       // we should ensure the value is compiled
       const compiledRootValue = this.ensureCompiled(rootValue);
