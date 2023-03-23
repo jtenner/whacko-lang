@@ -1,9 +1,11 @@
-export fn _start(): void {
-  let config_id = lunatic.process.create_config();
-  // if (config_id == -1) { Unreachable(); }
-  lunatic.process.drop_config(u64(config_id));
+enum Test {
+  value
+}
 
-  let errno = wasi.functions.environ_sizes_get(usize(12), usize(34));
- // if (errno != 0) { Unreachable(); }
-  return;
+export fn doSomething(param: Test): void {
+
+}
+
+export fn _start(): void {
+  doSomething(Test.value);
 }

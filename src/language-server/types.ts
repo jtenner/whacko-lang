@@ -7,6 +7,7 @@ import {
   DeclareDeclaration,
   DeclareFunction,
   Decorator,
+  EnumDeclaration,
   Expression,
   FunctionDeclaration,
   isConstructorClassMember,
@@ -1084,5 +1085,14 @@ export class CompileTimeMethodReference extends CompileTimeValue<MethodClassMemb
 export class CompileTimeVariableReference extends CompileTimeValue<ExecutionVariable> {
   constructor(variable: ExecutionVariable) {
     super(variable, variable.ty);
+  }
+}
+
+export class EnumType extends IntegerType {
+  constructor(
+    node: EnumDeclaration,
+    public values: Map<string, bigint>,
+  ) {
+    super(Type.i32, null, node);
   }
 }

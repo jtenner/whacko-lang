@@ -10,6 +10,7 @@ entry Program:
     | declarations+=TypeDeclaration
     | declarations+=NamespaceDeclaration
     | declarations+=BuiltinTypeDeclaration
+    | declarations+=EnumDeclaration
 )*;
 
 NamespaceDeclaration:
@@ -21,7 +22,8 @@ NamespaceDeclaration:
     | declarations+=TypeDeclaration
     | declarations+=NamespaceDeclaration
     | declarations+=BuiltinDeclaration
-    | declarations+=BuiltinTypeDeclaration)* "}";
+    | declarations+=BuiltinTypeDeclaration
+    | declarations+=EnumDeclaration)* "}";
 
 BuiltinTypeDeclaration:
     Decorators (export?="export") "builtintype" Name NamedTypeParameters ";";
@@ -36,7 +38,10 @@ DeclareFunction:
     Decorators "fn" Name Parameters ":" ReturnType ";";
 
 EnumDeclaration:
-    Decorators (export?="export")? "enum" Name "{"  "}";
+    Decorators (export?="export")? "enum" Name "{" (declarators+=EnumDeclarator ("," declarators+=EnumDeclarator)* ) "}";
+
+EnumDeclarator:
+    name=ID ("=" initializer=IntegerLiteral)?;
 
 ImportDeclaration:
     "import" "{" (declarators+=ImportDeclarator ("," declarators+=ImportDeclarator)*)? "}" "from" path=String ";";

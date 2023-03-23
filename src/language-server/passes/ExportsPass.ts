@@ -6,6 +6,7 @@ import {
   ClassDeclaration,
   DeclareDeclaration,
   DeclareFunction,
+  EnumDeclaration,
   ExportDeclarator,
   FunctionDeclaration,
   ID,
@@ -161,6 +162,10 @@ export class ExportsPass extends WhackoPass {
         `Cannot export ${name} because it's not defined in scope.`
       );
     }
+  }
+
+  override visitEnumDeclaration(node: EnumDeclaration): void {
+    this.defineExportableType(node);
   }
 
   defineExportableType(

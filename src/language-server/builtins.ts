@@ -70,18 +70,22 @@ const integerCast =
       parameters.length === 1 &&
       typeParameters.length === 1 &&
       value.ty.isEqual(parameterType) &&
-      parameterType instanceof IntegerType
+      parameterType.isNumeric
     ) {
       const derefedValue = pass.ensureDereferenced(value);
-      if (derefedValue instanceof CompileTimeInteger) {
+
+      if (derefedValue instanceof CompileTimeInteger || derefedValue instanceof CompileTimeFloat) {
         // we are good to go
         const intValue = signed
-          ? BigInt.asIntN(size, derefedValue.value)
-          : BigInt.asUintN(size, derefedValue.value);
+          ? BigInt.asIntN(size, BigInt(derefedValue.value))
+          : BigInt.asUintN(size, BigInt(derefedValue.value));
         ctx.stack.push(
           new CompileTimeInteger(intValue, intType)
         );
-      } else if (derefedValue instanceof RuntimeValue && derefedValue.ty instanceof IntegerType) {
+      } else if (
+        derefedValue instanceof RuntimeValue
+          && (derefedValue.ty instanceof IntegerType || derefedValue.ty instanceof FloatType)
+      ) {
         const name = pass.getTempNameRef();
         const ref = pass.LLVM._LLVMBuildIntCast2(
           pass.builder,
@@ -100,6 +104,12 @@ const integerCast =
       ctx.stack.push(new CompileTimeInvalid(ast));
     }
   };
+
+const floatCast =
+  (size: number, ty: Type.f32 | Type.f64) => 
+  ({ ctx, ast, parameters, typeParameters, pass }: BuiltinFunctionProps) => {
+
+  }; 
 
 export function registerDefaultBuiltins(program: WhackoProgram) {
   program.addBuiltin("i8", integerCast(8, Type.i8, true));

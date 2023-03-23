@@ -5,10 +5,13 @@ import {
   ClassDeclaration,
   DeclareDeclaration,
   DeclareFunction,
+  EnumDeclaration,
   FunctionDeclaration,
   ID,
+  isBuiltinTypeDeclaration,
   isClassDeclaration,
   isConstructorClassMember,
+  isEnumDeclaration,
   isFieldClassMember,
   isFunctionDeclaration,
   isGetterClassMember,
@@ -58,9 +61,32 @@ import {
   u64x2Type,
   f64x2Type,
   ConcreteClass,
+  EnumType,
 } from "./types";
 import { getFileName, getModule } from "./passes/ModuleCollectionPass";
 import { LLVMValueRef } from "llvm-js";
+import { getFullyQualifiedName } from "./passes/CompilationPass";
+
+export function resolveEnum(declaration: EnumDeclaration): EnumType | null {
+  const values = new Map<string, bigint>();
+  let nextValue = 0n;
+  for (const declarator of declaration.declarators) {
+    const name = declarator.name.name;
+    // uhoh there's already an enum value declared
+    if (values.has(name)) return null;
+
+    if (declarator.initializer) {
+      const value = BigInt.asIntN(32, BigInt(declarator.initializer.value));
+      nextValue = value + 1n;
+      values.set(name, value);
+    } else {
+      values.set(name, nextValue);
+      nextValue++;
+    }
+  }
+  const type = new EnumType(declaration, values);
+  return type;
+}
 
 export class ExecutionVariable {
   constructor(
@@ -183,11 +209,11 @@ export class ExecutionContext {
       }
 
 
-      if (element.node.$type === "ClassDeclaration")
+      if (isClassDeclaration(element.node))
         return this.resolveClass(element, concreteTypeParameters);
-      if (element.node.$type === "TypeDeclaration")
+      if (isTypeDeclaration(element.node))
         return this.resolveTypeDeclaration(element, concreteTypeParameters);
-      if (element.node.$type === "BuiltinTypeDeclaration") {
+      if (isBuiltinTypeDeclaration(element.node)) {
         const builtinType = assert(element.builtinType, "The builtin type must be defined.");
         return builtinType({
           ast: typeExpression,
@@ -196,11 +222,18 @@ export class ExecutionContext {
           typeParameters: concreteTypeParameters,
         });
       }
+      if (isEnumDeclaration(element.node)) {
+        const cachedConcreteType = (element as StaticTypeScopeElement).cachedConcreteType;
+        if (cachedConcreteType) return cachedConcreteType;
+        const result = resolveEnum(element.node as EnumDeclaration);
+        (element as StaticTypeScopeElement).cachedConcreteType = result;
+        return result;
+      }
     } else if (typeExpression.$type === "ID") {
       const id = typeExpression as ID;
       const name = id.name;
+      const typeParameters = id.typeParameters ?? [];
       if (typeMap.has(name)) return typeMap.get(name)!;
-
       // raw type
       switch (name) {
         case "bool":
@@ -244,7 +277,6 @@ export class ExecutionContext {
         case "string":
           return new StringType(null, typeExpression);
       }
-
       if (scope.has(name)) {
         const element = scope.get(name)!;
         const node = element.node as BuiltinTypeDeclaration;
@@ -275,6 +307,53 @@ export class ExecutionContext {
               typeParameters: [],
             });
           }
+        } else if (element instanceof DynamicTypeScopeElement) {
+          // we have a bunch of type parameters to resolve in this scope
+          const concreteTypeParameters = [] as ConcreteType[];
+
+          if (element.typeParameters.length !== typeParameters.length) {
+            // we can't resolve the type, not enough type parameters
+            return null;
+          }
+
+          for (let i = 0; i < typeParameters.length; i++) {
+            const typeParameter = typeParameters[i];
+            const concreteType = this.resolve(typeParameter, typeMap, scope);
+            if (concreteType) {
+              concreteTypeParameters.push(concreteType);
+            } else {
+              // we need to be able to resolve this type at this point
+              return null;
+            }
+          }
+
+          // next we generate the new type map and splice it
+          const map = new Map<string, ConcreteType>();
+          for (let i = 0; i < concreteTypeParameters.length; i++) {
+            const name = element.typeParameters[i];
+            const type = concreteTypeParameters[i];
+            map.set(name, type);
+          }
+
+          // finally resolve the scope element in the scope of the scope type element
+          return this.resolve(element.node as TypeExpression, map, assert(getScope(element.node), "The scope must exist at this point."));
+        } else if (element instanceof StaticTypeScopeElement) {
+          // no need for a type map to resolve this element, so we just defer to resolving the type in
+          // it's own context
+          if (element.cachedConcreteType) return element.cachedConcreteType;
+
+          if (isEnumDeclaration(node)) {
+            const type = resolveEnum(node);
+            if (type) {
+              element.cachedConcreteType = type;
+              return type;
+            }
+            // uhoh, we didn't find it
+          }
+
+          if (isTypeDeclaration(node)) {
+            return this.resolveTypeDeclaration(element, []);
+          }
         }
       }
     }
@@ -299,6 +378,7 @@ export class ExecutionContext {
       element.node.$type === "TypeDeclaration",
       "Element must be a type declaration."
     );
+    if (element instanceof StaticTypeScopeElement && element.cachedConcreteType) return element.cachedConcreteType;
     const node = element.node;
     const types = new Map<string, ConcreteType>();
     const typeDeclaration = element.node as TypeDeclaration;
@@ -313,7 +393,13 @@ export class ExecutionContext {
     const scope = getScope(node)!;
     assert(scope, "Scope must exist at this point.");
 
-    return this.resolve(typeDeclaration.type, types, scope);
+    const type = this.resolve(typeDeclaration.type, types, scope);
+
+    if (element instanceof StaticTypeScopeElement) {
+      element.cachedConcreteType = type;
+    }
+
+    return type;
   }
 }
 
@@ -374,6 +460,17 @@ export class CompileTimeDeclareFunctionReference extends CompileTimeValue<ScopeE
 export class CompileTimeClassReference extends CompileTimeValue<ScopeElement> {
   constructor(value: ScopeElement) {
     super(value, new InvalidType(value.node));
+  }
+}
+
+export class CompileTimeEnumReference extends CompileTimeValue<ScopeElement> {
+  constructor(value: ScopeElement) {
+    assert(value instanceof StaticTypeScopeElement, "Enums should always be static scope elements.");
+    assert(isEnumDeclaration(value.node), "The scope element must be an enum at this point.");
+    const result = (value as StaticTypeScopeElement).cachedConcreteType ?? resolveEnum(value.node as EnumDeclaration);
+    assert(result instanceof EnumType);
+    (value as StaticTypeScopeElement).cachedConcreteType = result;
+    super(value, result!);
   }
 }
 
