@@ -192,8 +192,8 @@ export class WhackoProgram {
     console.error(errorString);
 
     const bufref = this.LLVM._LLVMWriteBitcodeToMemoryBuffer(this.llvmModule);
-    const bufrefStart = this.LLVM.HEAPU32[bufref >>> 2];
-    const bufrefEnd = this.LLVM.HEAPU32[(bufref >>> 2) + 1];
+    const bufsize = this.LLVM._LLVMGetBufferSize(bufref);
+    const bufstart = this.LLVM._LLVMGetBufferStart(bufref);
 
     this.LLVM._LLVMDisposeBuilder(compilationPass.builder);
     this.LLVM._LLVMDisposeModule(this.llvmModule);
@@ -216,7 +216,7 @@ export class WhackoProgram {
     // const objBufrefEnd = this.LLVM.HEAPU32[(derefObjBufferPtr >>> 2) + 1];
 
     const result = [
-      ["test.bc", Buffer.from(this.LLVM.HEAPU8.buffer, bufrefStart, bufrefEnd - bufrefStart)],
+      ["test.bc", Buffer.from(this.LLVM.HEAPU8.buffer, bufstart, bufsize)],
       ["test.ll", Buffer.from(str)],
     ] as [string, Buffer][];
 
