@@ -1993,7 +1993,7 @@ export class CompilationPass extends WhackoPass {
         constStrArray = this.compiledStringPtrs.get(value.value)!;
       } else {
         const lowered = this.program.LLVMUtil.lower(value.value);
-        const inst = this.LLVM._LLVMBuildGlobalStringPtr(
+        const inst = this.LLVM._LLVMBuildGlobalString(
           this.builder,
           lowered,
           lowered
@@ -2008,6 +2008,11 @@ export class CompilationPass extends WhackoPass {
       const int32Type = new IntegerType(Type.i32, null, value.ty.node);
       const int32LLVMType = int32Type.llvmType(this.LLVM, this.program.LLVMUtil)!;
       const arrayType = new ArrayType(charType, byteLength, value.ty.node, "");
+      const stringLength = this.LLVM._LLVMConstInt(
+        int32LLVMType,
+        BigInt(byteLength),
+        0,
+      );
       const arrayLength = this.LLVM._LLVMConstInt(
         int32LLVMType,
         BigInt(byteLength) + CLASS_HEADER_OFFSET,
@@ -2020,15 +2025,19 @@ export class CompilationPass extends WhackoPass {
       // 4. push runtime value on stack 
 
       // MALLOC
-      const arrayLLVMType = arrayType.llvmType(this.LLVM, this.program.LLVMUtil)!;
+
+      const arrayLLVMType = this.LLVM._LLVMArrayType(this.LLVM._LLVMIntType(8), byteLength + Number(CLASS_HEADER_OFFSET));
       const resultPtrName = this.getTempNameRef();
-      const resultPtr = this.LLVM._LLVMBuildArrayMalloc(
+      const resultPtr = this.LLVM._LLVMBuildMalloc(
         this.builder,
         arrayLLVMType,
-        arrayLength,
         resultPtrName,
       );
       this.LLVM._free(resultPtrName);
+
+      // store the size of the string on the reference
+      const sizePtr = getPtrWithOffset(resultPtr, 0n, this);
+      this.LLVM._LLVMBuildStore(this.builder, stringLength, sizePtr);
 
       const destinationPtr = getPtrWithOffset(resultPtr, 8n, this);
 

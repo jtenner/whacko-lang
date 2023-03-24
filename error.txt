@@ -6,31 +6,33 @@ target triple = "wasm32-wasi"
 
 define void @_start() #0 {
 entry:
-  %0 = bitcast i32 20 to i32
-  %mallocsize = mul i32 %0, ptrtoint (ptr getelementptr (i32, ptr null, i32 1) to i32)
-  %malloccall = tail call ptr @malloc(i32 %mallocsize)
+  %malloccall = tail call ptr @malloc(i32 ptrtoint (ptr getelementptr ([20 x i8], ptr null, i32 1) to i32))
   %"tmp0~" = bitcast ptr %malloccall to ptr
-  %"tmp1~" = getelementptr ptr, ptr %"tmp0~", i32 8
-  call void @llvm.memcpy.p0.p0.i32(ptr align 1 %"tmp1~", ptr align 1 @"Hello world!", i32 20, i1 false)
+  %"tmp1~" = getelementptr i8, ptr %"tmp0~", i32 0
+  store i32 12, ptr %"tmp1~", align 4
+  %"tmp2~" = getelementptr i8, ptr %"tmp0~", i32 8
+  call void @llvm.memcpy.p0.p0.i32(ptr align 1 %"tmp2~", ptr align 1 @"Hello world!", i32 20, i1 false)
   call void @"std/console.wo~console.log"(ptr %"tmp0~")
   ret void
 }
 
 define void @"std/console.wo~console.log"(ptr %0) {
 entry:
-  %"tmp3~" = alloca ptr, i32 8, align 8
-  %"tmp4~" = ptrtoint ptr %"tmp3~" to i32
-  %"tmp5~" = ptrtoint ptr %0 to i32
-  %"tmp6~" = add i32 %"tmp5~", 8
-  %"tmp7~" = inttoptr i32 %"tmp4~" to ptr
-  store i32 %"tmp6~", ptr %"tmp7~", align 4
-  %"tmp8~" = add i32 %"tmp4~", 4
-  %"tmp9~" = ptrtoint ptr %0 to i32
-  %"tmp10~" = inttoptr i32 %"tmp8~" to ptr
-  store i32 %"tmp9~", ptr %"tmp10~", align 4
-  %"tmp11~" = alloca ptr, i32 4, align 8
-  %"tmp12~" = ptrtoint ptr %"tmp11~" to i32
-  %"tmp13~" = call i16 @"std/wasi.wo~wasi.functions.fd_write"(i32 1, i32 %"tmp4~", i32 1, i32 %"tmp12~")
+  %"tmp4~" = alloca ptr, i32 8, align 8
+  %"tmp5~" = ptrtoint ptr %"tmp4~" to i32
+  %"tmp6~" = ptrtoint ptr %0 to i32
+  %"tmp7~" = add i32 %"tmp6~", 8
+  %"tmp8~" = inttoptr i32 %"tmp5~" to ptr
+  store i32 %"tmp7~", ptr %"tmp8~", align 4
+  %"tmp9~" = add i32 %"tmp5~", 4
+  %"tmp10~" = ptrtoint ptr %0 to i32
+  %"tmp11~" = inttoptr i32 %"tmp10~" to ptr
+  %"tmp12~" = load i32, ptr %"tmp11~", align 4
+  %"tmp13~" = inttoptr i32 %"tmp9~" to ptr
+  store i32 %"tmp12~", ptr %"tmp13~", align 4
+  %"tmp14~" = alloca ptr, i32 4, align 8
+  %"tmp15~" = ptrtoint ptr %"tmp14~" to i32
+  %"tmp16~" = call i16 @"std/wasi.wo~wasi.functions.fd_write"(i32 1, i32 %"tmp5~", i32 1, i32 %"tmp15~")
   ret void
 }
 

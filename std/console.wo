@@ -8,7 +8,7 @@ export namespace console {
     memory.store(vec, memory.ptr(str) + usize(8));
 
     // at offset 4 we store the length which is located at offset 0
-    memory.store(vec + usize(4), memory.ptr(str));
+    memory.store(vec + usize(4), memory.load<usize>(memory.ptr(str)));
 
     let nwritten = stack.alloca(usize(4));
 

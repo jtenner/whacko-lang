@@ -621,6 +621,42 @@ export function registerDefaultBuiltins(program: WhackoProgram) {
   );
 
   program.addBuiltin(
+    "load",
+    ({ program, parameters, typeParameters, pass, ctx, ast }) => {
+      const { LLVM, LLVMUtil } = program;
+      const [type] = typeParameters;
+      const [param] = parameters;
+
+      if (type.isNumeric) {
+        const ptrType = new PointerType(new VoidType(ast), ast);
+        const numRef = pass.ensureCompiled(param);
+
+        const ptrRefName = pass.getTempNameRef();
+        const ptrRef = LLVM._LLVMBuildIntToPtr(
+          pass.builder,
+          numRef.ref,
+          ptrType.llvmType(LLVM, LLVMUtil)!,
+          ptrRefName
+        );
+        LLVM._free(ptrRefName);
+
+        const resultName = pass.getTempNameRef();
+        const resultRef = LLVM._LLVMBuildLoad2(
+          pass.builder,
+          type.llvmType(LLVM, LLVMUtil)!,
+          ptrRef,
+          resultName
+        );
+        LLVM._free(resultName);
+        ctx.stack.push(new RuntimeValue(resultRef, type));
+      } else {
+        ctx.stack.push(new CompileTimeInvalid(ast));
+        pass.error("Type", ast, "Cannot load non-numeric type.");
+      }
+    }
+  );
+
+  program.addBuiltin(
     "store",
     ({ program, parameters, typeParameters, pass, ctx, ast }) => {
       const [ptr, value] = parameters;

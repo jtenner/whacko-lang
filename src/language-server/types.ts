@@ -27,14 +27,16 @@ export const CLASS_HEADER_OFFSET = 8n; // [size, type?]
 export function getPtrWithOffset(ptr: LLVMValueRef, offset: bigint, pass: CompilationPass): LLVMValueRef {
   const { LLVM, program: { LLVMUtil }, builder } = pass;
   const llvmIntType = LLVM._LLVMIntType(32);
-  const voidPtrType = LLVM._LLVMPointerType(LLVM._LLVMVoidType(), 0);
+  // void ptr type instead?
+  // const i8PtrType = LLVM._LLVMPointerType(LLVM._LLVMInt8Type(), 0);
+  const i8Type = LLVM._LLVMInt8Type();
   const gepIndicies = LLVMUtil.lowerPointerArray([
     LLVM._LLVMConstInt(llvmIntType, offset, 0),
   ]);
   const gepName = pass.getTempNameRef();
   const ptrPlusOffset = LLVM._LLVMBuildGEP2(
     builder,
-    voidPtrType,
+    i8Type,
     ptr,
     gepIndicies,
     1,
