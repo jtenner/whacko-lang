@@ -1,11 +1,5 @@
-enum Test {
-  value
-}
-
-export fn doSomething(param: Test): void {
-
-}
 
 export fn _start(): void {
-  doSomething(Test.value);
+  // let a = "Hello world!";
+  console.log("Hello world!");
 }

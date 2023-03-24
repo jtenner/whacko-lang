@@ -2006,11 +2006,11 @@ export class CompilationPass extends WhackoPass {
       const byteLength = Buffer.byteLength(value.value);
       const charType = new IntegerType(Type.i8, null, value.ty.node);
       const int32Type = new IntegerType(Type.i32, null, value.ty.node);
-      const charPointerType = new PointerType(charType, value.ty.node);
+      const int32LLVMType = int32Type.llvmType(this.LLVM, this.program.LLVMUtil)!;
       const arrayType = new ArrayType(charType, byteLength, value.ty.node, "");
       const arrayLength = this.LLVM._LLVMConstInt(
-        int32Type.llvmType(this.LLVM, this.program.LLVMUtil)!,
-        BigInt(byteLength),
+        int32LLVMType,
+        BigInt(byteLength) + CLASS_HEADER_OFFSET,
         0
       );
       // Steps:
@@ -2020,20 +2020,22 @@ export class CompilationPass extends WhackoPass {
       // 4. push runtime value on stack 
 
       // MALLOC
-
+      const arrayLLVMType = arrayType.llvmType(this.LLVM, this.program.LLVMUtil)!;
       const resultPtrName = this.getTempNameRef();
       const resultPtr = this.LLVM._LLVMBuildArrayMalloc(
         this.builder,
-        arrayType.llvmType(this.LLVM, this.program.LLVMUtil)!,
+        arrayLLVMType,
         arrayLength,
         resultPtrName,
       );
-      this.LLVM._free(resultPtr);
+      this.LLVM._free(resultPtrName);
+
+      const destinationPtr = getPtrWithOffset(resultPtr, 8n, this);
 
       // memcopy
       const memcpy = this.LLVM._LLVMBuildMemCpy(
         this.builder,
-        resultPtr,
+        destinationPtr,
         1,
         constStrArray,
         1,

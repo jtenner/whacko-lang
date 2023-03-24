@@ -415,7 +415,6 @@ export class ConcreteClass extends ConcreteType {
           const ptrPlusOffset = getPtrWithOffset(ref, 4n, pass);
           LLVM._LLVMBuildStore(builder, idRef, ptrPlusOffset);
           
-
           for (const field of this.fields) {
             const ptr = getPtrWithOffset(ref, CLASS_HEADER_OFFSET + field.offset, pass);
             let value: LLVMValueRef;
@@ -1066,7 +1065,7 @@ export class PointerType extends ConcreteType {
   }
 
   override llvmType(LLVM: Module, LLVMUtil: typeof import("llvm-js")): LLVMTypeRef | null {
-    return LLVM._LLVMPointerType(this.pointingToType.llvmType(LLVM, LLVMUtil)!, 32);
+    return LLVM._LLVMPointerType(LLVM._LLVMVoidType(), 0);
   }
 }
 
