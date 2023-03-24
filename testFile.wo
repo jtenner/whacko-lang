@@ -1,5 +1,8 @@
+class A {
+  test: i32 = i32(14);
 
+  constructor() {}
+}
 export fn _start(): void {
-  // let a = "Hello world!";
-  console.log("Hello world!");
+  let a = new A();
 }

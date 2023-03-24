@@ -361,7 +361,7 @@ export class ConcreteClass extends ConcreteType {
   }
 
   override llvmType(LLVM: Module, LLVMUtil: typeof import("llvm-js")): LLVMTypeRef | null {
-    return LLVM._LLVMPointerType(LLVM._LLVMVoidType(), 0);
+    return LLVM._LLVMPointerType(LLVM._LLVMInt8Type(), 0);
   }
 
   constructorFunc: ConcreteFunction | null = null;
@@ -387,7 +387,8 @@ export class ConcreteClass extends ConcreteType {
         // previsit
         ({ pass }) => {
           const { LLVM, program: { LLVMUtil }, builder } = pass;
-          const offset = this.offset + CLASS_HEADER_OFFSET;
+          const offset = this.offset;
+          const fullSize = this.offset + CLASS_HEADER_OFFSET;
           const intType = new IntegerType(Type.i32, null, this.node);
           const llvmIntType = intType.llvmType(LLVM, LLVMUtil)!;
           const voidPtr = this.llvmType(LLVM, LLVMUtil)!;
@@ -396,12 +397,16 @@ export class ConcreteClass extends ConcreteType {
             offset,
             0
           );
+          
 
+          const mallocType = LLVM._LLVMArrayType(
+            LLVM._LLVMInt8Type(),
+            Number(fullSize)
+          );
           const selfRefName = pass.getTempNameRef(); 
-          const ref = LLVM._LLVMBuildArrayMalloc(
+          const ref = LLVM._LLVMBuildMalloc(
             builder,
-            voidPtr,
-            offsetRefInt,
+            mallocType,
             selfRefName,
           );
           LLVM._free(selfRefName);
