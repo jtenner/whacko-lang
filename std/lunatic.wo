@@ -1,0 +1,395 @@
+export namespace lunatic {
+  export declare distributed {
+    fn nodes_count(): u32;
+    fn get_nodes(nodes_ptr: usize, nodes_len: usize): u32;
+    fn node_id(): u64;
+    fn module_id(): u64;
+    // TODO: as-lunatic uses an enum (TimeoutErrCode) for the return value, but
+    //       enums aren't supported yet. Some other values can be returned too.
+    fn spawn(
+      node_id: u64,
+      config_id: u64,
+      module_id: u64,
+      func_str_ptr: usize,
+      func_str_len: usize,
+      params_ptr: usize,
+      params_len: usize,
+      id_ptr: usize
+    ): u32;
+    // TODO: Same as above, minus the additional return values.
+    fn send(node_id: u64, process_id: u64): u32;
+    // TODO: Same as above.
+    fn send_receive_skip_search(
+      node_id: u64,
+      process_id: u64,
+      wait_on_tag: i64,
+      timeout_duration: u64
+    ): u32;
+    fn exec_lookup_nodes(
+      query_ptr: usize,
+      query_len: usize,
+      query_id_ptr: usize,
+      nodes_len_ptr: usize,
+      error_ptr: usize
+    ): bool;
+    fn copy_lookup_nodes_results(
+      query_id: u64,
+      nodes_ptr: usize,
+      nodes_len: usize,
+      error_ptr: usize
+    ): i32;
+    fn test_root_cert(len_ptr: usize): usize;
+    fn default_server_certificates(
+      cert_pem_ptr: usize,
+      cert_pem_len: usize,
+      pk_pem_ptr: usize,
+      pk_pem_len: usize,
+      len_ptr: usize
+    ): usize;
+    fn sign_node(
+      cert_pem_ptr: usize,
+      cert_pem_len: usize,
+      pk_pem_ptr: usize,
+      pk_pem_len: usize,
+      csr_pem_ptr: usize,
+      csr_pem_len: usize,
+      len_ptr: usize
+    ): usize;
+  } from "lunatic::distributed";
+
+  export declare error {
+    fn string_size(error_id: u64): usize;
+    fn to_string(error_id: u64, error_str_ptr: usize): void;
+    fn drop(error_id: u64): void;
+  } from "lunatic::error";
+
+  export declare message {
+    fn create_data(tag: i64, buffer_capacity: u64): void;
+    fn write_data(data_ptr: usize, data_len: usize): usize;
+    fn read_data(data_ptr: usize, data_len: usize): usize;
+    fn seek_data(index: u64): void;
+    fn get_tag(): i64;
+    fn data_size(): u64;
+    fn push_module(module_id: u64): u64;
+    fn take_module(index: u64): u64;
+    fn push_tcp_stream(stream_id: u64): u64;
+    fn take_tcp_stream(index: u64): u64;
+    fn push_tls_stream(stream_id: u64): u64;
+    fn take_tls_stream(index: u64): u64;
+    fn send(process_id: u64): u32;
+    // TODO: Same as above, except with TimeoutErrCode.
+    fn send_receive_skip_search(process_id: u64, wait_on_tag: i64, timeout_duration: u64): u32;
+    // TODO: Same as above, except with MessageType.
+    fn receive(tag_ptr: usize, tag_len: usize, timeout_duration: u64): u32;
+    fn push_udp_socket(stream_id: u64): u64;
+    fn take_udp_socket(index: u64): u64;
+  } from "lunatic::message";
+
+  export declare metrics {
+    fn counter(name_str_ptr: usize, name_str_len: usize, value: u64): void;
+    fn increment_counter(name_str_ptr: usize, name_str_len: usize): void;
+    fn gauge(name_str_ptr: usize, name_str_len: usize, value: f64): void;
+    fn increment_gauge(name_str_ptr: usize, name_str_len: usize): void;
+    fn decrement_gauge(name_str_ptr: usize, name_str_len: usize): void;
+    fn histogram(name_str_ptr: usize, name_str_len: usize, value: f64): void;
+  } from "lunatic::metrics";
+
+  export namespace networking {
+    export declare dns {
+      // TODO: Same as above, except with TimeoutErrCode.
+      fn resolve(
+        name_str_ptr: usize,
+        name_str_len: usize,
+        timeout_duration: u64,
+        id_u64_ptr: usize
+      ): u32;
+      fn drop_dns_iterator(dns_iter_id: u64): void;
+      fn resolve_next(
+        dns_iter_id: u64,
+        addr_type_u32_ptr: usize,
+        addr_u8_ptr: usize,
+        port_u16_ptr: usize,
+        flow_info_u32_ptr: usize,
+        scope_id_u32_ptr: usize
+      ): bool;
+    } from "lunatic::networking";
+
+    export declare tcp {
+      // TODO: addr_type should be an enum of either 4 or 6.
+      fn tcp_bind(
+        addr_type: u8,
+        addr_u8_ptr: usize,
+        port: u16,
+        flow_info: u32,
+        scope_id: u32,
+        id_u64_ptr: usize
+      ): bool;
+      fn drop_tcp_listener(tcp_listener_id: u64): void;
+      fn tcp_local_addr(tcp_listener_id: u64, id_u64_ptr: usize): bool;
+      fn tcp_accept(listener_id: u64, id_u64_ptr: usize, socket_addr_id_ptr: usize): bool;
+      // TODO: Same as above, as well as the enum return value issue.
+      fn tcp_connect(
+        addr_type: u8,
+        addr_u8_ptr: usize,
+        port: u16,
+        flow_info: u32,
+        scope_id: u32,
+        timeout_duration: u64,
+        id_u64_ptr: usize
+      ): u32;
+      fn tcp_peer_addr(tcp_stream_id: u64, id_u64_ptr: usize): bool;
+      fn drop_tcp_stream(tcp_stream_id: u64): void;
+      fn clone_tcp_stream(tcp_stream_id: u64): u64;
+      // TODO: The enum return value issue applies here as well, except with
+      //       TimeoutErrCode. The comments in the Lunatic source don't indicate
+      //       that 9027 can be returned, but it still can anyway.
+      fn tcp_write_vectored(
+        stream_id: u64,
+        ciovec_array_ptr: usize,
+        ciovec_array_len: usize,
+        opaque_ptr: usize
+      ): u32;
+      // TODO: Same as above. The source still doesn't mention it returning 9027.
+      fn tcp_peek(
+        stream_id: u64,
+        buffer_ptr: usize,
+        buffer_len: usize,
+        opaque_ptr: usize
+      ): u32;
+      // TODO: Same as above, including the undocumented return value.
+      fn tcp_read(
+        stream_id: u64,
+        buffer_ptr: usize,
+        buffer_len: usize,
+        opaque_ptr: usize
+      ): u32;
+      fn set_read_timeout(stream_id: u64, duration: u64): void;
+      fn set_write_timeout(stream_id: u64, duration: u64): void;
+      fn set_peek_timeout(stream_id: u64, duration: u64): void;
+      fn get_read_timeout(stream_id: u64): u64;
+      fn get_write_timeout(stream_id: u64): u64;
+      fn get_peek_timeout(stream_id: u64): u64;
+      fn tcp_flush(stream_id: u64, error_id_ptr: usize): bool;
+    } from "lunatic::networking";
+
+    export declare tls_tcp {
+      // TODO: addr_type should be an enum.
+      fn tls_bind(
+        addr_type: u8,
+        addr_u8_ptr: usize,
+        port: u16,
+        flow_info: u32,
+        scope_id: u32,
+        id_u64_ptr: usize,
+        certs_array_ptr: usize,
+        certs_array_len: usize,
+        keys_array_ptr: usize,
+        keys_array_len: usize
+      ): bool;
+      fn drop_tls_listener(tls_listener_id: u64): void;
+      fn tls_local_addr(tls_listener_id: u64, id_i64_ptr: usize): bool;
+      fn tls_accept(listener_id: u64, id_u64_ptr: usize, socket_addr_id_ptr: usize): bool;
+      // TODO: The enum return value issue applies here, with TimeoutErrCode.
+      fn tls_connect(
+        addr_str_ptr: usize,
+        addr_str_len: usize,
+        port: u16,
+        timeout_duration: u64,
+        id_u64_ptr: usize,
+        certs_array_ptr: usize,
+        certs_array_len: usize
+      ): u32;
+      fn drop_tls_stream(tls_stream_id: u64): void;
+      fn clone_tls_stream(tls_stream_id: u64): u64;
+      // TODO: Same as above, except it's undocumented.
+      fn tls_write_vectored(
+        stream_id: u64,
+        ciovec_array_ptr: usize,
+        ciovec_array_len: usize,
+        opaque_ptr: usize
+      ): u32;
+      // TODO: Same as above, including 9027 being undocumented.
+      fn tls_read(
+        stream_id: u64,
+        buffer_ptr: usize,
+        buffer_len: usize,
+        opaque_ptr: usize
+      ): u32;
+      fn set_tls_read_timeout(stream_id: u64, duration: u64): void;
+      fn set_tls_write_timeout(stream_id: u64, duration: u64): void;
+      fn get_tls_read_timeout(stream_id: u64): u64;
+      fn get_tls_write_timeout(stream_id: u64): u64;
+      fn tls_flush(stream_id: u64, error_id_ptr: usize): bool;
+    } from "lunatic::networking";
+
+    export declare udp {
+      // TODO: addr_type should be an enum
+      fn udp_bind(
+        addr_type: u8,
+        addr_u8_ptr: usize,
+        port: u16,
+        flow_info: u32,
+        scope_id: u32,
+        id_u64_ptr: usize
+      ): bool;
+      fn udp_local_addr(udp_socket_id: u64, id_u64_ptr: usize): bool;
+      // TODO: The return type needs to be a completely new enum.
+      fn udp_peer_addr(udp_socket_id: u64, id_u64_ptr: usize): u32;
+      fn drop_udp_socket(udp_socket_id: u64): void;
+      fn udp_receive(
+        socket_id: u64,
+        buffer_ptr: usize,
+        buffer_len: usize,
+        opaque_ptr: usize
+      ): bool;
+      fn udp_receive_from(
+        socket_id: u64,
+        buffer_ptr: usize,
+        buffer_len: usize,
+        opaque_ptr: usize,
+        dns_iter_ptr: usize
+      ): bool;
+      // TODO: addr_type should be an enum. Also, the TimeoutErrCode return value
+      //       issue applies here as well.
+      fn udp_connect(
+        udp_socket_id: u64,
+        addr_type: u8,
+        addr_u8_ptr: usize,
+        port: u16,
+        flow_info: u32,
+        scope_id: u32,
+        timeout_duration: u64,
+        id_u64_ptr: usize
+      ): u32;
+      fn clone_udp_socket(udp_socket_id: u64): u64;
+      fn set_udp_socket_broadcast(udp_socket_id: u64, broadcast: bool): void;
+      fn get_udp_socket_broadcast(udp_socket_id: u64): bool;
+      fn set_udp_socket_ttl(udp_socket_id: u64, ttl: u32): void;
+      fn get_udp_socket_ttl(udp_socket_id: u64): u32;
+      // TODO: addr_type should be an enum.
+      fn udp_send_to(
+        socket_id: u64,
+        buffer_ptr: usize,
+        buffer_len: usize,
+        addr_type: u8,
+        addr_u8_ptr: usize,
+        port: u16,
+        flow_info: u32,
+        scope_id: u32,
+        opaque_ptr: usize
+      ): bool;
+      fn udp_send(
+        socket_id: u64,
+        buffer_ptr: usize,
+        buffer_len: usize,
+        opaque_ptr: usize
+      ): bool;
+    } from "lunatic::networking";
+  }
+
+  export declare process {
+    // TODO: This needs to return as-lunatic's CompileModuleErrCode.
+    fn compile_module(module_data_ptr: usize, module_data_len: usize, id_ptr: usize): i32;
+    fn drop_module(module_id: u64): void;
+    fn create_config(): i64;
+    // These signedness mismatches are copied from Lunatic's signatures.
+    fn drop_config(config_id: u64): void;
+    fn config_set_max_memory(config_id: u64, max_memory: u64): void;
+    fn config_get_max_memory(config_id: u64): u64;
+    fn config_set_max_fuel(config_id: u64, max_fuel: u64): void;
+    fn config_get_max_fuel(config_id: u64): u64;
+    fn config_can_compile_modules(config_id: u64): bool;
+    fn config_set_can_compile_modules(config_id: u64, can: bool): void;
+    fn config_can_create_configs(config_id: u64): bool;
+    fn config_set_can_create_configs(config_id: u64, can: bool): void;
+    fn config_can_spawn_processes(config_id: u64): bool;
+    fn config_set_can_spawn_processes(config_id: u64, can: bool): void;
+    fn spawn(
+      link: i64,
+      config_id: i64,
+      module_id: i64,
+      func_str_ptr: usize,
+      func_str_len: usize,
+      params_ptr: usize,
+      params_len: usize,
+      id_ptr: usize
+    ): bool;
+    fn sleep_ms(millis: u64): void;
+    fn die_when_link_dies(trap: bool): void;
+    fn process_id(): u64;
+    fn environment_id(): u64;
+    fn link(tag: i64, process_id: u64): void;
+    fn unlink(process_id: u64): void;
+    fn kill(process_id: u64): void;
+    fn exists(process_id: u64): bool;
+  } from "lunatic::process";
+
+  export declare registry {
+    @name("put") fn put_process(
+      name_str_ptr: usize,
+      name_str_len: usize,
+      node_id: u64,
+      process_id: u64
+    ): void;
+    // NOTE: This is the only place names are changed, because "get" is seen as
+    //       a keyword by the parser.
+    @name("get_process") fn get_process(
+      name_str_ptr: usize,
+      name_str_len: usize,
+      node_id_ptr: usize,
+      process_id_ptr: usize
+    ): bool;
+    @name("get_or_put_later") fn get_process_or_put_later(
+      name_str_ptr: usize,
+      name_str_len: usize,
+      node_id_ptr: usize,
+      process_id_ptr: usize
+    ): bool;
+    fn remove(name_str_ptr: usize, name_str_len: usize): void;
+  } from "lunatic::registry";
+
+  export declare sqlite {
+    fn open(path_str_ptr: usize, path_str_len: usize, connection_id_ptr: usize): bool;
+    fn query_prepare(conn_id: u64, query_str_ptr: usize, query_str_len: usize): u64;
+    fn execute(conn_id: u64, exec_str_ptr: usize, exec_str_len: usize): u32;
+    fn bind_value(statement_id: u64, bind_data_ptr: usize, bind_data_len: usize): void;
+    fn sqlite3_changes(conn_id: u64): u32;
+    fn statement_reset(statement_id: u64): void;
+    fn last_error(conn_id: u64, opaque_ptr: usize): usize;
+    fn sqlite3_finalize(statement_id: u64): void;
+    // TODO: This should return its own enum.
+    fn sqlite3_step(statement_id: u64): u32;
+    fn read_column(statement_id: u64, col_idx: u32, opaque_ptr: usize): usize;
+    fn column_names(statement_id: u64, opaque_ptr: usize): usize;
+    fn read_row(statement_id: u64, opaque_ptr: usize): usize;
+    fn column_count(statement_id: u64): u32;
+    fn column_name(statement_id: u64, column_idx: u32, opaque_ptr: usize): usize;
+  } from "lunatic::sqlite";
+
+  export declare timer {
+    fn send_after(process_id: u64, delay: u64): u64;
+    fn cancel_timer(timer_id: u64): bool;
+  } from "lunatic::timer";
+
+  export declare trap {
+    fn catch_trap(function: i32, pointer: i32): i32;
+  } from "lunatic::trap";
+
+  export declare version {
+    fn major(): u32;
+    fn minor(): u32;
+    fn patch(): u32;
+  } from "lunatic::version";
+
+  export declare wasi {
+    fn config_add_environment_variable(
+      config_id: u64,
+      key_ptr: usize,
+      key_len: usize,
+      value_ptr: usize,
+      value_len: usize
+    ): void;
+    fn config_add_command_line_argument(config_id: u64, argument_ptr: usize, argument_len: usize): void;
+    fn config_preopen_dir(config_id: u64, dir_ptr: usize, dir_len: usize): void;
+  } from "lunatic::wasi";
+}

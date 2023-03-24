@@ -16,6 +16,8 @@ import {
   CompileTimeDeclareFunctionReference,
   CompileTimeVoid,
   CompileTimeClassReference,
+  resolveEnum,
+  CompileTimeEnumReference,
 } from "../execution-context";
 import {
   BinaryExpression,
@@ -62,6 +64,9 @@ import {
   isThisLiteral,
   MethodClassMember,
   isMethodClassMember,
+  ID,
+  isEnumDeclaration,
+  EnumDeclaration,
   // TypeCastExpression,
 } from "../generated/ast";
 import { WhackoModule } from "../module";
@@ -78,6 +83,7 @@ import {
   ConcreteType,
   consumeDecorator,
   DynamicTypeScopeElement,
+  EnumType,
   Field,
   FloatType,
   FunctionType,
@@ -189,7 +195,7 @@ export function getAttributesForDeclareDeclaration(
 }
 
 export function getFullyQualifiedName(
-  node: FunctionDeclaration | DeclareFunction | ClassDeclaration,
+  node: FunctionDeclaration | DeclareFunction | ClassDeclaration | EnumDeclaration,
   typeParameters: ConcreteType[]
 ): string | null {
   let nodeName = node.name.name;
@@ -231,7 +237,7 @@ export function getFullyQualifiedName(
     } else {
       return null;
     }
-  } else if (isDeclareFunction(node)) {
+  } else if (isDeclareFunction(node) || isEnumDeclaration(node)) {
     assert(
       typeParameters.length === 0,
       "There should be no type parameters here."
@@ -374,7 +380,6 @@ export class CompilationPass extends WhackoPass {
 
     let name: string;
     if (isMethodClassMember(node)) {
-      console.log("Hit!");
       name = assert(classType, "Class should exist at this point.").getName()
         + "." 
         + node.name.name
@@ -563,11 +568,25 @@ export class CompilationPass extends WhackoPass {
 
         // TODO: Function finalization
 
+        // if the function return type is void, we can add an implicit return void to the end of the current block
+        if (isFunctionDeclaration(node) || isMethodClassMember(node)) {
+          const terminator = this.LLVM._LLVMGetBasicBlockTerminator(this.currentBlock);
+          if (!terminator && func.ty.returnType instanceof VoidType) {
+            this.LLVM._LLVMBuildRetVoid(this.builder);
+          }
+        }
+
         if (this.queue.length === 0) break;
       } else if (isDeclareDeclaration(node)) {
         // TODO: Is there anything here we need to do?
       }
     }
+  }
+
+  override visitExpressionStatement(node: ExpressionStatement): void {
+    this.visit(node.expression);
+    assert(this.ctx.stack.length === 1, "There should be an item on the stack.");
+    this.ctx.stack.pop();
   }
 
   override visitFunctionDeclaration(node: FunctionDeclaration): void {
@@ -652,17 +671,19 @@ export class CompilationPass extends WhackoPass {
 
     // next we position the builder and compile all the truthy statements
     this.LLVM._LLVMPositionBuilderAtEnd(this.builder, truthyLabel);
+    this.currentBlock = truthyLabel;
     this.visit(node.truthy);
     this.LLVM._LLVMBuildBr(this.builder, nextLabel);
 
     // finally if there is a falsy statement, we compile it
     this.LLVM._LLVMPositionBuilderAtEnd(this.builder, falsyLabel);
+    this.currentBlock = falsyLabel;
     if (node.falsy) this.visit(node.falsy);
     this.LLVM._LLVMBuildBr(this.builder, nextLabel);
 
     // finally start compiling the next block
     this.LLVM._LLVMPositionBuilderAtEnd(this.builder, nextLabel);
-
+    this.currentBlock = nextLabel;
     this.LLVM._free(truthyLabelName);
     this.LLVM._free(falsyLabelName);
     this.LLVM._free(nextLabelName);
@@ -726,6 +747,7 @@ export class CompilationPass extends WhackoPass {
             invalid.ty
           );
           this.ctx.vars.set(name.name, variable);
+          this.error("Type", type, "Invalid type expression for variable declaration.");
         }
       } else {
         // good, no type guard, assume the variable's type is equal to the expression's
@@ -740,12 +762,16 @@ export class CompilationPass extends WhackoPass {
     }
   }
 
+  override visitFloatLiteral(expression: FloatLiteral): void {
+    const floatValue = parseFloat(expression.value);
+    this.ctx.stack.push(new CompileTimeFloat(floatValue, new FloatType(Type.f64, floatValue, expression)));
+  }
+
   override visitRootIdentifier(expression: RootIdentifier): void {
     const scope = getScope(expression)!;
 
     if (isID(expression.root)) {
       const variable = this.ctx.vars.get(expression.root.name);
-
       if (variable) {
         this.ctx.stack.push(new CompileTimeVariableReference(variable));
       } else if (scope.has(expression.root.name)) {
@@ -753,14 +779,13 @@ export class CompilationPass extends WhackoPass {
         if (scopeItem) {
           this.pushScopeItemToStack(scopeItem, expression);
         } else {
+          this.error("Semantic", expression, "Cannot find root expression.");
           this.ctx.stack.push(new CompileTimeInvalid(expression));
         }
       }
     } else if (isThisLiteral(expression.root)) {
       this.visitThisLiteral(expression.root);
     } else {
-      console.error(expression.root);
-      console.error(scope);
       // we didn't really find it
       this.ctx.stack.push(new CompileTimeInvalid(expression));
     }
@@ -783,6 +808,8 @@ export class CompilationPass extends WhackoPass {
       this.ctx.stack.push(new CompileTimeDeclareFunctionReference(scopeItem));
     } else if (isClassDeclaration(scopeItem.node)) {
       this.ctx.stack.push(new CompileTimeClassReference(scopeItem));
+    } else if (isEnumDeclaration(scopeItem.node)) {
+      this.ctx.stack.push(new CompileTimeEnumReference(scopeItem));
     } else {
       this.ctx.stack.push(new CompileTimeInvalid(expression));
     }
@@ -790,7 +817,6 @@ export class CompilationPass extends WhackoPass {
 
   override visitMemberAccessExpression(node: MemberAccessExpression): void {
     const rootValue = obtainValue(node.memberRoot, this);
-
     if (
       rootValue instanceof CompileTimeNamespaceDeclarationReference ||
       rootValue instanceof CompileTimeDeclareDeclarationReference
@@ -815,8 +841,9 @@ export class CompilationPass extends WhackoPass {
           `Cannot find exported scope element ${node.member.name}.`
         );
         this.ctx.stack.push(new CompileTimeInvalid(node));
-        return;
       }
+
+      return;
     } else if (rootValue.ty instanceof ConcreteClass) {
       // we should ensure the value is compiled
       const compiledRootValue = this.ensureCompiled(rootValue);
@@ -837,6 +864,19 @@ export class CompilationPass extends WhackoPass {
         this.ctx.stack.push(new CompileTimeMethodReference(methodElement, ty, ref));
         return;
       }
+    } else if (rootValue instanceof CompileTimeEnumReference) {
+      const name = node.member.name;
+      // we need to push the compile time constant to the stack
+
+
+      if ((rootValue.ty as EnumType).values.has(name)) {
+        const enumMember = (rootValue.ty as EnumType).values.get(name)!;
+        this.ctx.stack.push(new CompileTimeInteger(enumMember, rootValue.ty as EnumType));
+      } else {
+        this.ctx.stack.push(new CompileTimeInvalid(node.member));
+        this.error("Semantic", node.member, `Cannot find enum member ${node.member.name} in ${(node.memberRoot.root as ID).name}`);
+      }
+      return;
     }
 
     this.error("Semantic", node, `Member access not supported.`);
@@ -1651,11 +1691,13 @@ export class CompilationPass extends WhackoPass {
       for (let i = 0; i < elementParameters.length; i++) {
         const elementParameter = elementParameters[i];
         const scope = assert(getScope(elementParameter));
+
         const ty = this.ctx.resolve(
           elementParameter.type,
           splicedTypeMap,
           scope
         );
+
         if (ty) {
           if (!callParameterValues[i].ty.isAssignableTo(ty)) {
             this.ctx.stack.push(new CompileTimeInvalid(node));
@@ -1715,9 +1757,7 @@ export class CompilationPass extends WhackoPass {
         attributes,
         classType,
       );
-      if (!callable) {
-        console.log(classType);
-      }
+
       const func = assert(
         callable,
         "The function should be compiled at this point."
@@ -1953,7 +1993,7 @@ export class CompilationPass extends WhackoPass {
         constStrArray = this.compiledStringPtrs.get(value.value)!;
       } else {
         const lowered = this.program.LLVMUtil.lower(value.value);
-        const inst = this.LLVM._LLVMBuildGlobalStringPtr(
+        const inst = this.LLVM._LLVMBuildGlobalString(
           this.builder,
           lowered,
           lowered
@@ -1966,11 +2006,16 @@ export class CompilationPass extends WhackoPass {
       const byteLength = Buffer.byteLength(value.value);
       const charType = new IntegerType(Type.i8, null, value.ty.node);
       const int32Type = new IntegerType(Type.i32, null, value.ty.node);
-      const charPointerType = new PointerType(charType, value.ty.node);
+      const int32LLVMType = int32Type.llvmType(this.LLVM, this.program.LLVMUtil)!;
       const arrayType = new ArrayType(charType, byteLength, value.ty.node, "");
-      const arrayLength = this.LLVM._LLVMConstInt(
-        int32Type.llvmType(this.LLVM, this.program.LLVMUtil)!,
+      const stringLength = this.LLVM._LLVMConstInt(
+        int32LLVMType,
         BigInt(byteLength),
+        0,
+      );
+      const arrayLength = this.LLVM._LLVMConstInt(
+        int32LLVMType,
+        BigInt(byteLength) + CLASS_HEADER_OFFSET,
         0
       );
       // Steps:
@@ -1981,20 +2026,25 @@ export class CompilationPass extends WhackoPass {
 
       // MALLOC
 
+      const arrayLLVMType = this.LLVM._LLVMArrayType(this.LLVM._LLVMIntType(8), byteLength + Number(CLASS_HEADER_OFFSET));
       const resultPtrName = this.getTempNameRef();
-      const resultPtr = this.LLVM._LLVMBuildArrayMalloc(
+      const resultPtr = this.LLVM._LLVMBuildMalloc(
         this.builder,
-        arrayType.llvmType(this.LLVM, this.program.LLVMUtil)!,
-        arrayLength,
+        arrayLLVMType,
         resultPtrName,
       );
-      this.LLVM._free(resultPtr);
+      this.LLVM._free(resultPtrName);
 
+      // store the size of the string on the reference
+      const sizePtr = getPtrWithOffset(resultPtr, 0n, this);
+      this.LLVM._LLVMBuildStore(this.builder, stringLength, sizePtr);
+
+      const destinationPtr = getPtrWithOffset(resultPtr, 8n, this);
 
       // memcopy
       const memcpy = this.LLVM._LLVMBuildMemCpy(
         this.builder,
-        resultPtr,
+        destinationPtr,
         1,
         constStrArray,
         1,

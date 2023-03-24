@@ -7,6 +7,7 @@ import {
   DeclareDeclaration,
   DeclareFunction,
   Decorator,
+  EnumDeclaration,
   Expression,
   FunctionDeclaration,
   isConstructorClassMember,
@@ -26,14 +27,16 @@ export const CLASS_HEADER_OFFSET = 8n; // [size, type?]
 export function getPtrWithOffset(ptr: LLVMValueRef, offset: bigint, pass: CompilationPass): LLVMValueRef {
   const { LLVM, program: { LLVMUtil }, builder } = pass;
   const llvmIntType = LLVM._LLVMIntType(32);
-  const voidPtrType = LLVM._LLVMPointerType(LLVM._LLVMVoidType(), 0);
+  // void ptr type instead?
+  // const i8PtrType = LLVM._LLVMPointerType(LLVM._LLVMInt8Type(), 0);
+  const i8Type = LLVM._LLVMInt8Type();
   const gepIndicies = LLVMUtil.lowerPointerArray([
     LLVM._LLVMConstInt(llvmIntType, offset, 0),
   ]);
   const gepName = pass.getTempNameRef();
   const ptrPlusOffset = LLVM._LLVMBuildGEP2(
     builder,
-    voidPtrType,
+    i8Type,
     ptr,
     gepIndicies,
     1,
@@ -358,7 +361,7 @@ export class ConcreteClass extends ConcreteType {
   }
 
   override llvmType(LLVM: Module, LLVMUtil: typeof import("llvm-js")): LLVMTypeRef | null {
-    return LLVM._LLVMPointerType(LLVM._LLVMVoidType(), 0);
+    return LLVM._LLVMPointerType(LLVM._LLVMInt8Type(), 0);
   }
 
   constructorFunc: ConcreteFunction | null = null;
@@ -384,7 +387,8 @@ export class ConcreteClass extends ConcreteType {
         // previsit
         ({ pass }) => {
           const { LLVM, program: { LLVMUtil }, builder } = pass;
-          const offset = this.offset + CLASS_HEADER_OFFSET;
+          const offset = this.offset;
+          const fullSize = this.offset + CLASS_HEADER_OFFSET;
           const intType = new IntegerType(Type.i32, null, this.node);
           const llvmIntType = intType.llvmType(LLVM, LLVMUtil)!;
           const voidPtr = this.llvmType(LLVM, LLVMUtil)!;
@@ -393,12 +397,16 @@ export class ConcreteClass extends ConcreteType {
             offset,
             0
           );
+          
 
+          const mallocType = LLVM._LLVMArrayType(
+            LLVM._LLVMInt8Type(),
+            Number(fullSize)
+          );
           const selfRefName = pass.getTempNameRef(); 
-          const ref = LLVM._LLVMBuildArrayMalloc(
+          const ref = LLVM._LLVMBuildMalloc(
             builder,
-            voidPtr,
-            offsetRefInt,
+            mallocType,
             selfRefName,
           );
           LLVM._free(selfRefName);
@@ -414,7 +422,6 @@ export class ConcreteClass extends ConcreteType {
           const ptrPlusOffset = getPtrWithOffset(ref, 4n, pass);
           LLVM._LLVMBuildStore(builder, idRef, ptrPlusOffset);
           
-
           for (const field of this.fields) {
             const ptr = getPtrWithOffset(ref, CLASS_HEADER_OFFSET + field.offset, pass);
             let value: LLVMValueRef;
@@ -1065,7 +1072,7 @@ export class PointerType extends ConcreteType {
   }
 
   override llvmType(LLVM: Module, LLVMUtil: typeof import("llvm-js")): LLVMTypeRef | null {
-    return LLVM._LLVMPointerType(this.pointingToType.llvmType(LLVM, LLVMUtil)!, 32);
+    return LLVM._LLVMPointerType(LLVM._LLVMVoidType(), 0);
   }
 }
 
@@ -1084,5 +1091,14 @@ export class CompileTimeMethodReference extends CompileTimeValue<MethodClassMemb
 export class CompileTimeVariableReference extends CompileTimeValue<ExecutionVariable> {
   constructor(variable: ExecutionVariable) {
     super(variable, variable.ty);
+  }
+}
+
+export class EnumType extends IntegerType {
+  constructor(
+    node: EnumDeclaration,
+    public values: Map<string, bigint>,
+  ) {
+    super(Type.i32, null, node);
   }
 }

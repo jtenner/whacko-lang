@@ -67,6 +67,8 @@ import {
   BuiltinDeclaration,
   RootIdentifier,
   BuiltinTypeDeclaration,
+  EnumDeclaration,
+  EnumDeclarator,
 } from "./generated/ast";
 import { createWhackoServices, WhackoServices } from "./whacko-module";
 
@@ -215,6 +217,10 @@ export class WhackoVisitor {
         return this.visitNamespaceDeclaration(node);
       case "BuiltinTypeDeclaration":
         return this.visitBuiltinTypeDeclaration(node);
+      case "EnumDeclaration":
+        return this.visitEnumDeclaration(node);
+      case "EnumDeclarator":
+        return this.visitEnumDeclarator(node);
       // case "TypeCastExpression":
       //   return this.visitTypeCastExpression(node);
       default:
@@ -331,6 +337,17 @@ export class WhackoVisitor {
     this.visit(node.namespace);
     this.visit(node.element);
     this.visitAll(node.typeParameters);
+  }
+
+  visitEnumDeclaration(node: EnumDeclaration) {
+    this.visitAll(node.decorators);
+    this.visit(node.name);
+    this.visitAll(node.declarators);
+  }
+
+  visitEnumDeclarator(node: EnumDeclarator) {
+    this.visit(node.name);
+    if (node.initializer) this.visit(node.initializer);
   }
 
   visitFieldClassMember(node: FieldClassMember) {

@@ -25,6 +25,7 @@ import {
   StringType,
   Type,
   VoidType,
+  ConcreteClass,
 } from "./types";
 import { assert } from "./util";
 
@@ -61,30 +62,87 @@ const simdInitialize = (typeEnum: Type) =>
 
 const integerCast =
   (size: number, ty: IntegerEnumType, signed: boolean) =>
-  ({ ctx, ast, parameters, typeParameters }: BuiltinFunctionProps) => {
+  ({ ctx, ast, parameters, typeParameters, pass }: BuiltinFunctionProps) => {
     const [value] = parameters;
     const [parameterType] = typeParameters;
+    const intType = new IntegerType(ty, null, ast);
+
     if (
-      parameters.length === 1 &&
-      typeParameters.length === 1 &&
       value.ty.isEqual(parameterType) &&
-      parameterType instanceof IntegerType
+      parameterType.isNumeric
     ) {
-      if (value instanceof CompileTimeInteger) {
+      const derefedValue = pass.ensureDereferenced(value);
+
+      if (derefedValue instanceof CompileTimeInteger || derefedValue instanceof CompileTimeFloat) {
         // we are good to go
         const intValue = signed
-          ? BigInt.asIntN(size, value.value)
-          : BigInt.asUintN(size, value.value);
+          ? BigInt.asIntN(size, BigInt(derefedValue.value))
+          : BigInt.asUintN(size, BigInt(derefedValue.value));
         ctx.stack.push(
-          new CompileTimeInteger(intValue, new IntegerType(ty, intValue, ast))
+          new CompileTimeInteger(intValue, intType)
         );
+      } else if (
+        derefedValue instanceof RuntimeValue
+          && (derefedValue.ty instanceof IntegerType || derefedValue.ty instanceof FloatType)
+      ) {
+        const name = pass.getTempNameRef();
+        const ref = pass.LLVM._LLVMBuildIntCast2(
+          pass.builder,
+          derefedValue.ref,
+          intType.llvmType(pass.LLVM, pass.program.LLVMUtil)!,
+          intType.isSigned ? 1 : 0,
+          name,
+        );
+        ctx.stack.push(new RuntimeValue(ref, intType));
+        pass.LLVM._free(name);
       } else {
-        // TODO: Implement runtime casting
+        pass.error("Type", ast, `Cannot cast non-integer value to integer.`);
+        ctx.stack.push(new CompileTimeInvalid(ast));
       }
     } else {
       ctx.stack.push(new CompileTimeInvalid(ast));
     }
   };
+
+const floatCast =
+  (size: number, ty: Type.f32 | Type.f64) => 
+  ({ ctx, ast, parameters, typeParameters, pass }: BuiltinFunctionProps) => {
+    const [value] = parameters;
+    const [parameterType] = typeParameters;
+    const floatType = new FloatType(ty, null, ast);
+
+    if (
+      value.ty.isEqual(parameterType) &&
+      parameterType.isNumeric
+    ) {
+      const derefedValue = pass.ensureDereferenced(value);
+
+      if (derefedValue instanceof CompileTimeInteger || derefedValue instanceof CompileTimeFloat) {
+        // we are good to go
+        const floatValue = Number(derefedValue.value);
+        ctx.stack.push(
+          new CompileTimeFloat(floatValue, floatType)
+        );
+      } else if (
+        derefedValue instanceof RuntimeValue
+        && (derefedValue.ty instanceof IntegerType || derefedValue.ty instanceof FloatType)
+      ) {
+        const name = pass.getTempNameRef();
+        const ref = pass.LLVM._LLVMBuildFPCast(
+          pass.builder,
+          derefedValue.ref,
+          floatType.llvmType(pass.LLVM, pass.program.LLVMUtil)!,
+          name,
+        );
+        ctx.stack.push(new RuntimeValue(ref, floatType));
+        pass.LLVM._free(name);
+      } else {
+        ctx.stack.push(new CompileTimeInvalid(ast));
+      }
+    } else {
+      ctx.stack.push(new CompileTimeInvalid(ast));
+    }
+  }; 
 
 export function registerDefaultBuiltins(program: WhackoProgram) {
   program.addBuiltin("i8", integerCast(8, Type.i8, true));
@@ -460,54 +518,55 @@ export function registerDefaultBuiltins(program: WhackoProgram) {
   );
 
   program.addBuiltin(
-    "Alloca",
-    ({ program, typeParameters, pass, ctx, ast }) => {
-      const [typeParameter] = typeParameters;
-
-      const namePtr = program.LLVMUtil.lower(pass.getTempName());
-      const ref = program.LLVM._LLVMBuildAlloca(
+    "alloca",
+    ({ program, parameters, pass, ctx, ast }) => {
+      const { LLVM, LLVMUtil } = program;
+      const voidType = new VoidType(ast);
+      const ptrType = new PointerType(voidType, ast);
+      const usizeType = new IntegerType(Type.usize, null, ast);
+      const [size] = parameters; 
+      const compiledValue = pass.ensureCompiled(size);
+      const name = pass.getTempNameRef();
+      const ptrRef = LLVM._LLVMBuildArrayAlloca(
         pass.builder,
-        typeParameter.llvmType(program.LLVM, program.LLVMUtil)!,
-        namePtr
+        ptrType.llvmType(LLVM, LLVMUtil)!,
+        compiledValue.ref,
+        name
       );
-      const intType = new IntegerType(Type.usize, null, ast);
-      const intCastNamePtr = program.LLVMUtil.lower(pass.getTempName());
-      const resultRef = program.LLVM._LLVMBuildPtrToInt(
-        pass.builder,
-        ref,
-        intType.llvmType(program.LLVM, program.LLVMUtil)!,
-        intCastNamePtr
-      );
-      program.LLVM._free(namePtr);
-      program.LLVM._free(intCastNamePtr);
+      LLVM._free(name);
 
-      ctx.stack.push(new RuntimeValue(resultRef, intType));
+      const resultName = pass.getTempNameRef();
+      const resultRef = LLVM._LLVMBuildPtrToInt(
+        pass.builder,
+        ptrRef,
+        usizeType.llvmType(LLVM, LLVMUtil)!,
+        resultName,
+      );
+      LLVM._free(resultName);
+
+      ctx.stack.push(new RuntimeValue(resultRef, usizeType));
     }
   );
 
   program.addBuiltin(
-    "Malloc",
-    ({ program, typeParameters, pass, ctx, ast }) => {
-      const [typeParameter] = typeParameters;
-
-      const namePtr = program.LLVMUtil.lower(pass.getTempName());
-      const ref = program.LLVM._LLVMBuildMalloc(
+    "malloc",
+    ({ program, parameters, pass, ctx, ast }) => {
+      const voidType = new VoidType(ast);
+      const ptrType = new PointerType(voidType, ast);
+      const usizeType = new IntegerType(Type.usize, null, ast);
+      const { LLVM, LLVMUtil } = program;
+      const [size] = parameters;
+      assert(size.ty.isEqual(usizeType), "The type here must be usize.");
+      const compiledSize = pass.ensureCompiled(size);
+      const name = pass.getTempNameRef();
+      const resultRef = pass.LLVM._LLVMBuildArrayMalloc(
         pass.builder,
-        typeParameter.llvmType(program.LLVM, program.LLVMUtil)!,
-        namePtr
+        ptrType.llvmType(LLVM, LLVMUtil)!,
+        compiledSize.ref,
+        name,
       );
-      const intType = new IntegerType(Type.usize, null, ast);
-      const intCastNamePtr = program.LLVMUtil.lower(pass.getTempName());
-      const resultRef = program.LLVM._LLVMBuildPtrToInt(
-        pass.builder,
-        ref,
-        intType.llvmType(program.LLVM, program.LLVMUtil)!,
-        intCastNamePtr
-      );
-      program.LLVM._free(namePtr);
-      program.LLVM._free(intCastNamePtr);
-      console.error("Hit");
-      ctx.stack.push(new RuntimeValue(resultRef, intType));
+      LLVM._free(name);
+      ctx.stack.push(new RuntimeValue(resultRef, usizeType));
     }
   );
 
@@ -522,7 +581,83 @@ export function registerDefaultBuiltins(program: WhackoProgram) {
   });
 
   program.addBuiltin(
-    "Store",
+    "ptr",
+    ({ program, parameters, typeParameters, pass, ctx, ast }) =>{
+      const { LLVM, LLVMUtil } = program;
+      const [classType] = typeParameters;
+      const [ptr] = parameters;
+      const usizeType = new IntegerType(Type.usize, null, ast);
+
+      if (classType instanceof StringType) {
+        const compiledPtr = pass.ensureCompiled(ptr);
+        const ref = compiledPtr.ref;
+        const name = pass.getTempNameRef();
+        const resultRef = LLVM._LLVMBuildPtrToInt(
+          pass.builder,
+          ref,
+          usizeType.llvmType(LLVM, LLVMUtil)!,
+          name
+        );
+        LLVM._free(name);
+        ctx.stack.push(new RuntimeValue(resultRef, usizeType));
+      } else if (classType instanceof ConcreteClass) {
+        const derefedPtr = pass.ensureDereferenced(ptr);
+        assert(derefedPtr instanceof RuntimeValue);
+        const ref = (derefedPtr as RuntimeValue).ref;
+        const name = pass.getTempNameRef();
+        const resultRef = LLVM._LLVMBuildPtrToInt(
+          pass.builder,
+          ref,
+          usizeType.llvmType(LLVM, LLVMUtil)!,
+          name
+        );
+        LLVM._free(name);
+        ctx.stack.push(new RuntimeValue(resultRef, usizeType));
+      } else {
+        ctx.stack.push(new CompileTimeInvalid(ast));
+        pass.error("Type", ast, `Cannot convert value to pointer, ${classType.getName()} is not a class.`);
+      }
+    }
+  );
+
+  program.addBuiltin(
+    "load",
+    ({ program, parameters, typeParameters, pass, ctx, ast }) => {
+      const { LLVM, LLVMUtil } = program;
+      const [type] = typeParameters;
+      const [param] = parameters;
+
+      if (type.isNumeric) {
+        const ptrType = new PointerType(new VoidType(ast), ast);
+        const numRef = pass.ensureCompiled(param);
+
+        const ptrRefName = pass.getTempNameRef();
+        const ptrRef = LLVM._LLVMBuildIntToPtr(
+          pass.builder,
+          numRef.ref,
+          ptrType.llvmType(LLVM, LLVMUtil)!,
+          ptrRefName
+        );
+        LLVM._free(ptrRefName);
+
+        const resultName = pass.getTempNameRef();
+        const resultRef = LLVM._LLVMBuildLoad2(
+          pass.builder,
+          type.llvmType(LLVM, LLVMUtil)!,
+          ptrRef,
+          resultName
+        );
+        LLVM._free(resultName);
+        ctx.stack.push(new RuntimeValue(resultRef, type));
+      } else {
+        ctx.stack.push(new CompileTimeInvalid(ast));
+        pass.error("Type", ast, "Cannot load non-numeric type.");
+      }
+    }
+  );
+
+  program.addBuiltin(
+    "store",
     ({ program, parameters, typeParameters, pass, ctx, ast }) => {
       const [ptr, value] = parameters;
       const compiledPtr = pass.ensureCompiled(ptr);
@@ -534,7 +669,7 @@ export function registerDefaultBuiltins(program: WhackoProgram) {
           program.LLVM._LLVMVoidType(),
           0
         );
-        const ptrCast = program.LLVM._LLVMBuildPointerCast(
+        const ptrCast = program.LLVM._LLVMBuildIntToPtr(
           pass.builder,
           compiledPtr.ref,
           type,
@@ -549,8 +684,10 @@ export function registerDefaultBuiltins(program: WhackoProgram) {
           `Invalid store operation, value to be stored must be numeric.`
         );
       }
+      ctx.stack.push(new CompileTimeVoid(ast));
     }
   );
+
   const isUsize = (val: ExecutionContextValue) => {
     return val.ty instanceof IntegerType && val.ty.ty === Type.usize;
   };
@@ -591,26 +728,36 @@ export function registerDefaultBuiltins(program: WhackoProgram) {
     }
   });
 
-  program.addBuiltin("Free", ({ ctx, pass, typeParameters, parameters, ast }) => {
-    // TODO: Refactor this because ptr can be a reference type
+  program.addBuiltin("free", ({ ctx, pass, typeParameters, parameters, ast, program }) => {
+    const { LLVM, LLVMUtil } = program;
     const [typeParameter] = typeParameters;
     const [ptr] = parameters;
-    if (isUsize(ptr)) {
-      const compiledPtr = pass.ensureCompiled(ptr);
-      const ptrType = pass.LLVM._LLVMPointerType(pass.LLVM._LLVMVoidType(), 0);
-      const ptrCastName = program.LLVMUtil.lower(pass.getTempName());
-      const ptrCast = pass.LLVM._LLVMBuildIntToPtr(
+    const usizeType = new IntegerType(Type.usize, null, ast);
+    const voidType = new VoidType(ast);
+    const ptrType = new PointerType(voidType, ast);
+
+    // free class, already pointer
+    if (typeParameter instanceof ConcreteClass) {
+      const derefPtr = pass.ensureDereferenced(ptr);
+      // class types are always compiled
+      assert(derefPtr instanceof RuntimeValue, "We must be a runtime value at this point");
+      const ref = (derefPtr as RuntimeValue).ref;
+      LLVM._LLVMBuildFree(pass.builder, ref);
+      // usize
+    } else if (typeParameter.isEqual(usizeType)) {
+      const derefedPtr = pass.ensureCompiled(ptr);
+      const ptrCastName = pass.getTempNameRef();
+      const ptrCast = LLVM._LLVMBuildIntToPtr(
         pass.builder,
-        compiledPtr.ref,
-        ptrType,
+        derefedPtr.ref,
+        ptrType.llvmType(LLVM, LLVMUtil)!,
         ptrCastName
       );
-
-      pass.LLVM._LLVMBuildFree(pass.builder, ptrCast);
-      pass.LLVM._free(ptrCastName);
-
-      ctx.stack.push(new CompileTimeVoid(ast));
+      LLVM._free(ptrCastName);
+      LLVM._LLVMBuildFree(pass.builder, ptrCast);
     }
+
+    ctx.stack.push(new CompileTimeVoid(ast));
   });
 
   program.addBuiltin("Splat", ({ typeParameters, parameters, ast, program, pass, ctx }) => {
@@ -669,4 +816,7 @@ export function registerDefaultBuiltins(program: WhackoProgram) {
 
     ctx.stack.push(new CompileTimeBool(isStringType, ast));
   });
+
+  program.addBuiltin("f32", floatCast(32, Type.f32));
+  program.addBuiltin("f64", floatCast(64, Type.f64));
 }

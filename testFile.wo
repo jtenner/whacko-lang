@@ -1,22 +1,8 @@
 class A {
-  a: i32 = i32(42);
+  test: i32 = i32(14);
 
-  constructor() {
-  }
-
-  doStuff<U>(a: U): void {
-    a + a;
-    return;
-  }
+  constructor() {}
 }
-
-export fn someVal(): i32 {
-  return i32(42);
-}
-
 export fn _start(): void {
-  let test = new A();
-  test = new A();
-  test.a = someVal() + i32(0);
-  return;
+  let a = new A();
 }

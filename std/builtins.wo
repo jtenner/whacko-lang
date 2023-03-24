@@ -10,13 +10,29 @@
 @name("u64") export builtin u64<T>(val: T): u64;
 @name("isize") export builtin isize<T>(val: T): isize;
 @name("usize") export builtin usize<T>(val: T): usize;
+@name("f32") export builtin f32<T>(val: T): f32;
+@name("f64") export builtin f64<T>(val: T): f64;
+
+export namespace heap {
+  @name("malloc") export builtin malloc(size: usize): usize;
+  @name("free") export builtin free<T>(ptr: T): void;
+}
+
+export namespace stack {
+  @name("alloca") export builtin alloca(size: usize): usize;
+}
+
+export namespace memory {
+  @name("store") export builtin store<T>(ptr: usize, value: T): void;
+  @name("load") export builtin load<T>(ptr: usize): T;
+  @name("ptr") export builtin ptr<T>(ref: T): usize;
+}
 
 // compiler intrinsics
 @name("AShr") export builtin AShr<T>(value: T, bits: T): T; // AShr(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 @name("Add") export builtin Add<T>(lhs: T, rhs: T): T; // Add(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("AddrSpaceCast") export builtin AddrSpaceCast(): void; // AddrSpaceCast(Builder: LLVMBuilderRef, Val: LLVMValueRef, DestTy: LLVMTypeRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("AggregateRet") export builtin AggregateRet(): void; // AggregateRet(Builder: LLVMBuilderRef, RetVals: Pointer<LLVMValueRef[]>, N: number): LLVMValueRef;
-@name("Alloca") export builtin Alloca<T>(): usize; // Alloca(Builder: LLVMBuilderRef, Ty: LLVMTypeRef, Name: LLVMStringRef): LLVMValueRef;
 @name("And") export builtin And<T>(lhs: T, rhs: T): T; // And(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("AtomicCmpXchg") export builtin AtomicCmpXchg(): void; // AtomicCmpXchg(Builder: LLVMBuilderRef, Ptr: LLVMValueRef, Cmp: LLVMValueRef, New: LLVMValueRef, SuccessOrdering: LLVMAtomicOrdering, FailureOrdering: LLVMAtomicOrdering, SingleThread: LLVMBool): LLVMValueRef;
 // @name("AtomicRMW") export builtin AtomicRMW(): void; // AtomicRMW(Builder: LLVMBuilderRef, op: LLVMAtomicRMWBinOp, PTR: LLVMValueRef, Val: LLVMValueRef, ordering: LLVMAtomicOrdering, singleThread: LLVMBool): LLVMValueRef;
@@ -46,8 +62,6 @@
 // @name("FRem") export builtin FRem(): void; // FRem(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("FSub") export builtin FSub(): void; // FSub(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("Fence") export builtin Fence(): void; // Fence(Builder: LLVMBuilderRef, ordering: LLVMAtomicOrdering, singleThread: LLVMBool, Name: LLVMStringRef): LLVMValueRef;
-@name("Malloc") export builtin Malloc<T>(): usize;
-@name("Free") export builtin Free<T>(ptr: T): void; 
 // @name("Freeze") export builtin Freeze(): void; // Freeze(Builder: LLVMBuilderRef, Val: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("GEP2") export builtin GEP2(): void; // GEP2(Builder: LLVMBuilderRef, Ty: LLVMTypeRef, Pointer: LLVMValueRef, Indices: Pointer<LLVMValueRef[]>, NumIndices: number, Name: LLVMStringRef): LLVMValueRef;
 // @name("ICmp") export builtin ICmp(): void; // ICmp(Builder: LLVMBuilderRef, Op: LLVMIntPredicate, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
@@ -93,7 +107,6 @@
 @name("Select") export builtin Select<T>(cond: bool, then: T, otherwise: T): T; // Select(Builder: LLVMBuilderRef, If: LLVMValueRef, Then: LLVMValueRef, Else: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("Shl") export builtin Shl(): void; // Shl(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("ShuffleVector") export builtin ShuffleVector(): void; // ShuffleVector(Builder: LLVMBuilderRef, V1: LLVMValueRef, V2: LLVMValueRef, Mask: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
-@name("Store") export builtin Store<T>(ptr: usize, value: T): void; // Store(Builder: LLVMBuilderRef, Val: LLVMValueRef, Ptr: LLVMValueRef): LLVMValueRef;
 // @name("StructGEP2") export builtin StructGEP2(): void; // StructGEP2(Builder: LLVMBuilderRef, Ty: LLVMTypeRef, Pointer: LLVMValueRef, Idx: number, Name: LLVMStringRef): LLVMValueRef;
 @name("Sub") export builtin Sub<T>(lhs: T, rhs: T): T; // Sub(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("Switch") export builtin Switch(): void; // Switch(Builder: LLVMBuilderRef, V: LLVMValueRef, Else: LLVMBasicBlockRef, NumCases: number): LLVMValueRef;
