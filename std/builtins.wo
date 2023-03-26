@@ -28,27 +28,23 @@ export namespace memory {
   @name("ptr") export builtin ptr<T>(ref: T): usize;
 }
 
+export namespace types {
+  @name("types.is") export builtin is<T, U>(): bool;
+  @name("types.isAssignableTo") export builtin isAssignableTo<T, U>(): bool;
+  @name("types.idOf") export builtin idOf<T>(): u32;
+  @name("types.sizeOf") export builtin sizeOf<T>(val: T): usize;
+}
+
+export namespace ensure {
+  @name("ensure.compiled") export builtin compiled<T>(val: T): T;
+}
+
 // compiler intrinsics
 @name("AShr") export builtin AShr<T>(value: T, bits: T): T; // AShr(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 @name("Add") export builtin Add<T>(lhs: T, rhs: T): T; // Add(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
-// @name("AddrSpaceCast") export builtin AddrSpaceCast(): void; // AddrSpaceCast(Builder: LLVMBuilderRef, Val: LLVMValueRef, DestTy: LLVMTypeRef, Name: LLVMStringRef): LLVMValueRef;
-// @name("AggregateRet") export builtin AggregateRet(): void; // AggregateRet(Builder: LLVMBuilderRef, RetVals: Pointer<LLVMValueRef[]>, N: number): LLVMValueRef;
 @name("And") export builtin And<T>(lhs: T, rhs: T): T; // And(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("AtomicCmpXchg") export builtin AtomicCmpXchg(): void; // AtomicCmpXchg(Builder: LLVMBuilderRef, Ptr: LLVMValueRef, Cmp: LLVMValueRef, New: LLVMValueRef, SuccessOrdering: LLVMAtomicOrdering, FailureOrdering: LLVMAtomicOrdering, SingleThread: LLVMBool): LLVMValueRef;
 // @name("AtomicRMW") export builtin AtomicRMW(): void; // AtomicRMW(Builder: LLVMBuilderRef, op: LLVMAtomicRMWBinOp, PTR: LLVMValueRef, Val: LLVMValueRef, ordering: LLVMAtomicOrdering, singleThread: LLVMBool): LLVMValueRef;
-// @name("BinOp") export builtin BinOp(): void; // BinOp(Builder: LLVMBuilderRef, Op: LLVMOpcode, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
-// @name("BitCast") export builtin BitCast(): void; // BitCast(Builder: LLVMBuilderRef, Val: LLVMValueRef, DestTy: LLVMTypeRef, Name: LLVMStringRef): LLVMValueRef;
-// @name("Cast") export builtin Cast(): void; // Cast(Builder: LLVMBuilderRef, Op: LLVMOpcode, Val: LLVMValueRef, DestTy: LLVMTypeRef, Name: LLVMStringRef): LLVMValueRef;
-// @name("CatchPad") export builtin CatchPad(): void; // CatchPad(Builder: LLVMBuilderRef, ParentPad: LLVMValueRef, Args: Pointer<LLVMValueRef[]>, NumArgs: number, Name: LLVMStringRef): LLVMValueRef;
-// @name("CatchRet") export builtin CatchRet(): void; // CatchRet(Builder: LLVMBuilderRef, CatchPad: LLVMValueRef, BB: LLVMBasicBlockRef): LLVMValueRef;
-// @name("CatchSwitch") export builtin CatchSwitch(): void; // CatchSwitch(Builder: LLVMBuilderRef, ParentPad: LLVMValueRef, UnwindBB: LLVMBasicBlockRef, NumHandlers: number, Name: LLVMStringRef): LLVMValueRef;
-// @name("CleanupPad") export builtin CleanupPad(): void; // CleanupPad(Builder: LLVMBuilderRef, ParentPad: LLVMValueRef, Args: Pointer<LLVMValueRef[]>, NumArgs: number, Name: LLVMStringRef): LLVMValueRef;
-// @name("CleanupRet") export builtin CleanupRet(): void; // CleanupRet(Builder: LLVMBuilderRef, CatchPad: LLVMValueRef, BB: LLVMBasicBlockRef): LLVMValueRef;
-// @name("CondBr") export builtin CondBr(): void; // CondBr(Builder: LLVMBuilderRef, If: LLVMValueRef, Then: LLVMBasicBlockRef, Else: LLVMBasicBlockRef): LLVMValueRef;
-// @name("ExactSDiv") export builtin ExactSDiv(): void; // ExactSDiv(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
-// @name("ExactUDiv") export builtin ExactUDiv(): void; // ExactUDiv(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
-// @name("ExtractElement") export builtin ExtractElement(): void; // ExtractElement(Builder: LLVMBuilderRef, VecVal: LLVMValueRef, Index: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
-// @name("ExtractValue") export builtin ExtractValue(): void; // ExtractValue(Builder: LLVMBuilderRef, AggVal: LLVMValueRef, Index: number, Name: LLVMStringRef): LLVMValueRef;
 @name("FAdd") export builtin FAdd<T>(lhs: T, rhs: T): T; // FAdd(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("FCmp") export builtin FCmp(): void; // FCmp(Builder: LLVMBuilderRef, Op: LLVMRealPredicate, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("FDiv") export builtin FDiv(): void; // FDiv(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;

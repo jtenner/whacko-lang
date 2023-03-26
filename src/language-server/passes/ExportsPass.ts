@@ -201,7 +201,7 @@ export class ExportsPass extends WhackoPass {
       node,
       this.currentMod!.path + "~" + this.nameStack + name
     );
-    if (scope.has(name)) {
+    if (scope.hasInCurrentScope(name)) {
       this.error(
         `Semantic`,
         node.name,

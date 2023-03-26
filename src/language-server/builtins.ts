@@ -819,4 +819,60 @@ export function registerDefaultBuiltins(program: WhackoProgram) {
 
   program.addBuiltin("f32", floatCast(32, Type.f32));
   program.addBuiltin("f64", floatCast(64, Type.f64));
+
+  program.addBuiltin("types.is", ({ typeParameters, ast, ctx }) => {
+    const [left, right] = typeParameters;
+    const result = left.isEqual(right);
+    ctx.stack.push(new CompileTimeBool(result, ast));
+  });
+
+  program.addBuiltin("types.isAssignableTo", ({ typeParameters, ast, ctx }) => {
+    const [left, right] = typeParameters;
+    const result = left.isAssignableTo(right);
+    ctx.stack.push(new CompileTimeBool(result, ast));
+  });
+
+  program.addBuiltin("types.idOf", ({ typeParameters, ast, ctx, pass }) => {
+    const [classType] = typeParameters;
+    if (classType instanceof ConcreteClass) {
+      const value = classType.id;
+      ctx.stack.push(new CompileTimeInteger(value, new IntegerType(Type.u32, value, ast)));
+    } else {
+      ctx.stack.push(new CompileTimeInvalid(ast));
+      pass.error("Type", ast, `Type parameter is not a class.`);
+    }
+  });
+
+  program.addBuiltin("types.sizeOf", ({ typeParameters, parameters, ast, ctx, pass, program }) => {
+    const { LLVM, LLVMUtil } = program;
+    const [classType] = typeParameters;
+    const [ptr] = parameters;
+    const derefedPtr = pass.ensureDereferenced(ptr);
+
+    const intType = new IntegerType(Type.usize, null, ast);
+    if (classType instanceof StringType) {
+      if (derefedPtr instanceof RuntimeValue) {
+        // perform a load from the pointer location
+        const refName = pass.getTempNameRef();
+        const ref = LLVM._LLVMBuildLoad2(
+          pass.builder,
+          intType.llvmType(LLVM, LLVMUtil)!,
+          derefedPtr.ref,
+          refName
+        );
+        LLVM._free(refName);
+        ctx.stack.push(new RuntimeValue(ref, intType))
+      } else {
+        assert(derefedPtr instanceof CompileTimeString, "Dereferenced value must be a compile time string at this point.");
+        const value = Buffer.byteLength((derefedPtr as CompileTimeString).value);
+        ctx.stack.push(new CompileTimeInteger(BigInt(value), intType));
+      }
+    } else if (classType instanceof ConcreteClass) {
+      ctx.stack.push(new CompileTimeInteger(classType.offset, intType));
+    } else {
+      // uhoh
+      pass.error("Type", ast, `Type ${classType.getName()} is not a string or a reference.`);
+      ctx.stack.push(new CompileTimeInvalid(ast));
+    }
+  });
 }

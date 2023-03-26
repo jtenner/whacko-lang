@@ -145,6 +145,10 @@ export class Scope {
     return this.elements.has(name) || this.parent?.has(name) || false;
   }
 
+  hasInCurrentScope(name: string): boolean {
+    return this.elements.has(name) ?? false;
+  }
+
   get(
     name: string,
     predicate: (element: ScopeElement) => boolean = () => true

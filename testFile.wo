@@ -3,6 +3,19 @@ class A {
 
   constructor() {}
 }
+
+fn id<T>(value: T): T {
+  return value;
+}
+
+fn gottenString(): string {
+  return "gotten";
+}
+
 export fn _start(): void {
+  let staticStrLen = id(types.sizeOf("some string"));
+  let strLen = id(types.sizeOf(gottenString()));
   let a = new A();
+  let size = id(types.sizeOf(a));
+  let sizeofA = ensure.compiled(types.sizeOf("this string"));
 }

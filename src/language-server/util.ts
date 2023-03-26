@@ -1,3 +1,5 @@
+import { AstNode } from "langium";
+
 export const enum DiagnosticLevel {
   Info,
   Warning,
@@ -17,4 +19,16 @@ export function assert<T>(
 ) {
   if (!condition) throw new Error(message);
   return condition;
+}
+
+export function logNode(node: AstNode) {
+  console.log(cleanNode(node))
+}
+
+export function cleanNode(node: AstNode): any {
+  return Object.fromEntries(
+    Object.entries(node)
+      .filter(([key, entry]) => key === "$type" || !key.startsWith("$"))
+      .map(([key, obj]) => [key, (obj.constructor === Object ? cleanNode(obj) : obj) as any])
+  );
 }

@@ -1,4 +1,4 @@
-import { assert } from "../util";
+import { assert, logNode } from "../util";
 import {
   CompileTimeBool,
   CompileTimeValue,
@@ -168,7 +168,11 @@ export function getBoolPredicate(node: BinaryExpression, pass: CompilationPass) 
 export function obtainValue(expression: AstNode, pass: CompilationPass) {
   const length = pass.ctx.stack.length;
   pass.visit(expression);
-  assert(pass.ctx.stack.length === length + 1, "Stack should only have a single value more on the stack... something went wrong.");
+  if (pass.ctx.stack.length !== length + 1) {
+    logNode(expression);
+    console.log(pass.ctx.stack);
+    assert(false, "Stack should only have a single value more on the stack... something went wrong.");
+  }
   return assert(pass.ctx.stack.pop(), "Value must exist on the stack at this point.");
 }
 
@@ -1529,7 +1533,6 @@ export class CompilationPass extends WhackoPass {
 
   override visitCallExpression(node: CallExpression): void {
     const callRootValue = obtainValue(node.callRoot, this);
-
     // evaluate each expression in the call expression
     const callParameterValues = [] as ExecutionContextValue[];
     for (const callParameterExpression of node.parameters) {
