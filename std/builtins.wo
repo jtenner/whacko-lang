@@ -35,10 +35,6 @@ export namespace types {
   @name("types.sizeOf") export builtin sizeOf<T>(val: T): usize;
 }
 
-export namespace ensure {
-  @name("ensure.compiled") export builtin compiled<T>(val: T): T;
-}
-
 // compiler intrinsics
 @name("AShr") export builtin AShr<T>(value: T, bits: T): T; // AShr(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 @name("Add") export builtin Add<T>(lhs: T, rhs: T): T; // Add(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
