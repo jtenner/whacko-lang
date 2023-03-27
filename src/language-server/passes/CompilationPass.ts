@@ -68,6 +68,7 @@ import {
   isEnumDeclaration,
   EnumDeclaration,
   TernaryExpression,
+  ArrayAccessExpression,
   // TypeCastExpression,
 } from "../generated/ast";
 import { WhackoModule } from "../module";
@@ -2242,6 +2243,12 @@ export class CompilationPass extends WhackoPass {
     this.LLVM._free(truthyLabelName);
     this.LLVM._free(falsyLabelName);
     this.LLVM._free(nextLabelName);
+  }
+
+  override visitArrayAccessExpression(node: ArrayAccessExpression): void {
+    // TODO: implement member access expression
+    this.ctx.stack.push(new CompileTimeInvalid(node));
+    this.error("Semantic", node, `Array access is not supported for this expression.`);
   }
 
   override visitTrueLiteral(expression: TrueLiteral): void {
