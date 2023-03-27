@@ -4,27 +4,32 @@ target triple = "wasm32-wasi"
 
 define void @_start() #0 {
 entry:
-  %"tmp0~" = call i32 @"testFile.wo~perform"(i32 1, i32 2, ptr @"testFile.wo~add")
-  %"tmp1~" = call i32 @"testFile.wo~perform"(i32 43, i32 1, ptr @"testFile.wo~sub")
+  %"tmp0~" = call i64 @"testFile.wo~getTernary"()
   ret void
 }
 
-define i32 @"testFile.wo~add"(i32 %0, i32 %1) #0 {
+define i64 @"testFile.wo~getTernary"() {
 entry:
-  %"tmp4~" = add i32 %0, %1
-  ret i32 %"tmp4~"
+  %"tmp1~" = call i1 @"testFile.wo~getBool"()
+  %"tmp6~" = alloca i128, align 8
+  br i1 %"tmp1~", label %"tmp3~", label %"tmp4~"
+
+"tmp3~":                                          ; preds = %entry
+  store i64 1, ptr %"tmp6~", align 4
+  br label %"tmp5~"
+
+"tmp4~":                                          ; preds = %entry
+  store i64 2, ptr %"tmp6~", align 4
+  br label %"tmp5~"
+
+"tmp5~":                                          ; preds = %"tmp4~", %"tmp3~"
+  %"tmp2~" = load i64, ptr %"tmp6~", align 4
+  ret i64 %"tmp2~"
 }
 
-define i32 @"testFile.wo~perform"(i32 %0, i32 %1, ptr %2) {
+define i1 @"testFile.wo~getBool"() {
 entry:
-  %"tmp3~" = call i32 %2(i32 %0, i32 %1)
-  ret i32 %"tmp3~"
-}
-
-define i32 @"testFile.wo~sub"(i32 %0, i32 %1) #0 {
-entry:
-  %"tmp2~" = sub i32 %0, %1
-  ret i32 %"tmp2~"
+  ret i1 true
 }
 
 attributes #0 = { "target-features"="+simd128" }

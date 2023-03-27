@@ -67,6 +67,7 @@ import {
   ID,
   isEnumDeclaration,
   EnumDeclaration,
+  TernaryExpression,
   // TypeCastExpression,
 } from "../generated/ast";
 import { WhackoModule } from "../module";
@@ -2119,6 +2120,128 @@ export class CompilationPass extends WhackoPass {
       ),
       value.ty
     );
+  }
+
+  override visitTernaryExpression(node: TernaryExpression): void {
+    // There are 3 paths we can take for this expression
+    const condition = this.ensureDereferenced(obtainValue(node.condition, this));
+  
+    // CASE 1: The condition is a compile time constant
+    if (condition instanceof CompileTimeBool || condition instanceof CompileTimeInteger) {
+      // we eliminate the corresponding branch here
+      this.ctx.stack.push(
+        condition.value
+          ? obtainValue(node.truthy, this)
+          : obtainValue(node.falsy, this)
+      );
+      // We cannot do type checking of the truthy and falsy branches here because we don't actually
+      // evaluate it.
+      // TODO: develop some kind of type resolution for expressions that do not provide codegen
+      return;
+    }
+
+    // Some basic type checking, the condition must be an integer or a bool
+    const isBool = condition.ty instanceof BoolType;
+    const isInt = condition.ty instanceof IntegerType;
+    if (!isBool && !isInt) {
+      // we can't do this. Push a compile time invalid to the stack
+      this.error("Type", node, `Condition in ternary is not a bool or an int.`);
+      this.ctx.stack.push(new CompileTimeInvalid(node));
+      return;
+    }
+
+    // Since we cannot determine if the truthy and falsy sides of the expression are compile time constants,
+    // at least not without potentially writing code to the current block, we cannot use a `select` instruction
+    // here safely. The only viable alternative is to generate 3 labels, truthy, falsy and next
+    
+    const resultName = this.getTempNameRef();
+    const truthyLabelName = this.getTempNameRef();
+    const falsyLabelName = this.getTempNameRef();
+    const nextLabelName = this.getTempNameRef();
+    const storageSiteName = this.getTempNameRef();
+
+    // first generate the truthy branch
+    const truthyLabel = this.LLVM._LLVMAppendBasicBlockInContext(
+      this.program.llvmContext,
+      this.func.funcRef,
+      truthyLabelName
+    );
+      
+    // then generate the falsy branch
+    const falsyLabel = this.LLVM._LLVMAppendBasicBlockInContext(
+      this.program.llvmContext,
+      this.func.funcRef,
+      falsyLabelName
+    );
+
+    // and don't forget the next block
+    const nextLabel = this.LLVM._LLVMAppendBasicBlockInContext(
+      this.program.llvmContext,
+      this.func.funcRef,
+      nextLabelName
+    );
+
+    const storageSite = this.LLVM._LLVMBuildAlloca(
+      this.builder,
+      this.LLVM._LLVMInt128Type(),
+      storageSiteName
+    );
+
+    // then create the brIf, ensuring the condition is compiled
+    const compiledCondition = this.ensureCompiled(condition); 
+    this.LLVM._LLVMBuildCondBr(
+      this.builder,
+      compiledCondition.ref,
+      truthyLabel,
+      falsyLabel
+    );
+
+    // first we visit the truthy branch
+    this.LLVM._LLVMPositionBuilderAtEnd(this.builder, truthyLabel);
+    this.currentBlock = truthyLabel;
+    const truthyCompiledValue = this.ensureCompiled(obtainValue(node.truthy, this));
+    this.LLVM._LLVMBuildStore(
+      this.builder,
+      truthyCompiledValue.ref,
+      storageSite
+    );
+    this.LLVM._LLVMBuildBr(this.builder, nextLabel);
+
+    // then we visit the falsy branch
+    this.LLVM._LLVMPositionBuilderAtEnd(this.builder, falsyLabel);
+    this.currentBlock = falsyLabel;
+    const falsyCompiledValue = this.ensureCompiled(obtainValue(node.falsy, this));
+    this.LLVM._LLVMBuildStore(
+      this.builder,
+      falsyCompiledValue.ref,
+      storageSite
+    );
+    this.LLVM._LLVMBuildBr(this.builder, nextLabel);
+
+    // now we can visit the next block and continue execution
+    this.LLVM._LLVMPositionBuilderAtEnd(this.builder, nextLabel);
+    this.currentBlock = nextLabel;
+
+    // at this point we have the two compiled values, and we can safely type check them
+    if (falsyCompiledValue.ty.isAssignableTo(truthyCompiledValue.ty)) {
+      // we choose the truthy value's type no matter what it is
+      const value = this.LLVM._LLVMBuildLoad2(
+        this.builder,
+        truthyCompiledValue.ty.llvmType(this.LLVM, this.program.LLVMUtil)!,
+        storageSite,
+        resultName
+      );
+      this.ctx.stack.push(new RuntimeValue(value, truthyCompiledValue.ty));
+    } else {
+      this.error("Type", node.falsy, `Falsy type in ternary is not assignable to truthy type.`);
+      this.ctx.stack.push(new CompileTimeInvalid(node.falsy));
+    }
+    // free our memory
+    this.LLVM._free(resultName);
+    this.LLVM._free(storageSiteName);
+    this.LLVM._free(truthyLabelName);
+    this.LLVM._free(falsyLabelName);
+    this.LLVM._free(nextLabelName);
   }
 
   override visitTrueLiteral(expression: TrueLiteral): void {
