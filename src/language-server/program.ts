@@ -297,14 +297,15 @@ export class WhackoProgram {
     const lldArgs = [
       "wasm-ld",
       tmpOName,
-      "-o", 
+      "-o",
       tmpWasmName,
       ...staticLibFiles,
+      "--verbose",
       "-O3"
     ];
     const { arrayPtr: lldArrayPtr, ptrs: lldArrayPtrs } = lowerStringArray(this.LLD, lldArgs);
 
-    // this.LLD._main(lldArrayPtrs.length, lldArrayPtr);
+    this.LLD._main(lldArrayPtrs.length, lldArrayPtr);
     this.LLD._free(lldArrayPtr);
     for (const ptr of lldArrayPtrs) this.LLD._free(ptr);
     // const wasmFile = this.LLC.FS.readFile(tmpWasmName);

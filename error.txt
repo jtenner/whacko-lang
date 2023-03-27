@@ -1,0 +1,33 @@
+Function context does not match Module context!
+ptr @malloc
+Function context does not match Module context!
+ptr @malloc
+
+wasm-ld: Loading: /S8PhmxLFUdHbEfY3bBX7Cg.o
+wasm-ld: Loading: /IHIiFdxYPGfVvyRuDspAfA.a
+wasm-ld: Loading: /uSM_FLuwaH9vEuWVBirq-Q.a
+wasm-ld: Processing: /S8PhmxLFUdHbEfY3bBX7Cg.o
+wasm-ld: Processing: /IHIiFdxYPGfVvyRuDspAfA.a
+wasm-ld: Processing: /uSM_FLuwaH9vEuWVBirq-Q.a
+wasm-ld: Processing: /uSM_FLuwaH9vEuWVBirq-Q.a(dlmalloc.o)
+wasm-ld: Processing: /uSM_FLuwaH9vEuWVBirq-Q.a(errno.o)
+wasm-ld: Processing: /uSM_FLuwaH9vEuWVBirq-Q.a(sbrk.o)
+wasm-ld: Processing: /uSM_FLuwaH9vEuWVBirq-Q.a(abort.o)
+wasm-ld: Processing: /uSM_FLuwaH9vEuWVBirq-Q.a(memcpy.o)
+wasm-ld: Processing: /uSM_FLuwaH9vEuWVBirq-Q.a(memset.o)
+wasm-ld: Processing: /uSM_FLuwaH9vEuWVBirq-Q.a(exit.o)
+wasm-ld: Processing: /uSM_FLuwaH9vEuWVBirq-Q.a(_Exit.o)
+wasm-ld: Processing: /uSM_FLuwaH9vEuWVBirq-Q.a(__wasilibc_real.o)
+wasm-ld: Processing: /uSM_FLuwaH9vEuWVBirq-Q.a(strlen.o)
+Aborted(native code called abort())
+RuntimeError: Aborted(native code called abort())
+    at abort (file:///home/jtenner/whacko-lang/node_modules/llvm-js/build/lld.js:8:16102)
+    at _abort (file:///home/jtenner/whacko-lang/node_modules/llvm-js/build/lld.js:8:87902)
+    at wasm://wasm/069c707e:wasm-function[28887]:0x18e59ff
+    at wasm://wasm/069c707e:wasm-function[1274]:0xce212
+    at wasm://wasm/069c707e:wasm-function[285]:0x56666
+    at wasm://wasm/069c707e:wasm-function[1273]:0xcdd3f
+    at wasm://wasm/069c707e:wasm-function[1278]:0xce468
+    at wasm://wasm/069c707e:wasm-function[5168]:0x39a880
+    at wasm://wasm/069c707e:wasm-function[55]:0x3fbd6
+    at wasm://wasm/069c707e:wasm-function[78]:0x4199c
