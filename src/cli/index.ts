@@ -1,4 +1,4 @@
-import { glob } from "glob";
+import { sync as glob } from "glob";
 import path from "node:path";
 // @ts-ignore
 import { parseArgs } from "node:util";
@@ -7,20 +7,32 @@ import { assert } from "../language-server/util";
 // import { WhackoProgram } from "../compiler";
 import fs from "node:fs/promises";
 
-const options = {};
+const options = {
+  
+}
 
 export default async function main(args: string[]): Promise<void> {
-  const llvm = await eval(`import("llvm-js")`);
-  const LLVM = await llvm.load();
+  const LLVMUtil = await eval(`import("llvm-js")`);
+  const LLVM = await LLVMUtil.load();
+  const { default: loadLLC } = await eval(`import("llvm-js/build/llc.js")`);
+  const LLC = await loadLLC();
+  const { default: loadLLD } = await eval(`import("llvm-js/build/lld.js")`);
+  const LLD = await loadLLD();
   const { values, positionals } = parseArgs({
     args,
-    options,
+    options: {
+      "outWasm": { type: "string" },
+      "outLL": { type: "string" },
+      "outBC": { type: "string" },
+      "outO": { type: "string" },
+    },
     allowPositionals: true,
-  });
-  const program = new WhackoProgram(LLVM, llvm);
+  }) as any;
+
+  const program = new WhackoProgram(LLVM, LLVMUtil, LLC, LLD);
 
   // first step in any program is registering the builtins
-  const stdLibs = glob.sync("std/*.wo", {
+  const stdLibs = glob("std/*.wo", {
     absolute: true,
     root: __dirname,
   });
@@ -34,6 +46,18 @@ export default async function main(args: string[]): Promise<void> {
     );
   }
 
+  // then we register static lib files
+  const staticLibs = glob("std/*.a", {
+    absolute: true,
+    root: __dirname,
+  });
+
+  for (const staticLib of staticLibs) {
+    const dirname = path.dirname(staticLib);
+    const basename = path.basename(staticLib);
+    program.addStaticLibrary(basename, dirname);
+  }
+
   for (const positional of positionals) {
     program.addModule(
       positional,
@@ -44,10 +68,11 @@ export default async function main(args: string[]): Promise<void> {
   }
 
   try {
-    const result = program.compile();
-    for (const [file, buff] of result) {
-      await fs.writeFile(file, buff);
-    }
+    const { bcFile, llFile, oFile } = program.compile();
+    if (values.outWasm) console.log("Can't output wasm files yet"); // fs.writeFile("./out.wasm", wasmFile);
+    if (values.outLL) await fs.writeFile("./out.ll", llFile);
+    if (values.outBC) await fs.writeFile("./out.bc", bcFile);
+    if (values.outO) await fs.writeFile("./out.o", oFile);
   } catch (ex) {
     console.error(ex);
   }

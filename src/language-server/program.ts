@@ -31,12 +31,38 @@ import type {
   LLVMStringRef,
   Module,
 } from "llvm-js";
+import crypto from "node:crypto";
 
 export type LLVMJSUtil = typeof import("llvm-js");
 
+export function lowerStringArray(mod: any, args: string[]) {
+  const ptrs = [] as number[];
+
+  for (const arg of args) {
+    const size = Buffer.byteLength(arg) + 1;
+    const ptr = mod._malloc(size);
+    ptrs.push(ptr);
+    mod.stringToUTF8(arg, ptr, size);
+  }
+
+  const arraySize = args.length * 4 + 1;
+  const arrayPtr = mod._malloc(arraySize);
+  for (let i = 0; i < ptrs.length; i++) {
+    const ptr = ptrs[i];
+    mod.HEAPU32[(arrayPtr >>> 2) + i] = ptr;
+  }
+
+  return { ptrs, arrayPtr };
+}
+
 export class WhackoProgram {
   llvmContext: LLVMContextRef;
-  constructor(public LLVM: Module, public LLVMUtil: LLVMJSUtil) {
+  constructor(
+    public LLVM: Module,
+    public LLVMUtil: LLVMJSUtil,
+    public LLC: any,
+    public LLD: any
+  ) {
     registerDefaultBuiltins(this);
     this.llvmModule = LLVM._LLVMModuleCreateWithName(LLVMUtil.lower("whacko"));
     this.llvmContext = LLVM._LLVMContextCreate();
@@ -62,6 +88,13 @@ export class WhackoProgram {
       throw new Error("Builtin already defined.");
     }
     this.builtinTypes.set(name, func);
+  }
+
+  staticLibs = new Map<string, Buffer>();
+  addStaticLibrary(libPath: string, from: string): this {
+    const absoluteLibPath = path.join(from, libPath);
+    this.staticLibs.set(libPath, fs.readFileSync(absoluteLibPath));
+    return this;
   }
 
   addModule(
@@ -125,7 +158,7 @@ export class WhackoProgram {
     }
   }
 
-  compile(): Map<string, Buffer> {
+  compile() {
     const exportsPass = new ExportsPass(this);
     for (const [, module] of this.modules) {
       exportsPass.visitModule(module);
@@ -178,7 +211,6 @@ export class WhackoProgram {
 
     const strRef = this.LLVM._LLVMPrintModuleToString(this.llvmModule);
     const str = this.LLVMUtil.lift(strRef);
-    console.error(str);
 
     const errorPointer = this.LLVM._malloc<LLVMStringRef[]>(4);
     this.LLVM._LLVMVerifyModule(
@@ -202,6 +234,7 @@ export class WhackoProgram {
 
     const messagePtr = this.LLVM._malloc<LLVMStringRef[]>(4);
     const objBufferPtr = this.LLVM._malloc<LLVMMemoryBufferRef[]>(4);
+
     // const objFileSuccess = this.LLVM._LLVMTargetMachineEmitToMemoryBuffer(
     //   machine,
     //   this.llvmModule,
@@ -214,21 +247,68 @@ export class WhackoProgram {
     // const derefObjBufferPtr = this.LLVM.HEAPU32[objBufferPtr >>> 2];
     // const objBufrefStart = this.LLVM.HEAPU32[derefObjBufferPtr >>> 2];
     // const objBufrefEnd = this.LLVM.HEAPU32[(derefObjBufferPtr >>> 2) + 1];
-
-    const result = [
-      ["test.bc", Buffer.from(this.LLVM.HEAPU8.buffer, bufstart, bufsize)],
-      ["test.ll", Buffer.from(str)],
-    ] as [string, Buffer][];
+    const bcFile = Buffer.from(this.LLVM.HEAPU8.buffer, bufstart, bufsize);
+    const llFile = Buffer.from(str);
 
     this.LLVM._LLVMDisposeMemoryBuffer(bufref);
     // this.LLVM._LLVMDisposeMemoryBuffer(derefObjBufferPtr as any);
     this.LLVM._free(messagePtr);
     this.LLVM._free(objBufferPtr);
 
-    // console.log(objFileSuccess)
-    // if (objFileSuccess) {
-    //   result.push(["test.o", Buffer.from(this.LLVM.HEAPU8.buffer, objBufrefStart, objBufrefEnd - objBufrefStart)]);
-    // }
-    return new Map(result);
+    // write the bcFile into the memfs so that we can turn it into a wasm .o file
+    const tmpFileBase = crypto.randomBytes(16).toString('base64url');
+    const tmpBCName = "/" + tmpFileBase + ".bc";
+    const tmpOName = "/" + tmpFileBase + ".o";
+    this.LLC.FS.writeFile(tmpBCName, bcFile);
+    this.LLC.FS.chmod(tmpBCName, 0o444);
+
+    // we need to free every one of these pointers after calling _main()
+    const { arrayPtr: llcArgvPtr, ptrs: llcArgvPtrs } = lowerStringArray(this.LLC, [
+      "llc",
+      tmpBCName,
+      "--march=wasm32",
+      "-o", 
+      tmpOName,
+      "-filetype=obj",
+      "--experimental-debug-variable-locations",
+      "--emit-call-site-info",
+      "-O3"
+    ]);
+    // process.stdout.write(JSON.stringify(Object.keys(this.LLC.FS)));
+    this.LLC._main(llcArgvPtrs.length, llcArgvPtr);
+    this.LLC._free(llcArgvPtr);
+    for (const ptr of llcArgvPtrs) this.LLC._free(ptr);
+    const oFile = this.LLC.FS.readFile(tmpOName);
+
+    // now we link it against libc and libm
+    const staticLibFiles = [] as string[];
+    for (const [staticLib, staticLibBuffer] of this.staticLibs) {
+      const tmpFileBase = crypto.randomBytes(16).toString('base64url');
+      const staticLibFile = "/" + tmpFileBase + path.extname(staticLib);
+      staticLibFiles.push(staticLibFile);
+      this.LLD.FS.writeFile(staticLibFile, staticLibBuffer);
+      this.LLD.FS.chmod(staticLibFile, 0o444);
+    }
+    
+    const tmpWasmName = "/" + tmpFileBase + ".wasm";
+    this.LLD.FS.writeFile(tmpOName, oFile);
+    this.LLD.FS.chmod(tmpOName, 0o444);
+
+    const lldArgs = [
+      "wasm-ld",
+      tmpOName,
+      "-o", 
+      tmpWasmName,
+      ...staticLibFiles,
+      "-O3"
+    ];
+    const { arrayPtr: lldArrayPtr, ptrs: lldArrayPtrs } = lowerStringArray(this.LLD, lldArgs);
+
+    // this.LLD._main(lldArrayPtrs.length, lldArrayPtr);
+    this.LLD._free(lldArrayPtr);
+    for (const ptr of lldArrayPtrs) this.LLD._free(ptr);
+    // const wasmFile = this.LLC.FS.readFile(tmpWasmName);
+
+    return { llFile, bcFile, oFile };
   }
 }

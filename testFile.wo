@@ -17,5 +17,5 @@ export fn _start(): void {
   let strLen = id(types.sizeOf(gottenString()));
   let a = new A();
   let size = id(types.sizeOf(a));
-  let sizeofA = ensure.compiled(types.sizeOf("this string"));
+  let sizeofA = id(types.sizeOf("this string"));
 }

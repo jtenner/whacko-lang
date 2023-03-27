@@ -1687,7 +1687,7 @@ export class CompilationPass extends WhackoPass {
         const name = functionToBeCompiled.typeParameters[i].name;
         splicedTypeMap.set(name, callTypeParameters[i]);
       }
-    }
+    } 
     
     if (elementParameters && functionToBeCompiled) {
       // we are good for parameter type checking
@@ -1809,6 +1809,8 @@ export class CompilationPass extends WhackoPass {
     if (functionToBeCompiled === null) {
       console.error(callRootValue);
     }
+
+    // this.LLVM._LLVMGetNamedFunction()
 
     this.ctx.stack.push(new CompileTimeInvalid(node));
     this.error("Semantic", node, "Call expression not supported.");
@@ -2077,6 +2079,21 @@ export class CompilationPass extends WhackoPass {
       );
       this.LLVM._free(name);
       return new RuntimeValue(ref, field.ty);
+    } else if (value instanceof CompileTimeFunctionReference) {
+      const scopeItem = value.value;
+      if (scopeItem instanceof StaticTypeScopeElement) {
+        // we can compile it and push the pointer to the stack
+        this.compileCallable(
+          scopeItem.node as FunctionDeclaration,
+          [],
+          assert(getModule(scopeItem.node), "The module for this function must be known."),
+          [
+            ["target-features", "+simd128"]
+          ],
+        );
+      } else {
+        this.error("Type", scopeItem.node, "Cannot pass around generic function references.");
+      }
     }
   
     this.error(
