@@ -581,7 +581,7 @@ export function registerDefaultBuiltins(program: WhackoProgram) {
   });
 
   program.addBuiltin(
-    "ptr",
+    "memory.ptr",
     ({ program, parameters, typeParameters, pass, ctx, ast }) =>{
       const { LLVM, LLVMUtil } = program;
       const [classType] = typeParameters;
@@ -621,7 +621,7 @@ export function registerDefaultBuiltins(program: WhackoProgram) {
   );
 
   program.addBuiltin(
-    "load",
+    "memory.load",
     ({ program, parameters, typeParameters, pass, ctx, ast }) => {
       const { LLVM, LLVMUtil } = program;
       const [type] = typeParameters;
@@ -657,7 +657,7 @@ export function registerDefaultBuiltins(program: WhackoProgram) {
   );
 
   program.addBuiltin(
-    "store",
+    "memory.store",
     ({ program, parameters, typeParameters, pass, ctx, ast }) => {
       const [ptr, value] = parameters;
       const compiledPtr = pass.ensureCompiled(ptr);
@@ -688,10 +688,11 @@ export function registerDefaultBuiltins(program: WhackoProgram) {
     }
   );
 
+
   const isUsize = (val: ExecutionContextValue) => {
     return val.ty instanceof IntegerType && val.ty.ty === Type.usize;
   };
-  program.addBuiltin("MemCopy", ({ program, pass, parameters }) => {
+  program.addBuiltin("memory.copy", ({ program, pass, parameters, ast, ctx }) => {
     const [src, dest, count] = parameters;
     if (isUsize(src) && isUsize(dest) && isUsize(count)) {
       const compiledSrc = pass.ensureCompiled(src);
@@ -725,6 +726,10 @@ export function registerDefaultBuiltins(program: WhackoProgram) {
       );
       pass.LLVM._free(ptrSrcCastName);
       pass.LLVM._free(ptrDestCastName);
+      ctx.stack.push(new CompileTimeVoid(ast));
+    } else {
+      ctx.stack.push(new CompileTimeInvalid(ast));
+      pass.error("Type", ast, `Invalid call to memory.copy, parameters must be usize.`);
     }
   });
 

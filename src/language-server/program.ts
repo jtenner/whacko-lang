@@ -249,6 +249,7 @@ export class WhackoProgram {
     // const objBufrefEnd = this.LLVM.HEAPU32[(derefObjBufferPtr >>> 2) + 1];
     const bcFile = Buffer.from(this.LLVM.HEAPU8.buffer, bufstart, bufsize);
     const llFile = Buffer.from(str);
+    console.error(str);
 
     this.LLVM._LLVMDisposeMemoryBuffer(bufref);
     // this.LLVM._LLVMDisposeMemoryBuffer(derefObjBufferPtr as any);
@@ -305,7 +306,7 @@ export class WhackoProgram {
     ];
     const { arrayPtr: lldArrayPtr, ptrs: lldArrayPtrs } = lowerStringArray(this.LLD, lldArgs);
 
-    this.LLD._main(lldArrayPtrs.length, lldArrayPtr);
+    // this.LLD._main(lldArrayPtrs.length, lldArrayPtr);
     this.LLD._free(lldArrayPtr);
     for (const ptr of lldArrayPtrs) this.LLD._free(ptr);
     // const wasmFile = this.LLC.FS.readFile(tmpWasmName);

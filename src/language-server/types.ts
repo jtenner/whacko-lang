@@ -42,6 +42,7 @@ export function getPtrWithOffset(ptr: LLVMValueRef, offset: bigint, pass: Compil
     1,
     gepName
   );
+
   LLVM._free(gepIndicies);
   LLVM._free(gepName);
   return ptrPlusOffset;
@@ -481,6 +482,10 @@ export class ArrayType extends ConcreteType {
   override getName(): string {
     return `Array<${this.childType.name}>`;
   }
+
+  override llvmType(LLVM: Module, LLVMUtil: typeof import("llvm-js")): LLVMTypeRef | null {
+    return LLVM._LLVMArrayType(this.childType.llvmType(LLVM, LLVMUtil)!, this.initialLength);
+  }
 }
 
 export class Parameter {
@@ -515,18 +520,26 @@ export class FunctionType extends ConcreteType {
 
   override getName() {
     const parameterNames = this.parameterTypes.map((e) => e.getName());
-    return `Function(${parameterNames.join(",")})`;
+    return `Function(${parameterNames.join(",")}): ${this.returnType.getName()}`;
   }
 
   override llvmType(
     LLVM: Module,
     LLVMUtil: typeof import("llvm-js")
   ): LLVMTypeRef | null {
+    const returnType = this.returnType instanceof FunctionType
+      ? LLVM._LLVMPointerType(LLVM._LLVMVoidType(), 0)
+      : this.returnType.llvmType(LLVM, LLVMUtil)!;
+
     const loweredParameterTypes = LLVMUtil.lowerPointerArray(
-      this.parameterTypes.map((e) => e.llvmType(LLVM, LLVMUtil)!)
+      this.parameterTypes.map((e) => 
+        e instanceof FunctionType 
+          ? LLVM._LLVMPointerType(LLVM._LLVMVoidType(), 0)
+          : e.llvmType(LLVM, LLVMUtil)!
+      )
     );
     const result = LLVM._LLVMFunctionType(
-      this.returnType.llvmType(LLVM, LLVMUtil)!,
+      returnType,
       loweredParameterTypes,
       this.parameterTypes.length,
       0
@@ -572,12 +585,19 @@ export class MethodType extends ConcreteType {
     LLVM: Module,
     LLVMUtil: typeof import("llvm-js")
   ): LLVMTypeRef | null {
+    const returnType = this.returnType instanceof FunctionType
+      ? LLVM._LLVMPointerType(LLVM._LLVMVoidType(), 0)
+      : this.returnType.llvmType(LLVM, LLVMUtil)!;
     const parameterTypes = [this.thisType].concat(this.parameterTypes);
-    const parameterLLVMTypes = parameterTypes.map((e) => e.llvmType(LLVM, LLVMUtil)!);
+    const parameterLLVMTypes = parameterTypes
+      .map((e) => 
+        e instanceof FunctionType 
+        ? LLVM._LLVMPointerType(LLVM._LLVMVoidType(), 0)
+        : e.llvmType(LLVM, LLVMUtil)!);
 
     const loweredParameterTypes = LLVMUtil.lowerPointerArray(parameterLLVMTypes);
     const result = LLVM._LLVMFunctionType(
-      this.returnType.llvmType(LLVM, LLVMUtil)!,
+      returnType,
       loweredParameterTypes,
       parameterTypes.length,
       0
@@ -586,8 +606,6 @@ export class MethodType extends ConcreteType {
     return result;
   }
 }
-
-
 
 export class Field {
   constructor(

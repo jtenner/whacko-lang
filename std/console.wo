@@ -5,7 +5,7 @@ export namespace console {
     let vec = stack.alloca(usize(8)); // usize type
     
     // at offset 0 of the vec, we store the pointer
-    memory.store(vec, memory.ptr(str) + usize(8));
+    memory.store(vec, memory.ptr(str) + usize(4));
 
     // at offset 4 we store the length which is located at offset 0
     memory.store(vec + usize(4), memory.load<usize>(memory.ptr(str)));

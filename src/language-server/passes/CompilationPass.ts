@@ -169,8 +169,6 @@ export function obtainValue(expression: AstNode, pass: CompilationPass) {
   const length = pass.ctx.stack.length;
   pass.visit(expression);
   if (pass.ctx.stack.length !== length + 1) {
-    logNode(expression);
-    console.log(pass.ctx.stack);
     assert(false, "Stack should only have a single value more on the stack... something went wrong.");
   }
   return assert(pass.ctx.stack.pop(), "Value must exist on the stack at this point.");
@@ -509,7 +507,6 @@ export class CompilationPass extends WhackoPass {
         );
       }
     }
-
 
     for (let i = 0; i < attributes.length; i++) {
       const [key, value] = attributes[i];
@@ -1532,7 +1529,8 @@ export class CompilationPass extends WhackoPass {
   }
 
   override visitCallExpression(node: CallExpression): void {
-    const callRootValue = obtainValue(node.callRoot, this);
+    const callRootValue = this.ensureDereferenced(obtainValue(node.callRoot, this));
+
     // evaluate each expression in the call expression
     const callParameterValues = [] as ExecutionContextValue[];
     for (const callParameterExpression of node.parameters) {
@@ -1556,7 +1554,9 @@ export class CompilationPass extends WhackoPass {
 
     // now we need to see what's on the stack and do type inference
     if (
-      (callRootValue instanceof CompileTimeFunctionReference || callRootValue instanceof CompileTimeMethodReference) &&
+      (
+        callRootValue instanceof CompileTimeFunctionReference 
+        || callRootValue instanceof CompileTimeMethodReference) &&
       callTypeParameters.length === 0 &&
       ((callRootValue.value as ScopeTypeElement).node as FunctionDeclaration)
         .typeParameters.length > 0
@@ -1702,13 +1702,16 @@ export class CompilationPass extends WhackoPass {
         );
 
         if (ty) {
-          if (!callParameterValues[i].ty.isAssignableTo(ty)) {
+          const callParameter = this.ensureCompiled(callParameterValues[i]);
+          const callParameterTy = callParameter.ty;
+          if (!callParameterTy.isAssignableTo(ty)) {
             this.ctx.stack.push(new CompileTimeInvalid(node));
             this.error(
               "Type",
               node,
-              "Parameter is not assignable to expression type."
+              `Parameter ${callParameterTy.getName()} is not assignable to type ${ty.getName()}.`
             );
+            assert(false);
             return;
           }
         } else {
@@ -1801,20 +1804,58 @@ export class CompilationPass extends WhackoPass {
       } else {
         this.ctx.stack.push(new RuntimeValue(ref, func.ty.returnType));
       }
-
-      // this.LLVM._LLVMSetAlignment(ref, Number(func.ty.returnType.size));
       return;
+    } else if (callRootValue instanceof RuntimeValue && callRootValue.ty instanceof FunctionType) {
+      // this is the equivalent of call_indirect
+
+      // we need to type check each parameter
+      if (callRootValue.ty.parameterTypes.length !== callParameterValues.length) {
+        this.ctx.stack.push(new CompileTimeInvalid(node));
+        this.error("Type", node, "Call parameter length does not match function signature.");
+        return;
+      } else {
+        // some type checks
+        for (let i = 0; i < callParameterValues.length; i++) {
+          // ensure each value is compiled first because if there are any function references
+          // they need to be compiled here
+          const callParameter = this.ensureCompiled(callParameterValues[i]);
+          callParameterValues[i] = callParameter;
+
+          if (!callParameter.ty.isAssignableTo(callRootValue.ty.parameterTypes[i])) {
+            // we can't use this parameter
+            this.ctx.stack.push(new CompileTimeInvalid(node));
+            this.error("Type", callParameter.ty.node, "Call parameter does not match function parameter type.");
+            return;
+          } 
+        }
+
+        const parameters = this.program.LLVMUtil.lowerPointerArray(
+          callParameterValues.map((e) => this.ensureCompiled(e).ref)
+        );
+        const parametersCount = callParameterValues.length;
+        const callName = this.getTempNameRef();
+        const result = this.LLVM._LLVMBuildCall2(
+          this.builder,
+          callRootValue.ty.llvmType(this.LLVM, this.program.LLVMUtil)!,
+          callRootValue.ref,
+          parameters,
+          parametersCount,
+          callName
+        );
+        this.LLVM._free(parameters);
+        this.LLVM._free(callName);
+        this.ctx.stack.push(new RuntimeValue(result, callRootValue.ty.returnType));
+        return;
+        //
+      }
     }
 
     if (functionToBeCompiled === null) {
       console.error(callRootValue);
     }
 
-    // this.LLVM._LLVMGetNamedFunction()
-
     this.ctx.stack.push(new CompileTimeInvalid(node));
     this.error("Semantic", node, "Call expression not supported.");
-    // TODO: Redo calls because lots of things could be on the stack
   }
 
   getTempName() {
@@ -1997,66 +2038,34 @@ export class CompilationPass extends WhackoPass {
       if (hasCompiledString) {
         constStrArray = this.compiledStringPtrs.get(value.value)!;
       } else {
-        const lowered = this.program.LLVMUtil.lower(value.value);
-        const inst = this.LLVM._LLVMBuildGlobalString(
-          this.builder,
-          lowered,
-          lowered
+        const stringLength = Buffer.byteLength(value.value);
+        const int8Type = this.LLVM._LLVMInt8Type();
+        const header = Buffer.alloc(4 + stringLength);
+        header.writeUint32LE(stringLength);
+        header.write(value.value, 4, "utf-8")
+        const headerValues = Array.from(header);
+        const loweredHeaderValues = this.program.LLVMUtil.lowerPointerArray(headerValues.map(e => this.LLVM._LLVMConstInt(int8Type, BigInt(e), 0)));
+
+        const name = this.getTempNameRef();
+        const global = this.LLVM._LLVMAddGlobal(
+          this.program.llvmModule,
+          this.LLVM._LLVMArrayType(this.LLVM._LLVMInt8Type(), header.length),
+          name
         );
-        this.compiledStringPtrs.set(value.value, inst);
-        this.LLVM._free(lowered);
-        constStrArray = inst;
+
+        const values = this.LLVM._LLVMConstArray(
+          this.LLVM._LLVMInt8Type(),
+          loweredHeaderValues,
+          header.length
+        );
+        this.LLVM._LLVMSetInitializer(global, values);
+        this.LLVM._free(name);
+        this.LLVM._free(loweredHeaderValues);
+        constStrArray = global;
+        this.compiledStringPtrs.set(value.value, global);
       }
 
-      const byteLength = Buffer.byteLength(value.value);
-      const charType = new IntegerType(Type.i8, null, value.ty.node);
-      const int32Type = new IntegerType(Type.i32, null, value.ty.node);
-      const int32LLVMType = int32Type.llvmType(this.LLVM, this.program.LLVMUtil)!;
-      const arrayType = new ArrayType(charType, byteLength, value.ty.node, "");
-      const stringLength = this.LLVM._LLVMConstInt(
-        int32LLVMType,
-        BigInt(byteLength),
-        0,
-      );
-      const arrayLength = this.LLVM._LLVMConstInt(
-        int32LLVMType,
-        BigInt(byteLength) + CLASS_HEADER_OFFSET,
-        0
-      );
-      // Steps:
-      // 1. malloc array of proper length
-      // 2. bitcast result to char*
-      // 3. perform memcopy
-      // 4. push runtime value on stack 
-
-      // MALLOC
-
-      const arrayLLVMType = this.LLVM._LLVMArrayType(this.LLVM._LLVMIntType(8), byteLength + Number(CLASS_HEADER_OFFSET));
-      const resultPtrName = this.getTempNameRef();
-      const resultPtr = this.LLVM._LLVMBuildMalloc(
-        this.builder,
-        arrayLLVMType,
-        resultPtrName,
-      );
-      this.LLVM._free(resultPtrName);
-
-      // store the size of the string on the reference
-      const sizePtr = getPtrWithOffset(resultPtr, 0n, this);
-      this.LLVM._LLVMBuildStore(this.builder, stringLength, sizePtr);
-
-      const destinationPtr = getPtrWithOffset(resultPtr, 8n, this);
-
-      // memcopy
-      const memcpy = this.LLVM._LLVMBuildMemCpy(
-        this.builder,
-        destinationPtr,
-        1,
-        constStrArray,
-        1,
-        arrayLength,
-      );
-
-      return new RuntimeValue(resultPtr, new StringType(null, value.ty.node));
+      return new RuntimeValue(constStrArray, new StringType(null, value.ty.node));
     } else if (value instanceof CompileTimeBool) {
       const ref = this.LLVM._LLVMConstInt(
         value.ty.llvmType(this.LLVM, this.program.LLVMUtil)!,
@@ -2083,16 +2092,19 @@ export class CompilationPass extends WhackoPass {
       const scopeItem = value.value;
       if (scopeItem instanceof StaticTypeScopeElement) {
         // we can compile it and push the pointer to the stack
-        this.compileCallable(
+        const func = assert(this.compileCallable(
           scopeItem.node as FunctionDeclaration,
           [],
           assert(getModule(scopeItem.node), "The module for this function must be known."),
           [
             ["target-features", "+simd128"]
           ],
-        );
+        ), "The function must be in the queue to be compiled at this point.");
+
+        // this.LLVM._LLVMBuildFPCast()
+        return new RuntimeValue(func.funcRef, func.ty); 
       } else {
-        this.error("Type", scopeItem.node, "Cannot pass around generic function references.");
+        this.error("Type", scopeItem.node, "Cannot pass around generic function references, they must be compilable without type parameters.");
       }
     }
   

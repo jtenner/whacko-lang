@@ -14,6 +14,7 @@ import {
   isEnumDeclaration,
   isFieldClassMember,
   isFunctionDeclaration,
+  isFunctionTypeExpression,
   isGetterClassMember,
   isID,
   isMethodClassMember,
@@ -116,7 +117,21 @@ export class ExecutionContext {
     typeMap = this.types,
     scope = this.scope
   ): ConcreteType | null {
-    if (typeExpression.$type === "FunctionTypeExpression") {
+    if (isFunctionTypeExpression(typeExpression)) {
+      const parameterTypes = [] as ConcreteType[];
+      for (const parameter of typeExpression.parameters) {
+        const resolved = this.resolve(parameter, typeMap, scope);
+        if (resolved) {
+          parameterTypes.push(resolved);
+        } else {
+          return null;
+        }
+      }
+
+      const returnType = this.resolve(typeExpression.returnType, typeMap, scope);
+      if (returnType) {
+        return new FunctionType(parameterTypes, [], returnType, typeExpression, "");
+      }
       // TODO: We don't support this yet, and I need help
       return null;
     } else if (typeExpression.$type === "TupleTypeExpression") {

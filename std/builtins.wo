@@ -23,9 +23,10 @@ export namespace stack {
 }
 
 export namespace memory {
-  @name("store") export builtin store<T>(ptr: usize, value: T): void;
-  @name("load") export builtin load<T>(ptr: usize): T;
-  @name("ptr") export builtin ptr<T>(ref: T): usize;
+  @name("memory.copy") export builtin copy(src: usize, dest: usize, count: usize): usize;
+  @name("memory.store") export builtin store<T>(ptr: usize, value: T): void;
+  @name("memory.load") export builtin load<T>(ptr: usize): T;
+  @name("memory.ptr") export builtin ptr<T>(ref: T): usize;
 }
 
 export namespace types {
