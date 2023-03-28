@@ -12,6 +12,8 @@ import {
   ExternDeclaration,
   FunctionDeclaration,
   isConstructorClassMember,
+  isMethodClassMember,
+  isStringLiteral,
   MethodClassMember,
   NamespaceDeclaration,
   VariableDeclarator,
@@ -326,6 +328,7 @@ export class ConcreteClass extends ConcreteType {
   static id = 0n;
 
   id = ++ConcreteClass.id;
+  operators = new Map<string, ConcreteFunction>();
 
   constructor(
     public typeParameters: Map<string, ConcreteType>,
@@ -457,6 +460,21 @@ export class ConcreteClass extends ConcreteType {
 
     this.constructorFunc = func;
     return func;
+  }
+
+  getOperatorMethod(op: string): MethodClassMember | null {
+    let method: MethodClassMember | null = null;
+    for (const member of this.element.members) {
+      const [name] = member.decorators.filter(e => e.name.name === "operator");
+      if (isMethodClassMember(member) && name && name.parameters[0] && isStringLiteral(name.parameters[0])) {
+        const { value } = name.parameters[0];
+        if (value === op) {
+          method = member;
+          break;
+        }
+      }
+    }
+    return method;
   }
 }
 
@@ -1128,6 +1146,12 @@ export class CompileTimeMethodReference extends CompileTimeValue<MethodClassMemb
 export class CompileTimeVariableReference extends CompileTimeValue<ExecutionVariable> {
   constructor(variable: ExecutionVariable) {
     super(variable, variable.ty);
+  }
+}
+
+export class CompileTimeArrayAccessReference extends CompileTimeValue<RuntimeValue> {
+  constructor(ty: ConcreteClass, public root: RuntimeValue, value: RuntimeValue) {
+    super(value, ty)
   }
 }
 

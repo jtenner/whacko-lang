@@ -80,6 +80,7 @@ import {
   BoolType,
   BuiltinFunction,
   CLASS_HEADER_OFFSET,
+  CompileTimeArrayAccessReference,
   CompileTimeFieldReference,
   CompileTimeMethodReference,
   CompileTimeVariableReference,
@@ -987,8 +988,8 @@ export class CompilationPass extends WhackoPass {
     const rhs = this.ensureDereferenced(obtainValue(node.rhs, this));
 
     // first, we need to make sure that both sides are assignable to each other
-    if (!lhs.ty.isAssignableTo(rhs.ty)) {
-      // uhoh, binary expressions require assignability
+    if (lhs.ty.isNumeric && !lhs.ty.isAssignableTo(rhs.ty)) {
+      // uhoh, binary expressions require assignability if the lhs is numeric
       this.ctx.stack.push(new CompileTimeInvalid(node));
       this.error("Type", node, `Operation not supported, lhs and rhs binary operators are not assignable to each other.`);
       return;
@@ -1075,7 +1076,35 @@ export class CompilationPass extends WhackoPass {
   }
 
   compileAssignmentExpression(node: AstNode, lhs: ExecutionContextValue, value: ExecutionContextValue) {
-    if (lhs instanceof CompileTimeVariableReference) {
+    if (lhs instanceof CompileTimeArrayAccessReference) {
+      const ty = lhs.ty as ConcreteClass;
+      assert(ty instanceof ConcreteClass, "The type of the array access expression must be a class.");
+
+      const method = ty.getOperatorMethod("[]=");
+      
+      if (method) {
+        if (method.typeParameters.length === 0) {
+          // we are now safe to compile the method
+          const func = assert(
+            this.compileCallable(
+              method,
+              [],
+              assert(getModule(method), "The module must exist at this point."),
+              [],
+              ty
+            ),
+            "The function must be compilable at this point."
+          );
+
+          const { root, value } = lhs;
+
+        } else {
+          this.error("Sematic", node, `Assignment operator must have no generic type parameters.`);
+        }
+      } else {
+        this.error("Sematic", node, `Cannot assign to class reference with no assignment operator.`);
+      }
+    } else if (lhs instanceof CompileTimeVariableReference) {
       const variable = lhs.value;
       if (variable.immutable) {
         this.error("Sematic", node, `Cannot assign to immutable variable.`);
@@ -1949,7 +1978,7 @@ export class CompilationPass extends WhackoPass {
         return;
       }
 
-      const classRef = this.createClass(scopeElement, classParameterTypes);
+      const classRef = this.compileClass(scopeElement, classParameterTypes);
       if (classRef) {
         const constructorFunc = classRef.compileConstructor(this);
 
@@ -1986,7 +2015,7 @@ export class CompilationPass extends WhackoPass {
 
   cachedClasses = new Map<string, ConcreteClass>();
 
-  createClass(element: ClassDeclaration, typeParameters: ConcreteType[]): ConcreteClass | null {
+  compileClass(element: ClassDeclaration, typeParameters: ConcreteType[]): ConcreteClass | null {
     if (element.typeParameters.length != typeParameters.length) {
       return null;
     }
@@ -2019,9 +2048,75 @@ export class CompilationPass extends WhackoPass {
     }
 
     const classRef = new ConcreteClass(typeMap, fields, element, runningOffset);
+
     return classRef;
   }
 
+  compileArrayAccessSetOperator(concreteClass: ConcreteClass, member: MethodClassMember): void {
+    const scope = assert(getScope(member), "The scope must exist at this point.");
+    const module = assert(getModule(member), "The module must be defined at this point.");
+
+    // first we need to make some assumptions about the set operator, it should only have a single parameter, and return void
+    const returnType = this.ctx.resolve(member.returnType, concreteClass.typeParameters, scope);
+
+    if (!returnType) {
+      this.error("Type", member.returnType, `Could not resolve the return type of this method.`);
+      return;
+    }
+
+    if (concreteClass.operators.has("[]=")) {
+      this.error("Semantic", member.returnType, "Class already has an operator of type []=.");
+      return;
+    }
+
+    // we must be a void return type
+    if (!(returnType instanceof VoidType)) {
+      this.error("Semantic", member.returnType, "Return type of ArrayAccessSet operator must be void.");
+      return;
+    }
+
+    // single parameter
+    if (member.parameters.length !== 1) {
+      this.error("Semantic", member, `ArrayAccessSet operator must have a single parameter.`);
+      return;
+    }
+
+    const func = assert(
+      this.compileCallable(member, [], module, [], concreteClass),
+      "The operator function should be compilable at this point."
+    );
+    concreteClass.operators.set("[]=", func);
+  }
+
+  compileArrayAccessGetOperator(concreteClass: ConcreteClass, member: MethodClassMember): void {
+    const scope = assert(getScope(member), "The scope must exist at this point.");
+    const module = assert(getModule(member), "The module must be defined at this point.");
+
+    // first we need to make some assumptions about the set operator, it should only have a single parameter, and return void
+    const returnType = this.ctx.resolve(member.returnType, concreteClass.typeParameters, scope);
+
+    if (!returnType) {
+      this.error("Type", member.returnType, `Could not resolve the return type of this method.`);
+      return;
+    }
+
+    if (returnType instanceof VoidType) {
+      this.error("Semantic", member.returnType, "Return type of ArrayAccessSet operator must not be void or invalid.");
+      return;
+    }
+
+    // single parameter
+    if (member.parameters.length !== 1) {
+      this.error("Semantic", member, `ArrayAccessSet operator must have a single parameter.`);
+      return;
+    }
+
+    const func = assert(
+      this.compileCallable(member, [], module, [], concreteClass),
+      "The operator function should be compilable at this point."
+    );
+    concreteClass.operators.set("[]", func);
+  }
 
   ensureDereferenced(value: ExecutionContextValue): ExecutionContextValue {
     if (value instanceof CompileTimeVariableReference) {
@@ -2058,17 +2153,30 @@ export class CompilationPass extends WhackoPass {
       const hasCompiledString = this.compiledStringPtrs.has(value.value);
       let constStrArray: LLVMValueRef;
 
+      // we should always look for the `str` class
+      const element = assert(this.program.globalScope.get("str"), "The str class must be defined.") as StaticTypeScopeElement;
+      assert(isClassDeclaration(element.node), "The str class must be a class declaration.");
+      assert(element instanceof StaticTypeScopeElement, "The scope element for the str class must be a StaticTypeScopeElement.");
+
+      // if the class isn't created, we need to create it
+      const strClass = assert(this.compileClass(element.node as ClassDeclaration, []), "The str class must be creatable at this point.");
+
       if (hasCompiledString) {
         constStrArray = this.compiledStringPtrs.get(value.value)!;
       } else {
+        // then we we need to write the pre-computed data segment into static memory
         const stringLength = Buffer.byteLength(value.value);
         const int8Type = this.LLVM._LLVMInt8Type();
-        const header = Buffer.alloc(4 + stringLength);
+        const header = Buffer.alloc(8 + stringLength);
         header.writeUint32LE(stringLength);
-        header.write(value.value, 4, "utf-8")
+        header.writeUint32LE(Number(strClass.id));
+        header.write(value.value, 8, "utf-8");
+
+        // lower the header values into LLVM
         const headerValues = Array.from(header);
         const loweredHeaderValues = this.program.LLVMUtil.lowerPointerArray(headerValues.map(e => this.LLVM._LLVMConstInt(int8Type, BigInt(e), 0)));
 
+        // create a global
         const name = this.getTempNameRef();
         const global = this.LLVM._LLVMAddGlobal(
           this.program.llvmModule,
@@ -2076,19 +2184,22 @@ export class CompilationPass extends WhackoPass {
           name
         );
 
+        // create a const array and then set it as the initializer
         const values = this.LLVM._LLVMConstArray(
           this.LLVM._LLVMInt8Type(),
           loweredHeaderValues,
           header.length
         );
         this.LLVM._LLVMSetInitializer(global, values);
+
+        // free memory
         this.LLVM._free(name);
         this.LLVM._free(loweredHeaderValues);
         constStrArray = global;
         this.compiledStringPtrs.set(value.value, global);
       }
 
-      return new RuntimeValue(constStrArray, new StringType(null, value.ty.node));
+      return new RuntimeValue(constStrArray, strClass);
     } else if (value instanceof CompileTimeBool) {
       const ref = this.LLVM._LLVMConstInt(
         value.ty.llvmType(this.LLVM, this.program.LLVMUtil)!,
@@ -2129,8 +2240,39 @@ export class CompilationPass extends WhackoPass {
       } else {
         this.error("Type", scopeItem.node, "Cannot pass around generic function references, they must be compilable without type parameters.");
       }
+    } else if (value instanceof CompileTimeArrayAccessReference) {
+      const ty = value.ty as ConcreteClass;
+      assert(ty instanceof ConcreteClass, "The type of the array access expression must be a class.");
+
+      const method = ty.getOperatorMethod("[]");
+      if (method) {
+        if (method.typeParameters.length === 0 && method.parameters.length === 1) {
+          const func = this.compileCallable(method, [], getModule(method)!, [], ty);
+          if (func) {
+            const ty = func.ty as MethodType;
+            const root = value.root;
+            const index = value.value;
+
+            assert(ty instanceof MethodType);
+            const callRefName = this.getTempNameRef();
+            const loweredExpressions = this.program.LLVMUtil.lowerPointerArray([root.ref, index.ref]);
+            const callRef = this.LLVM._LLVMBuildCall2(
+              this.builder,
+              ty.llvmType(this.LLVM, this.program.LLVMUtil)!,
+              func.funcRef,
+              loweredExpressions,
+              2,
+              callRefName
+            );
+            this.LLVM._free(callRefName);
+            this.LLVM._free(loweredExpressions);
+
+            return new RuntimeValue(callRef, ty.returnType);
+          }
+        }
+      }
     }
-  
+
     this.error(
       "Type",
       value.ty.node,
@@ -2267,8 +2409,19 @@ export class CompilationPass extends WhackoPass {
   }
 
   override visitArrayAccessExpression(node: ArrayAccessExpression): void {
-    
-    // TODO: implement member access expression
+    const rootValue = obtainValue(node.arrayRoot, this);
+    const indexExpression = obtainValue(node.indexExpression, this);
+
+    // we should ensure the value is compiled
+    const compiledRootValue = this.ensureCompiled(rootValue);
+    const compiledIndexExpression = this.ensureCompiled(indexExpression);
+
+    const ty = compiledRootValue.ty;
+    if (ty instanceof ConcreteClass) {
+      this.ctx.stack.push(new CompileTimeArrayAccessReference(ty, compiledRootValue, compiledIndexExpression));
+      return;
+    }
+
     this.ctx.stack.push(new CompileTimeInvalid(node));
     this.error("Semantic", node, `Array access is not supported for this expression.`);
   }

@@ -4,4 +4,4 @@ node --enable-source-maps bin/cli testFile.wo --outBC out.bc --outLL out.ll --ou
 ## llc-16 test.bc --march=wasm32 -o test.o -filetype=obj --experimental-debug-variable-locations --emit-call-site-info --polly -O3
 
 ## UNCOMMENT THE FOLLOWING LINE IF YOU HAVE LLVM INSTALLED:
-wasm-ld-16 out.o -o test.wasm stc/libc.a std/libm.a -O3
+wasm-ld-16 out.o -o test.wasm std/libc.a std/libm.a -O3

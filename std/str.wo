@@ -1,0 +1,8 @@
+export class str {
+  constructor() {}
+
+  @operator("[]") __get(offset: usize): u8 {
+    return memory.load<u8>(memory.ptr(this) + usize(8) + offset);
+  }
+
+}

@@ -1,5 +1,6 @@
 
 
 export fn _start(): void {
-  math.acos(1.0);
+  let a = "test!";
+  let b = a[i32(0)];
 }
