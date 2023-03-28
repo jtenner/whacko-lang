@@ -1,11 +1,5 @@
-fn getBool(): bool {
-  return true;
-}
 
-fn getTernary(): i64 {
-  return getBool() ? 1 : 2;
-}
 
 export fn _start(): void {
-  getTernary();
+  math.acos(1.0);
 }

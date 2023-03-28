@@ -18,6 +18,7 @@ import {
   CompileTimeClassReference,
   resolveEnum,
   CompileTimeEnumReference,
+  CompileTimeExternReference,
 } from "../execution-context";
 import {
   BinaryExpression,
@@ -69,6 +70,8 @@ import {
   EnumDeclaration,
   TernaryExpression,
   ArrayAccessExpression,
+  isExternDeclaration,
+  ExternDeclaration,
   // TypeCastExpression,
 } from "../generated/ast";
 import { WhackoModule } from "../module";
@@ -199,7 +202,7 @@ export function getAttributesForDeclareDeclaration(
 }
 
 export function getFullyQualifiedName(
-  node: FunctionDeclaration | DeclareFunction | ClassDeclaration | EnumDeclaration,
+  node: FunctionDeclaration | DeclareFunction | ClassDeclaration | EnumDeclaration | ExternDeclaration,
   typeParameters: ConcreteType[]
 ): string | null {
   let nodeName = node.name.name;
@@ -241,7 +244,7 @@ export function getFullyQualifiedName(
     } else {
       return null;
     }
-  } else if (isDeclareFunction(node) || isEnumDeclaration(node)) {
+  } else if (isDeclareFunction(node) || isEnumDeclaration(node) || isExternDeclaration(node)) {
     assert(
       typeParameters.length === 0,
       "There should be no type parameters here."
@@ -342,7 +345,7 @@ export class CompilationPass extends WhackoPass {
    * @returns
    */
   compileCallable(
-    node: FunctionDeclaration | DeclareFunction | ClassDeclaration | MethodClassMember,
+    node: FunctionDeclaration | DeclareFunction | ClassDeclaration | MethodClassMember | ExternDeclaration,
     typeParameters: ConcreteType[],
     module: WhackoModule,
     attributes: [string, string][],
@@ -380,7 +383,7 @@ export class CompilationPass extends WhackoPass {
       nodeParameters = node.parameters;
     }
 
-    if (nodeTypeParameters?.length !== typeParameters.length) return null;
+    if (nodeTypeParameters.length !== typeParameters.length) return null;
 
     let name: string;
     if (isMethodClassMember(node)) {
@@ -389,6 +392,13 @@ export class CompilationPass extends WhackoPass {
         + node.name.name
         + (typeParameters.length ? `<${typeParameters.map(e => e.getName()).join(",")}>` : "");
 
+    } else if (isExternDeclaration(node)) {
+      const nameDecorator = consumeDecorator("name", node.decorators);
+      if (nameDecorator && nameDecorator.parameters[0] && isStringLiteral(nameDecorator.parameters[0])) {
+        name = nameDecorator.parameters[0].value
+      } else {
+        name = node.name.name;
+      } 
     } else {
       name = getFullyQualifiedName(node, typeParameters)! + (isClassDeclaration(node) ? ".constructor" : "");
     }
@@ -419,7 +429,7 @@ export class CompilationPass extends WhackoPass {
       (e) => this.ctx.resolve(e.type) ?? new InvalidType(e.type)
     );
 
-    if (isFunctionDeclaration(node) || isDeclareFunction(node)) {
+    if (isFunctionDeclaration(node) || isDeclareFunction(node) || isExternDeclaration(node)) {
       nodeReturnType = this.ctx.resolve(node.returnType) ?? new InvalidType(node.returnType);
     } else if (isMethodClassMember(node)) {
       nodeReturnType = this.ctx.resolve(
@@ -813,6 +823,8 @@ export class CompilationPass extends WhackoPass {
       this.ctx.stack.push(new CompileTimeClassReference(scopeItem));
     } else if (isEnumDeclaration(scopeItem.node)) {
       this.ctx.stack.push(new CompileTimeEnumReference(scopeItem));
+    } else if (isExternDeclaration(scopeItem.node)) {
+      this.ctx.stack.push(new CompileTimeExternReference(scopeItem));
     } else {
       this.ctx.stack.push(new CompileTimeInvalid(expression));
     }
@@ -1531,6 +1543,7 @@ export class CompilationPass extends WhackoPass {
   }
 
   override visitCallExpression(node: CallExpression): void {
+    logNode(node.callRoot);
     const callRootValue = this.ensureDereferenced(obtainValue(node.callRoot, this));
 
     // evaluate each expression in the call expression
@@ -1603,13 +1616,16 @@ export class CompilationPass extends WhackoPass {
       splicedTypeMap = new Map((callRootValue.ty as ConcreteClass).typeParameters);
     }
 
-    let functionToBeCompiled: FunctionDeclaration | DeclareFunction | MethodClassMember | null =
+    let functionToBeCompiled: FunctionDeclaration | DeclareFunction | MethodClassMember | ExternDeclaration | null =
       null;
     let classType: ConcreteClass | null = null;
     let attributes: [string, string][] = [];
     let builtin: BuiltinFunction | null = null;
 
-    if (callRootValue instanceof CompileTimeDeclareFunctionReference) {
+    if (
+      callRootValue instanceof CompileTimeDeclareFunctionReference
+      || callRootValue instanceof CompileTimeExternReference  
+    ) {
       // type parameters are invalid for declare functions
       if (callTypeParameters.length > 0) {
         this.ctx.stack.push(new CompileTimeInvalid(node));
@@ -1621,23 +1637,28 @@ export class CompilationPass extends WhackoPass {
         return;
       }
 
-      functionToBeCompiled = callRootValue.value.node as DeclareFunction;
+      functionToBeCompiled = callRootValue.value.node as ExternDeclaration | DeclareFunction;
       elementParameters = functionToBeCompiled.parameters;
 
       const nameDecorator = consumeDecorator(
         "name",
         functionToBeCompiled.decorators
       );
-      attributes.push([
-        "wasm-import-module",
-        functionToBeCompiled.$container.namespace.value,
-      ]);
-      attributes.push([
-        "wasm-import-name",
-        // @ts-ignore
-        (nameDecorator?.parameters[0] as StringLiteral)?.value ??
-          functionToBeCompiled.name.name,
-      ]);
+
+
+      if (callRootValue instanceof CompileTimeDeclareFunctionReference) {
+        attributes.push([
+          "wasm-import-module",
+          // @ts-ignore
+          functionToBeCompiled.$container.namespace.value,
+        ]);
+        attributes.push([
+          "wasm-import-name",
+          // @ts-ignore
+          (nameDecorator?.parameters[0] as StringLiteral)?.value ??
+            functionToBeCompiled.name.name,
+        ]);
+      }
     }
 
     if (callRootValue instanceof CompileTimeFunctionReference) {
@@ -2246,6 +2267,7 @@ export class CompilationPass extends WhackoPass {
   }
 
   override visitArrayAccessExpression(node: ArrayAccessExpression): void {
+    
     // TODO: implement member access expression
     this.ctx.stack.push(new CompileTimeInvalid(node));
     this.error("Semantic", node, `Array access is not supported for this expression.`);

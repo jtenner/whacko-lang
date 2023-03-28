@@ -36,6 +36,63 @@ export namespace types {
   @name("types.sizeOf") export builtin sizeOf<T>(val: T): usize;
 }
 
+export namespace math {
+  @name("acos") export extern acos(x: f64): f64;
+  @name("asin") export extern asin(x: f64): f64;
+  @name("atan") export extern atan(x: f64): f64;
+  @name("atan2") export extern atan2(x: f64, y: f64): f64;
+  @name("cbrt") export extern cbrt(x: f64): f64;
+  @name("cosh") export extern cosh(x: f64): f64;
+  @name("expm1") export extern expm1(x: f64): f64;
+  @name("hypot") export extern hypot(x: f64, y: f64): f64;
+  @name("log1p") export extern log1p(x: f64): f64;
+  @name("sinh") export extern sinh(x: f64): f64;
+  @name("tan") export extern tan(x: f64): f64;
+  @name("tanh") export extern tanh(x: f64): f64;
+  @name("cos") export extern cos(x: f64): f64;
+  @name("cosf") export extern cosf(x: f32): f32;
+  @name("exp") export extern exp(x: f64): f64;
+  @name("expf") export extern expf(x: f32): f32;
+  @name("log2") export extern log2(x: f64): f64;
+  @name("log2f") export extern log2f(x: f32): f32;
+  @name("log10") export extern log10(x: f64): f64;
+  @name("log10f") export extern log10f(x: f32): f32;
+  @name("log") export extern log(x: f64): f64;
+  @name("logf") export extern logf(x: f32): f32;
+  @name("fmin") export extern fmin(x: f64, y: f64): f64;
+  @name("fminf") export extern fminf(x: f32, y: f32): f32;
+  @name("fmax") export extern fmax(x: f64, y: f64): f64;
+  @name("fmaxf") export extern fmaxf(x: f32, y: f32): f32;
+  @name("round") export extern round(x: f64): f64;
+  @name("roundf") export extern roundf(x: f32): f32;
+  @name("sin") export extern sin(x: f64): f64;
+  @name("sinf") export extern sinf(x: f32): f32;
+  @name("pow") export extern pow(x: f64, y: f64): f64;
+  @name("powf") export extern powf(x: f32, y: f32): f32;
+  @name("exp2") export extern exp2(x: f64): f64;
+  @name("exp2f") export extern exp2f(x: f32): f32;
+  @name("fmod") export extern fmod(x: f64, y: f64): f64;
+  @name("fmodf") export extern fmodf(x: f32, y: f32): f32;
+  @name("fma") export extern fma(x: f64, y: f64, z: f64): f64;
+  @name("fmaf") export extern fmaf(x: f32, y: f32, z: f32): f32;
+  @name("acosf") export extern acosf(n: f32): f32;
+  @name("asinf") export extern asinf(n: f32): f32;
+  @name("atan2f") export extern atan2f(a: f32, b: f32): f32;
+  @name("atanf") export extern atanf(n: f32): f32;
+  @name("cbrtf") export extern cbrtf(n: f32): f32;
+  @name("coshf") export extern coshf(n: f32): f32;
+  @name("expm1f") export extern expm1f(n: f32): f32;
+  @name("fdim") export extern fdim(a: f64, b: f64): f64;
+  @name("fdimf") export extern fdimf(a: f32, b: f32): f32;
+  @name("hypotf") export extern hypotf(x: f32, y: f32): f32;
+  @name("log1pf") export extern log1pf(n: f32): f32;
+  @name("sinhf") export extern sinhf(n: f32): f32;
+  @name("tanf") export extern tanf(n: f32): f32;
+  @name("tanhf") export extern tanhf(n: f32): f32;
+  @name("ldexp") export extern ldexp(f: f64, n: i32): f64;
+  @name("ldexpf") export extern ldexpf(f: f32, n: i32): f32;
+}
+
 // compiler intrinsics
 @name("AShr") export builtin AShr<T>(value: T, bits: T): T; // AShr(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 @name("Add") export builtin Add<T>(lhs: T, rhs: T): T; // Add(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;

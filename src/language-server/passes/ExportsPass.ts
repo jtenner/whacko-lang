@@ -8,6 +8,7 @@ import {
   DeclareFunction,
   EnumDeclaration,
   ExportDeclarator,
+  ExternDeclaration,
   FunctionDeclaration,
   ID,
   isStringLiteral,
@@ -168,9 +169,14 @@ export class ExportsPass extends WhackoPass {
     this.defineExportableType(node);
   }
 
+  override visitExternDeclaration(node: ExternDeclaration): void {
+    this.defineExportableType(node);
+  }
+
   defineExportableType(
     node: NamespaceDeclaration | DeclareDeclaration
   ): NamespaceTypeScopeElement;
+  defineExportableType(node: ExternDeclaration): StaticTypeScopeElement;
   defineExportableType(
     node: Declaration | BuiltinDeclaration
   ): DynamicTypeScopeElement | StaticTypeScopeElement;

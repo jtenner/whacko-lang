@@ -11,6 +11,7 @@ entry Program:
     | declarations+=NamespaceDeclaration
     | declarations+=BuiltinTypeDeclaration
     | declarations+=EnumDeclaration
+    | declarations+=ExternDeclaration
 )*;
 
 NamespaceDeclaration:
@@ -23,10 +24,15 @@ NamespaceDeclaration:
     | declarations+=NamespaceDeclaration
     | declarations+=BuiltinDeclaration
     | declarations+=BuiltinTypeDeclaration
-    | declarations+=EnumDeclaration)* "}";
+    | declarations+=EnumDeclaration
+    | declarations+=ExternDeclaration
+    )* "}";
+
+ExternDeclaration:
+    Decorators (export?="export")? "extern" Name Parameters ":" ReturnType ";";
 
 BuiltinTypeDeclaration:
-    Decorators (export?="export") "builtintype" Name NamedTypeParameters ";";
+    Decorators (export?="export")? "builtintype" Name NamedTypeParameters ";";
 
 BuiltinDeclaration:
     Decorators (export?="export")? "builtin" Name NamedTypeParameters Parameters ":" ReturnType ";";

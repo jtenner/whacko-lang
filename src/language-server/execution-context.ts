@@ -6,6 +6,7 @@ import {
   DeclareDeclaration,
   DeclareFunction,
   EnumDeclaration,
+  ExternDeclaration,
   FunctionDeclaration,
   ID,
   isBuiltinTypeDeclaration,
@@ -63,6 +64,7 @@ import {
   f64x2Type,
   ConcreteClass,
   EnumType,
+  ExternType,
 } from "./types";
 import { getFileName, getModule } from "./passes/ModuleCollectionPass";
 import { LLVMValueRef } from "llvm-js";
@@ -486,6 +488,13 @@ export class CompileTimeEnumReference extends CompileTimeValue<ScopeElement> {
     assert(result instanceof EnumType);
     (value as StaticTypeScopeElement).cachedConcreteType = result;
     super(value, result!);
+  }
+}
+
+export class CompileTimeExternReference extends CompileTimeValue<ScopeElement> {
+  constructor(value: ScopeElement) {
+    assert(value instanceof StaticTypeScopeElement, "Extern functions must be static scope elements.");
+    super(value, new ExternType(value.node as ExternDeclaration));
   }
 }
 

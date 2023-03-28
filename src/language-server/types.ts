@@ -9,6 +9,7 @@ import {
   Decorator,
   EnumDeclaration,
   Expression,
+  ExternDeclaration,
   FunctionDeclaration,
   isConstructorClassMember,
   MethodClassMember,
@@ -639,6 +640,20 @@ export class NamespaceDeclarationType extends ConcreteType {
 
 export class DeclareFunctionType extends ConcreteType {
   constructor(node: DeclareFunction) {
+    super(Type.func, node, node.name.name);
+  }
+
+  getName(): string {
+    return "";
+  }
+
+  get isNumeric(): boolean {
+    return false;
+  }
+}
+
+export class ExternType extends ConcreteType {
+  constructor(node: ExternDeclaration) {
     super(Type.func, node, node.name.name);
   }
 

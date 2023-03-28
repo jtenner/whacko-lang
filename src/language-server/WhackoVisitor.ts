@@ -69,6 +69,7 @@ import {
   BuiltinTypeDeclaration,
   EnumDeclaration,
   EnumDeclarator,
+  ExternDeclaration,
 } from "./generated/ast";
 import { createWhackoServices, WhackoServices } from "./whacko-module";
 
@@ -221,6 +222,8 @@ export class WhackoVisitor {
         return this.visitEnumDeclaration(node);
       case "EnumDeclarator":
         return this.visitEnumDeclarator(node);
+      case "ExternDeclaration":
+        return this.visitExternDeclaration(node);
       // case "TypeCastExpression":
       //   return this.visitTypeCastExpression(node);
       default:
@@ -527,6 +530,13 @@ export class WhackoVisitor {
   }
 
   visitIdentifier(expression: ID) {}
+
+  visitExternDeclaration(node: ExternDeclaration): void {
+    this.visitAll(node.decorators);
+    this.visit(node.name);
+    this.visitAll(node.parameters);
+    this.visit(node.returnType);
+  }
 
   // visitTypeCastExpression(expression: TypeCastExpression) {
   //   this.visit(expression.expression);
