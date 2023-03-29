@@ -5,7 +5,11 @@ export class str {
     return memory.load<u8>(memory.ptr(this) + usize(8) + offset);
   }
 
-  @operator("[]=") __set(offset: usize, value: u8): void {
-    
+  @operator("[]=") __set(offset: usize, value: u8): void {}
+
+  toString(): String {
+    const str = new String();
+    str.appendStr(this);
+    return str;
   }
 }

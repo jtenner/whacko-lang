@@ -556,6 +556,7 @@ export class CompilationPass extends WhackoPass {
     while (true) {
       const { ctx, func, node, typeParameters, module, previsit, postvisit } = this.queue.pop()!;
       if (isFunctionDeclaration(node) || isClassDeclaration(node) || isMethodClassMember(node)) {
+        console.log("compiling", node.name.name);
         this.entry = this.LLVM._LLVMAppendBasicBlockInContext(
           this.program.llvmContext,
           func.funcRef,
@@ -569,19 +570,23 @@ export class CompilationPass extends WhackoPass {
         this.currentMod = module;
 
         if (previsit) previsit({ pass: this });
+
         if (isClassDeclaration(node)) {
           const constructorClassMember = (node as ClassDeclaration).members.find(e => isConstructorClassMember(e));
 
           if (constructorClassMember) {
+            const pass = new ScopeCollectionPass(this.program, this.ctx, this);
+            pass.visit(constructorClassMember);
             this.visit(constructorClassMember);
           }
         } else {
+          if (isMethodClassMember(node)) console.log(node.name.name);
+          const pass = new ScopeCollectionPass(this.program, this.ctx, this);
+          pass.visit(node);
           this.visit(node);
         }
 
         if (postvisit) postvisit({ pass: this });
-
-        // TODO: Function finalization
 
         // if the function return type is void, we can add an implicit return void to the end of the current block
         if (isFunctionDeclaration(node) || isMethodClassMember(node)) {
@@ -608,6 +613,12 @@ export class CompilationPass extends WhackoPass {
     const pass = new ScopeCollectionPass(this.program, this.ctx, this);
     pass.visit(node);
     super.visitFunctionDeclaration(node);
+  }
+
+  override visitMethodClassMember(node: MethodClassMember): void {
+    const pass = new ScopeCollectionPass(this.program, this.ctx, this);
+    pass.visit(node);
+    super.visitMethodClassMember(node);
   }
 
   override visitIfElseStatement(node: IfElseStatement): void {
@@ -787,6 +798,7 @@ export class CompilationPass extends WhackoPass {
 
   private pushScopeItemToStack(scopeItem: ScopeElement, expression: AstNode) {
     if (isParameter(scopeItem.node) || isVariableDeclarator(scopeItem.node)) {
+      logNode(scopeItem.node);
       const variable = assert(this.ctx.getVariable(scopeItem.node), "The scope variable for this node must exist.");
       this.ctx.stack.push(new CompileTimeVariableReference(variable));
     } else if (isBuiltinDeclaration(scopeItem.node)) {

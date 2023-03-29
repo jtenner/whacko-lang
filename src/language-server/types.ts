@@ -390,12 +390,6 @@ export class ConcreteClass extends ConcreteType {
   compileConstructor(pass: CompilationPass): ConcreteFunction | null {
     if (this.constructorFunc) return this.constructorFunc;
 
-    const constructorElement = 
-      assert(
-        this.element.members.find(e => isConstructorClassMember(e)) as ConstructorClassMember,
-        "Constructor element must exist"
-      );
-
     const constructorParameterTypes = assert(this.getClassTypeParameters(), "We must be able to resolve the parameters.");
 
     const func = assert(
@@ -419,7 +413,6 @@ export class ConcreteClass extends ConcreteType {
             0
           );
           
-
           const mallocType = LLVM._LLVMArrayType(
             LLVM._LLVMInt8Type(),
             Number(fullSize)

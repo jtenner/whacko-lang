@@ -1,6 +1,11 @@
-
+class A {
+  method(): void {
+  //   let b = i32(1);
+  //   let c = i32(3) + b;
+  }
+}
 
 export fn _start(): void {
-  let a = "Hello operator";
-  a[usize(0)] = u8(1);
+  let a = new A();
+  a.method();
 }

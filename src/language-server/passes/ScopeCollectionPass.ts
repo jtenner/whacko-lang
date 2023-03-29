@@ -56,7 +56,6 @@ export class ScopeCollectionPass extends WhackoPass {
     const { LLVM, LLVMUtil } = this.program;
     const parent = node.$container;
     const scope = assert(getScope(node), "The scope must be created for this node at this point.");
-
     if (!visited.has(node)) { 
       scope.add(node.name.name, new VariableScopeElement(node));
       visited.add(node);
