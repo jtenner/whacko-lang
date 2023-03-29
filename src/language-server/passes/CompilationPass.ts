@@ -861,6 +861,7 @@ export class CompilationPass extends WhackoPass {
 
       return;
     } else if (rootValue.ty instanceof ConcreteClass) {
+      console.log(rootValue);
       // we should ensure the value is compiled
       const compiledRootValue = this.ensureCompiled(rootValue);
       const ref = compiledRootValue.ref;

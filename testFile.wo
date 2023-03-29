@@ -7,6 +7,7 @@ class B<C> {
 class A extends B<i32> {
   constructor() {
     super();
+    super.b();
   }
 }
 
