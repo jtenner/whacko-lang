@@ -1,10 +1,15 @@
-class A {
-  method(): void {
-    let b = i32(1);
+class B<C> {
+ a: i32 = i32(99);
+
+ b(): void {}
+}
+
+class A extends B<i32> {
+  constructor() {
+    super();
   }
 }
 
 export fn _start(): void {
   let a = new A();
-  a.method();
 }

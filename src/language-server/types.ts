@@ -344,9 +344,11 @@ export class ConcreteClass extends ConcreteType {
 
   constructor(
     public typeParameters: Map<string, ConcreteType>,
+    public extendsClass: ConcreteClass | null,
     public fields: Field[],
     public element: ClassDeclaration,
     public offset: bigint,
+    public pass: CompilationPass,
   ) {
     super(Type.usize, element, element.name.name);
   }
@@ -358,12 +360,19 @@ export class ConcreteClass extends ConcreteType {
     )!;
   }
 
+  getMethodByName(name: string): MethodClassMember | null {
+    return this.element.members.find(e => isMethodClassMember(e) && e.name.name === name) as MethodClassMember
+      ?? this.extendsClass?.getMethodByName(name) 
+      ?? null;
+  }
+
   get isNumeric(): boolean {
     return false;
   }
 
   getClassTypeParameters(): ConcreteType[] | null {
     const ctx = new ExecutionContext(
+      this.pass,
       assert(getScope(this.element), "The scope must exist at this point."),
       this.typeParameters,
     );
@@ -400,30 +409,19 @@ export class ConcreteClass extends ConcreteType {
         [],
         this,
         // previsit
-        ({ pass }) => {
+        ({ pass, func }) => {
+          console.log("Preamble")
           const { LLVM, program: { LLVMUtil }, builder } = pass;
           const offset = this.offset;
-          const fullSize = this.offset + CLASS_HEADER_OFFSET;
           const intType = new IntegerType(Type.i32, null, this.node);
           const llvmIntType = intType.llvmType(LLVM, LLVMUtil)!;
-          const voidPtr = this.llvmType(LLVM, LLVMUtil)!;
           const offsetRefInt = LLVM._LLVMConstInt(
             llvmIntType,
             offset,
             0
           );
           
-          const mallocType = LLVM._LLVMArrayType(
-            LLVM._LLVMInt8Type(),
-            Number(fullSize)
-          );
-          const selfRefName = pass.getTempNameRef(); 
-          const ref = LLVM._LLVMBuildMalloc(
-            builder,
-            mallocType,
-            selfRefName,
-          );
-          LLVM._free(selfRefName);
+          const ref = LLVM._LLVMGetParam(func.funcRef, 0);
 
           pass.ctx.self = new ExecutionVariable(
             true,
@@ -1158,6 +1156,12 @@ export class CompileTimeMethodReference extends CompileTimeValue<MethodClassMemb
 export class CompileTimeVariableReference extends CompileTimeValue<ExecutionVariable> {
   constructor(variable: ExecutionVariable) {
     super(variable, assert(variable.ty, "Variable type must be set at this point."));
+  }
+}
+
+export class CompileTimeSuperReference extends CompileTimeValue<ConcreteClass> {
+  constructor(ty: ConcreteClass) {
+    super(ty, ty);
   }
 }
 

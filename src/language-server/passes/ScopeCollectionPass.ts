@@ -1,7 +1,7 @@
 import { AstNode } from "langium";
 import { LLVMBuilderRef } from "llvm-js";
 import { ExecutionContext, ExecutionVariable } from "../execution-context";
-import { FunctionLiteral, Parameter, VariableDeclarator } from "../generated/ast";
+import { FunctionLiteral, Parameter, TernaryExpression, VariableDeclarator } from "../generated/ast";
 import { WhackoProgram } from "../program";
 import { ConcreteType, getScope, VariableScopeElement } from "../types";
 import { assert, logNode } from "../util";
@@ -50,6 +50,7 @@ export class ScopeCollectionPass extends WhackoPass {
     LLVM._free(name);
 
     this.ctx.vars.set(node, variable);
+    super.visitParameter(node);
   }
 
   override visitVariableDeclarator(node: VariableDeclarator): void {
@@ -78,6 +79,17 @@ export class ScopeCollectionPass extends WhackoPass {
       LLVM._free(name);
     }
     this.ctx.vars.set(node, variable);
+    super.visitVariableDeclarator(node);
+  }
+
+  override visitTernaryExpression(node: TernaryExpression): void {
+    const storageSiteName = this.pass.getTempNameRef();
+    this.ctx.storageSites.set(node, this.program.LLVM._LLVMBuildAlloca(
+      this.pass.builder,
+      this.program.LLVM._LLVMInt128Type(),
+      storageSiteName
+    ));
+    this.program.LLVM._free(storageSiteName);
   }
 
   override visitFunctionLiteral(node: FunctionLiteral): void {

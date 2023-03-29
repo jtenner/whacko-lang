@@ -74,6 +74,9 @@ import {
   ExternDeclaration,
   isParameter,
   isVariableDeclarator,
+  ClassMember,
+  SuperLiteral,
+  isSuperLiteral,
   // TypeCastExpression,
 } from "../generated/ast";
 import { WhackoModule } from "../module";
@@ -85,6 +88,7 @@ import {
   CompileTimeArrayAccessReference,
   CompileTimeFieldReference,
   CompileTimeMethodReference,
+  CompileTimeSuperReference,
   CompileTimeVariableReference,
   ConcreteClass,
   ConcreteFunction,
@@ -128,7 +132,9 @@ import { ScopeCollectionPass } from "./ScopeCollectionPass";
 
 export interface FunctionVisitParams {
   pass: CompilationPass;
+  func: ConcreteFunction;
 }
+
 
 export function getIntegerPredicate(node: BinaryExpression, signed: boolean, pass: CompilationPass) {
   if (signed) {
@@ -387,7 +393,9 @@ export class CompilationPass extends WhackoPass {
       nodeParameters = node.parameters;
     }
 
-    if (nodeTypeParameters.length !== typeParameters.length) return null;
+    if (nodeTypeParameters.length !== typeParameters.length) {
+      return null;
+    }
 
     let name: string;
     if (isMethodClassMember(node)) {
@@ -420,6 +428,7 @@ export class CompilationPass extends WhackoPass {
     }
 
     const ctx = new ExecutionContext(
+      this,
       assert(getScope(node), "Scope must exist at this point"),
       map
     );
@@ -445,7 +454,7 @@ export class CompilationPass extends WhackoPass {
     nodeReturnType = assert(nodeReturnType, "Node return type must be defined at this point");
 
     // create the function/method type
-    const funcType = isMethodClassMember(node)
+    const funcType = isMethodClassMember(node) || isClassDeclaration(node)
       ? new MethodType(
         classType!,
         parameterTypes,
@@ -567,7 +576,7 @@ export class CompilationPass extends WhackoPass {
         this.func = func;
         this.currentMod = module;
 
-        if (previsit) previsit({ pass: this });
+        if (previsit) previsit({ pass: this, func });
 
         if (isClassDeclaration(node)) {
           const constructorClassMember = (node as ClassDeclaration).members.find(e => isConstructorClassMember(e));
@@ -581,7 +590,7 @@ export class CompilationPass extends WhackoPass {
           this.visit(node);
         }
 
-        if (postvisit) postvisit({ pass: this });
+        if (postvisit) postvisit({ pass: this, func });
 
         // if the function return type is void, we can add an implicit return void to the end of the current block
         if (isFunctionDeclaration(node) || isMethodClassMember(node)) {
@@ -785,6 +794,8 @@ export class CompilationPass extends WhackoPass {
       }
     } else if (isThisLiteral(expression.root)) {
       this.visitThisLiteral(expression.root);
+    } else if (isSuperLiteral(expression.root)) {
+      this.visitSuperLiteral(expression.root);
     } else {
       // we didn't really find it
       this.ctx.stack.push(new CompileTimeInvalid(expression));
@@ -862,8 +873,7 @@ export class CompilationPass extends WhackoPass {
         return;
       }
 
-      const methodElement = ty.element.members
-        .find(e => isMethodClassMember(e) && e.name.name === node.member.name) as MethodClassMember | undefined;
+      const methodElement = ty.getMethodByName(node.member.name);
 
       if (methodElement) {
         this.ctx.stack.push(new CompileTimeMethodReference(methodElement, ty, ref));
@@ -1582,6 +1592,49 @@ export class CompilationPass extends WhackoPass {
       callParameterValues.push(callParamaterValue);
     }
 
+    if (callRootValue instanceof CompileTimeSuperReference) {
+      // special case where super is callable
+      const superTypeConstructor = callRootValue.value.compileConstructor(this);
+      if (
+        superTypeConstructor
+        && node.parameters.length === superTypeConstructor.ty.parameterTypes.length
+        && node.typeParameters.length === 0
+      ) {
+        const selfValue = assert(this.ctx.self, "Self must exist!").value as RuntimeValue;
+        assert(selfValue instanceof RuntimeValue, "Self value must be a RuntimeValue");
+        const parameterValues = [selfValue.ref];
+        for (let i = 0; i < callParameterValues.length; i++) {
+          const parameter = callParameterValues[i];
+          const signatureParameterType = superTypeConstructor.ty.parameterTypes[i];
+          if (parameter.ty.isAssignableTo(signatureParameterType)) {
+            const compiledParameter = this.ensureCompiled(parameter);
+            parameterValues.push(compiledParameter.ref);
+          } else {
+            this.error("Type", node, "Parameter type is not assignable to signature parameter type.");
+            this.ctx.stack.push(new CompileTimeInvalid(node));
+            return;
+          }
+        }
+
+        const loweredParameters = this.program.LLVMUtil.lowerPointerArray(parameterValues);
+        this.LLVM._LLVMBuildCall2(
+          this.builder,
+          superTypeConstructor.ty.llvmType(this.LLVM, this.program.LLVMUtil)!,
+          superTypeConstructor.funcRef,
+          loweredParameters,
+          parameterValues.length,
+          0 as any,
+        );
+        this.LLVM._free(loweredParameters);
+        this.ctx.stack.push(new CompileTimeVoid(node));
+        return;
+      }
+
+      this.ctx.stack.push(new CompileTimeInvalid(node));
+      this.error("Semantic", node, "Super call not supported.");
+      return;
+    }
+
     // if there are any type parameters we can resolve them
     const callTypeParameters = [] as ConcreteType[];
     for (const typeParameter of node.typeParameters) {
@@ -1995,21 +2048,35 @@ export class CompilationPass extends WhackoPass {
             runtimeParameters.push(this.ensureCompiled(value));
           }
 
-          const argsPtr = this.program.LLVMUtil.lowerPointerArray(runtimeParameters.map(e => e.ref));
+          const fullSize = classRef.offset + CLASS_HEADER_OFFSET;
+          const mallocType = this.LLVM._LLVMArrayType(
+            this.LLVM._LLVMInt8Type(),
+            Number(fullSize)
+          );
+          const selfRefName = this.getTempNameRef(); 
+          const ref = this.LLVM._LLVMBuildMalloc(
+            this.builder,
+            mallocType,
+            selfRefName,
+          );
+          this.LLVM._free(selfRefName);
+
+          const argsPtr = this.program.LLVMUtil.lowerPointerArray([ref, ...runtimeParameters.map(e => e.ref)]);
           const nameRef = this.getTempNameRef(); 
+
           // CompileCall2
-          const callRef = this.LLVM._LLVMBuildCall2(
+          this.LLVM._LLVMBuildCall2(
             this.builder,
             constructorFunc.ty.llvmType(this.LLVM, this.program.LLVMUtil)!,
             constructorFunc.funcRef,
             argsPtr,
-            runtimeParameters.length,
+            runtimeParameters.length + 1,
             nameRef
           );
 
           this.LLVM._free(argsPtr);
           this.LLVM._free(nameRef);
-          const resultValue = new RuntimeValue(callRef, constructorFunc.ty.returnType);
+          const resultValue = new RuntimeValue(ref, constructorFunc.ty.returnType);
           this.ctx.stack.push(resultValue);
           return;
         }
@@ -2042,7 +2109,22 @@ export class CompilationPass extends WhackoPass {
 
     // for each field
     let runningOffset = 0n;
-    const fields = [] as Field[];
+    let fields = [] as Field[];
+    let extendsType: ConcreteClass | null = null;
+    // get the extending class
+    if (element.extends) {
+      const scope = assert(getScope(element.extends), "The scope must exist!");
+      extendsType = this.ctx.resolve(element.extends, typeMap, scope) as ConcreteClass | null;
+      if (extendsType && extendsType instanceof ConcreteClass) {
+        fields = extendsType.fields.slice();
+        runningOffset = extendsType.offset;
+      } else {
+        this.error("Type", element.extends, "The resolved type of the class extension could not be resolved, or was not a class.");
+        return null;
+      };
+    }
+
+    // then for each member
     for (const member of element.members) {
       if (isFieldClassMember(member)) {
         const ty = this.ctx.resolve(member.type, typeMap, getScope(member)!);
@@ -2054,7 +2136,7 @@ export class CompilationPass extends WhackoPass {
       }
     }
 
-    const classRef = new ConcreteClass(typeMap, fields, element, runningOffset);
+    const classRef = new ConcreteClass(typeMap, extendsType, fields, element, runningOffset, this);
 
     return classRef;
   }
@@ -2361,10 +2443,9 @@ export class CompilationPass extends WhackoPass {
       nextLabelName
     );
 
-    const storageSite = this.LLVM._LLVMBuildAlloca(
-      this.builder,
-      this.LLVM._LLVMInt128Type(),
-      storageSiteName
+    const storageSite = assert(
+      this.ctx.storageSites.get(node),
+      "The storage site for this expression should already exist."
     );
 
     // then create the brIf, ensuring the condition is compiled
@@ -2470,6 +2551,24 @@ export class CompilationPass extends WhackoPass {
       this.ctx.stack.push(new CompileTimeVariableReference(self));
     } else {
       this.error("Semantic", expression, `Cannot access this outside of a class context.`);
+      this.ctx.stack.push(new CompileTimeInvalid(expression));
+    }
+  }
+
+  override visitSuperLiteral(expression: SuperLiteral): void {
+    const self = this.ctx.self;
+    if (self) {
+      const selfType = self.ty as ConcreteClass;
+      assert(selfType instanceof ConcreteClass);
+      const extendsType = selfType.extendsClass;
+      if (extendsType) {
+        this.ctx.stack.push(new CompileTimeSuperReference(extendsType));
+      } else {
+        this.error("Semantic", expression, `Cannot access super on class that does not extend.`);
+        this.ctx.stack.push(new CompileTimeInvalid(expression));
+      }
+    } else {
+      this.error("Semantic", expression, `Cannot access super outside of a class context.`);
       this.ctx.stack.push(new CompileTimeInvalid(expression));
     }
   }

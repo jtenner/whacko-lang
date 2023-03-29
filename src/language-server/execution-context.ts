@@ -1,4 +1,4 @@
-import { assert } from "./util";
+import { assert, logNode } from "./util";
 import { AstNode } from "langium";
 import {
   BuiltinTypeDeclaration,
@@ -68,7 +68,7 @@ import {
 } from "./types";
 import { getFileName, getModule } from "./passes/ModuleCollectionPass";
 import { LLVMValueRef } from "llvm-js";
-import { getFullyQualifiedName } from "./passes/CompilationPass";
+import { CompilationPass, getFullyQualifiedName } from "./passes/CompilationPass";
 
 export function resolveEnum(declaration: EnumDeclaration): EnumType | null {
   const values = new Map<string, bigint>();
@@ -109,8 +109,10 @@ export class ExecutionContext {
   parent: ExecutionContext | null = null;
   stack = [] as ExecutionContextValue[];
   self: ExecutionVariable | null = null;
+  storageSites = new Map<AstNode, LLVMValueRef>();
 
   constructor(
+    public pass: CompilationPass,
     public scope: Scope,
     public types = new Map<string, ConcreteType>(),
     public vars = new Map<AstNode, ExecutionVariable>()
@@ -360,13 +362,16 @@ export class ExecutionContext {
             map.set(name, type);
           }
 
+          if (isClassDeclaration(element.node)) {
+            return this.pass.compileClass(element.node, concreteTypeParameters);
+          }
           // finally resolve the scope element in the scope of the scope type element
           return this.resolve(element.node as TypeExpression, map, assert(getScope(element.node), "The scope must exist at this point."));
         } else if (element instanceof StaticTypeScopeElement) {
           // no need for a type map to resolve this element, so we just defer to resolving the type in
           // it's own context
           if (element.cachedConcreteType) return element.cachedConcreteType;
-
+          
           if (isEnumDeclaration(node)) {
             const type = resolveEnum(node);
             if (type) {
@@ -379,6 +384,12 @@ export class ExecutionContext {
           if (isTypeDeclaration(node)) {
             return this.resolveTypeDeclaration(element, []);
           }
+
+          if (isClassDeclaration(node)) {
+            return this.resolveClass(element, []);
+          }
+
+          logNode(node);
         }
       }
     }
@@ -391,8 +402,8 @@ export class ExecutionContext {
     element: ScopeTypeElement,
     typeParameters: ConcreteType[]
   ): ConcreteClass | null {
-    assert(false, "Cannot resolve classes yet");
-    return null;
+    assert(isClassDeclaration(element.node), "Element must be a class declaration.");
+    return this.pass.compileClass(element.node as ClassDeclaration, typeParameters);
   }
 
   private resolveTypeDeclaration(
