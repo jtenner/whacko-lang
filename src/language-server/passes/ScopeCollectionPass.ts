@@ -77,7 +77,6 @@ export class ScopeCollectionPass extends WhackoPass {
       );
       LLVM._free(name);
     }
-
     this.ctx.vars.set(node, variable);
   }
 

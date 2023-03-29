@@ -104,6 +104,8 @@ export class ExecutionVariable {
 }
 
 export class ExecutionContext {
+  static id = 0;
+  id = ++ExecutionContext.id;
   parent: ExecutionContext | null = null;
   stack = [] as ExecutionContextValue[];
   self: ExecutionVariable | null = null;
@@ -112,9 +114,11 @@ export class ExecutionContext {
     public scope: Scope,
     public types = new Map<string, ConcreteType>(),
     public vars = new Map<AstNode, ExecutionVariable>()
-  ) {}
+  ) {
+  }
 
   getVariable(node: AstNode): ExecutionVariable | null {
+    
     return this.vars.get(node) ?? this.parent?.getVariable(node) ?? null;
   }
 

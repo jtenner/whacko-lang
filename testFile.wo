@@ -1,7 +1,6 @@
 class A {
   method(): void {
-  //   let b = i32(1);
-  //   let c = i32(3) + b;
+    let b = i32(1);
   }
 }
 

@@ -423,8 +423,7 @@ export class CompilationPass extends WhackoPass {
       assert(getScope(node), "Scope must exist at this point"),
       map
     );
-    this.ctx = ctx;
-
+    
     // We need to evaluate the current function based on the current type parameters.
     // We also need to compile a function with the correct signature.
     // This requires getting the llvm types and parameter types for this function.
@@ -434,9 +433,9 @@ export class CompilationPass extends WhackoPass {
     );
 
     if (isFunctionDeclaration(node) || isDeclareFunction(node) || isExternDeclaration(node)) {
-      nodeReturnType = this.ctx.resolve(node.returnType) ?? new InvalidType(node.returnType);
+      nodeReturnType = ctx.resolve(node.returnType) ?? new InvalidType(node.returnType);
     } else if (isMethodClassMember(node)) {
-      nodeReturnType = this.ctx.resolve(
+      nodeReturnType = ctx.resolve(
         node.returnType,
         map,
         assert(getScope(node.returnType), "The scope must exist at this point")
@@ -556,7 +555,6 @@ export class CompilationPass extends WhackoPass {
     while (true) {
       const { ctx, func, node, typeParameters, module, previsit, postvisit } = this.queue.pop()!;
       if (isFunctionDeclaration(node) || isClassDeclaration(node) || isMethodClassMember(node)) {
-        console.log("compiling", node.name.name);
         this.entry = this.LLVM._LLVMAppendBasicBlockInContext(
           this.program.llvmContext,
           func.funcRef,
@@ -580,9 +578,6 @@ export class CompilationPass extends WhackoPass {
             this.visit(constructorClassMember);
           }
         } else {
-          if (isMethodClassMember(node)) console.log(node.name.name);
-          const pass = new ScopeCollectionPass(this.program, this.ctx, this);
-          pass.visit(node);
           this.visit(node);
         }
 
@@ -798,7 +793,6 @@ export class CompilationPass extends WhackoPass {
 
   private pushScopeItemToStack(scopeItem: ScopeElement, expression: AstNode) {
     if (isParameter(scopeItem.node) || isVariableDeclarator(scopeItem.node)) {
-      logNode(scopeItem.node);
       const variable = assert(this.ctx.getVariable(scopeItem.node), "The scope variable for this node must exist.");
       this.ctx.stack.push(new CompileTimeVariableReference(variable));
     } else if (isBuiltinDeclaration(scopeItem.node)) {
@@ -939,19 +933,6 @@ export class CompilationPass extends WhackoPass {
         );
       }
     }
-  }
-
-  override visitBlockStatement(node: BlockStatement): void {
-    const nodeScope = assert(getScope(node), "Scope must be defined for this");
-    const ctx = this.ctx;
-    this.ctx = new ExecutionContext(
-      nodeScope,
-      new Map(ctx.types),
-      new Map(ctx.vars)
-    );
-    this.ctx.parent = ctx;
-    super.visitBlockStatement(node);
-    this.ctx = ctx;
   }
 
   override visitIntegerLiteral(expression: IntegerLiteral): void {
@@ -1615,14 +1596,21 @@ export class CompilationPass extends WhackoPass {
       }
     }
 
+    const callRootValueFunctionMethodReference = callRootValue instanceof CompileTimeFunctionReference || callRootValue instanceof CompileTimeMethodReference;
+
+    let func: MethodClassMember | FunctionDeclaration | null = null;
+
+    if (callRootValue instanceof CompileTimeFunctionReference) {
+      func = callRootValue.value.node as FunctionDeclaration;
+    } else if (callRootValue instanceof CompileTimeMethodReference) {
+      func = callRootValue.value;
+    }
+
     // now we need to see what's on the stack and do type inference
     if (
-      (
-        callRootValue instanceof CompileTimeFunctionReference 
-        || callRootValue instanceof CompileTimeMethodReference) &&
+      callRootValueFunctionMethodReference &&
       callTypeParameters.length === 0 &&
-      ((callRootValue.value as ScopeTypeElement).node as FunctionDeclaration)
-        .typeParameters.length > 0
+      assert(func, "The function must be set at this point.").typeParameters.length > 0
     ) {
       const element = callRootValue.value as ScopeTypeElement;
       const functionDeclaration = element.node as FunctionDeclaration;

@@ -69,7 +69,7 @@ export default async function main(args: string[]): Promise<void> {
 
   try {
     const { bcFile, llFile, oFile } = program.compile();
-    if (values.outWasm) console.log("Can't output wasm files yet"); // fs.writeFile("./out.wasm", wasmFile);
+    if (values.outWasm) ("Can't output wasm files yet"); // fs.writeFile("./out.wasm", wasmFile);
     if (values.outLL) await fs.writeFile("./out.ll", llFile);
     if (values.outBC) await fs.writeFile("./out.bc", bcFile);
     if (values.outO) await fs.writeFile("./out.o", oFile);
