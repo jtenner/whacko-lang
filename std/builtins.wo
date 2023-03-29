@@ -1,7 +1,7 @@
 @name("Log") export builtin Log(val: string): void;
 
 @name("i8") export builtin i8<T>(val: T): i8;
-@name("i8") export builtin u8<T>(val: T): u8;
+@name("u8") export builtin u8<T>(val: T): u8;
 @name("i16") export builtin i16<T>(val: T): i16;
 @name("u16") export builtin u16<T>(val: T): u16;
 @name("i32") export builtin i32<T>(val: T): i32;

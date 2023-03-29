@@ -81,6 +81,12 @@ export class StaticTypeScopeElement extends ScopeTypeElement {
   }
 }
 
+export class VariableScopeElement extends ScopeElement {
+  constructor(node: AstNode) {
+    super(getModule(node)!, node);
+  }
+}
+
 export interface BuiltinFunctionProps {
   ast: AstNode;
   ctx: ExecutionContext;
@@ -119,9 +125,13 @@ export function setScope(node: AstNode, scope: Scope) {
 }
 
 export function getScope(node: AstNode): Scope | null {
+  // @ts-ignore
+  const name = node?.name?.name;
   while (true) {
     const scope = scopes.get(node);
-    if (scope) return scope;
+    if (scope) {
+      return scope;
+    }
 
     // we need to go up the tree
     if (node.$container) {
@@ -133,6 +143,8 @@ export function getScope(node: AstNode): Scope | null {
 }
 
 export class Scope {
+  static id: number = 0;
+  public id: number = Scope.id++;
   public elements = new Map<string, ScopeElement>();
 
   constructor(public parent: Scope | null = null) {}
@@ -420,7 +432,12 @@ export class ConcreteClass extends ConcreteType {
           );
           LLVM._free(selfRefName);
 
-          pass.ctx.vars.set("&self", new ExecutionVariable(true, "&self", new RuntimeValue(ref, this), this));
+          pass.ctx.self = new ExecutionVariable(
+            true,
+            "&self",
+            new RuntimeValue(ref, this),
+            this,
+          );
           // initialize all the fields including refType and size
 
           // Store offset at beginning of reference
@@ -451,8 +468,10 @@ export class ConcreteClass extends ConcreteType {
         // post visit
         ({ pass }) => {
           const { LLVM, program: { LLVMUtil }, builder } = pass;
-          const self = assert(pass.ctx.vars.get("&self"), "Self must be defined.");
-          LLVM._LLVMBuildRet(builder, (self.value as RuntimeValue).ref);
+          const self = assert(pass.ctx.self, "Self must be defined.");
+          const value = (self.value as RuntimeValue);
+          assert(value instanceof RuntimeValue, "Self should be a runtime value.");
+          LLVM._LLVMBuildRet(builder, value.ref);
         }
       ),
       "This function must be compilable"
@@ -1145,7 +1164,7 @@ export class CompileTimeMethodReference extends CompileTimeValue<MethodClassMemb
 
 export class CompileTimeVariableReference extends CompileTimeValue<ExecutionVariable> {
   constructor(variable: ExecutionVariable) {
-    super(variable, variable.ty);
+    super(variable, assert(variable.ty, "Variable type must be set at this point."));
   }
 }
 

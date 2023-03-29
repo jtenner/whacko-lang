@@ -92,26 +92,30 @@ export function resolveEnum(declaration: EnumDeclaration): EnumType | null {
 }
 
 export class ExecutionVariable {
+  ptr: LLVMValueRef | null = null;
+  set: boolean = false;
+
   constructor(
-    public immutable: boolean,
-    public name: string,
-    public value: ExecutionContextValue,
-    public ty: ConcreteType
+    public immutable: boolean = false,
+    public name: string = "",
+    public value: ExecutionContextValue | null = null,
+    public ty: ConcreteType | null = null
   ) {}
 }
 
 export class ExecutionContext {
   parent: ExecutionContext | null = null;
   stack = [] as ExecutionContextValue[];
+  self: ExecutionVariable | null = null;
 
   constructor(
     public scope: Scope,
     public types = new Map<string, ConcreteType>(),
-    public vars = new Map<string, ExecutionVariable>()
+    public vars = new Map<AstNode, ExecutionVariable>()
   ) {}
 
-  getVariable(name: string): ExecutionVariable | null {
-    return this.vars.get(name) ?? this.parent?.getVariable(name) ?? null;
+  getVariable(node: AstNode): ExecutionVariable | null {
+    return this.vars.get(node) ?? this.parent?.getVariable(node) ?? null;
   }
 
   resolve(

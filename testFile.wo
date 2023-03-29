@@ -1,6 +1,6 @@
 
 
 export fn _start(): void {
-  let a = "test!";
-  let b = a[i32(0)];
+  let a = "Hello operator";
+  a[usize(0)] = u8(1);
 }

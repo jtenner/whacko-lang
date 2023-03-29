@@ -78,6 +78,7 @@ const integerCast =
         const intValue = signed
           ? BigInt.asIntN(size, BigInt(derefedValue.value))
           : BigInt.asUintN(size, BigInt(derefedValue.value));
+          console.log("intValue is", intValue);
         ctx.stack.push(
           new CompileTimeInteger(intValue, intType)
         );

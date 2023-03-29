@@ -2,22 +2,20 @@
 source_filename = "whacko"
 target triple = "wasm32-wasi"
 
-@"tmp0~" = global [13 x i8] c"\01\00\00\00\00\00\00\00test!"
+@"tmp1~" = global [22 x i8] c"\01\00\00\00\00\00\00\00Hello operator"
 
 define void @_start() #0 {
 entry:
-  %"tmp1~" = call i8 @"std/str.wo~str.__get"(ptr @"tmp0~", i32 0)
+  %"tmp0~" = alloca i128, align 8
+  store ptr @"tmp1~", ptr %"tmp0~", align 8
+  %"tmp2~" = load ptr, ptr %"tmp0~", align 8
+  call void @"std/str.wo~str.__set"(ptr %"tmp2~", i32 0, i8 1)
   ret void
 }
 
-define i8 @"std/str.wo~str.__get"(ptr %0, i32 %1) {
+define void @"std/str.wo~str.__set"(ptr %0, i32 %1, i8 %2) {
 entry:
-  %"tmp2~" = ptrtoint ptr %0 to i32
-  %"tmp3~" = add i32 %"tmp2~", 8
-  %"tmp4~" = add i32 %"tmp3~", %1
-  %"tmp5~" = inttoptr i32 %"tmp4~" to ptr
-  %"tmp6~" = load i8, ptr %"tmp5~", align 1
-  ret i8 %"tmp6~"
+  ret void
 }
 
 attributes #0 = { "target-features"="+simd128" }

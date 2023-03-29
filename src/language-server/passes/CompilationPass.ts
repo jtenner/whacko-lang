@@ -72,6 +72,8 @@ import {
   ArrayAccessExpression,
   isExternDeclaration,
   ExternDeclaration,
+  isParameter,
+  isVariableDeclarator,
   // TypeCastExpression,
 } from "../generated/ast";
 import { WhackoModule } from "../module";
@@ -122,6 +124,7 @@ import type {
 import { WhackoProgram } from "../program";
 import { getFileName, getRelativeFileName, getModule } from "./ModuleCollectionPass";
 import { AstNode } from "langium";
+import { ScopeCollectionPass } from "./ScopeCollectionPass";
 
 export interface FunctionVisitParams {
   pass: CompilationPass;
@@ -469,21 +472,18 @@ export class CompilationPass extends WhackoPass {
     const func = new ConcreteFunction(llvmFunc, funcType);
 
     if (isMethodClassMember(node)) {
-      // first parameter is always this
-      ctx.vars.set(
+      ctx.self = new ExecutionVariable(
+        true,
         "&self",
-        new ExecutionVariable(
-          true,
-          "&self",
-          new RuntimeValue(
-            this.LLVM._LLVMGetParam(func.funcRef, 0),
-            classType!,
-          ),
+        new RuntimeValue(
+          this.LLVM._LLVMGetParam(func.funcRef, 0),
           classType!,
         ),
+        classType!
       );
       // next we need to initialize the context with some parameter variables
       for (let i = 0; i < parameterNames.length; i++) {
+        const parameter = nodeParameters[i];
         const parameterName = parameterNames[i];
         const parameterType = parameterTypes[i];
   
@@ -491,7 +491,7 @@ export class CompilationPass extends WhackoPass {
         const ref = this.LLVM._LLVMGetParam(func.funcRef, i + 1);
   
         ctx.vars.set(
-          parameterName,
+          parameter,
           new ExecutionVariable(
             false,
             parameterName,
@@ -503,16 +503,17 @@ export class CompilationPass extends WhackoPass {
     } else {
       // next we need to initialize the context with some parameter variables
       for (let i = 0; i < parameterNames.length; i++) {
+        const parameter = nodeParameters[i];
         const parameterName = parameterNames[i];
         const parameterType = parameterTypes[i];
   
         const ref = this.LLVM._LLVMGetParam(func.funcRef, i);
   
         ctx.vars.set(
-          parameterName,
+          parameter,
           new ExecutionVariable(
             // self is always immutable
-            parameterName === "&self",
+            false,
             parameterName,
             new RuntimeValue(ref, parameterType),
             parameterType
@@ -604,20 +605,8 @@ export class CompilationPass extends WhackoPass {
   }
 
   override visitFunctionDeclaration(node: FunctionDeclaration): void {
-    for (let i = 0; i < node.parameters.length; i++) {
-      const parameter = node.parameters[i];
-      const name = parameter.name.name;
-      const ty = this.ctx.resolve(parameter.type)!;
-      const getParam = this.LLVM._LLVMGetParam(this.func.funcRef, i);
-
-      const variable = new ExecutionVariable(
-        false,
-        name,
-        new RuntimeValue(getParam, ty),
-        ty
-      );
-      this.ctx.vars.set(name, variable);
-    }
+    const pass = new ScopeCollectionPass(this.program, this.ctx, this);
+    pass.visit(node);
     super.visitFunctionDeclaration(node);
   }
 
@@ -708,10 +697,14 @@ export class CompilationPass extends WhackoPass {
   ): void {
     const { immutable, declarators } = node;
     for (let i = 0; i < declarators.length; i++) {
-      const { expression, name, type } = declarators[i];
+      const declarator = declarators[i];
+      const { expression, name, type } = declarator;
 
-      if (this.ctx.vars.has(name.name)) {
-        // if it already exists, we can't even override the current variable
+      // the var should exist, but be unset
+      const variable = assert(this.ctx.vars.get(declarator), "The variable must exist at this point.");
+
+      if (variable.set) {
+        // if it already exists, and has been set....
         this.error(
           "Semantic",
           name,
@@ -719,6 +712,7 @@ export class CompilationPass extends WhackoPass {
         );
         continue;
       }
+      variable.set = true;
 
       // we should always visit the expression
       const value = this.ensureDereferenced(obtainValue(expression, this));
@@ -727,51 +721,42 @@ export class CompilationPass extends WhackoPass {
         this.error(`Type`, value.ty.node, `Function returns void, cannot assign void to variable.`);
         continue;
       }
-
+      let success = true;
       if (type) {
         const variableType = this.ctx.resolve(type);
         if (variableType) {
           if (value.ty.isAssignableTo(variableType!)) {
             // good we can store the variable
-            const variable = new ExecutionVariable(
-              immutable,
-              name.name,
-              immutable ? value : this.ensureCompiled(value),
-              variableType
-            );
-            this.ctx.vars.set(name.name, variable);
+            variable.value = immutable ? value : this.ensureCompiled(value)
           } else {
             // bad, we store a compiletime invalid with the variableType
             const invalid = new CompileTimeInvalid(expression);
-            const variable = new ExecutionVariable(
-              immutable,
-              name.name,
-              invalid,
-              invalid.ty
-            );
-            this.ctx.vars.set(name.name, variable);
+            variable.ty = variableType;
+            variable.value = invalid;
+            this.error("Type", type, "Invalid type, not assignable to variable type.");
+            success = false;
           }
         } else {
           // bad, we couldn't resolve the type, set the variable to compile time invalid
-          const invalid = new CompileTimeInvalid(type);
-          const variable = new ExecutionVariable(
-            immutable,
-            name.name,
-            invalid,
-            invalid.ty
-          );
-          this.ctx.vars.set(name.name, variable);
+          const invalid = new CompileTimeInvalid(expression);
+          variable.ty = invalid.ty;
+          variable.value = invalid;
           this.error("Type", type, "Invalid type expression for variable declaration.");
+          success = false;
         }
       } else {
         // good, no type guard, assume the variable's type is equal to the expression's
-        const variable = new ExecutionVariable(
-          immutable,
-          name.name,
-          immutable ? value : this.ensureCompiled(value),
-          value.ty
+        variable.value = immutable ? value : this.ensureCompiled(value);
+        variable.ty = variable.value.ty;
+      }
+
+      if (success && !immutable) {
+        assert(variable.value instanceof RuntimeValue, "Variable value must be a runtime value by now.");
+        this.LLVM._LLVMBuildStore(
+          this.builder,
+          (variable.value as RuntimeValue).ref,
+          variable.ptr!
         );
-        this.ctx.vars.set(name.name, variable);
       }
     }
   }
@@ -782,20 +767,15 @@ export class CompilationPass extends WhackoPass {
   }
 
   override visitRootIdentifier(expression: RootIdentifier): void {
-    const scope = getScope(expression)!;
-
+    const scope = assert(getScope(expression), "The scope for this expression must exist.");
     if (isID(expression.root)) {
-      const variable = this.ctx.vars.get(expression.root.name);
-      if (variable) {
-        this.ctx.stack.push(new CompileTimeVariableReference(variable));
-      } else if (scope.has(expression.root.name)) {
-        const scopeItem = scope.get(expression.root.name);
-        if (scopeItem) {
-          this.pushScopeItemToStack(scopeItem, expression);
-        } else {
-          this.error("Semantic", expression, "Cannot find root expression.");
-          this.ctx.stack.push(new CompileTimeInvalid(expression));
-        }
+      const scopeItem = scope.get(expression.root.name);
+      
+      if (scopeItem) {
+        this.pushScopeItemToStack(scopeItem, expression);
+      } else {
+        this.error("Semantic", expression, "Cannot find root expression.");
+        this.ctx.stack.push(new CompileTimeInvalid(expression));
       }
     } else if (isThisLiteral(expression.root)) {
       this.visitThisLiteral(expression.root);
@@ -806,7 +786,10 @@ export class CompilationPass extends WhackoPass {
   }
 
   private pushScopeItemToStack(scopeItem: ScopeElement, expression: AstNode) {
-    if (isBuiltinDeclaration(scopeItem.node)) {
+    if (isParameter(scopeItem.node) || isVariableDeclarator(scopeItem.node)) {
+      const variable = assert(this.ctx.getVariable(scopeItem.node), "The scope variable for this node must exist.");
+      this.ctx.stack.push(new CompileTimeVariableReference(variable));
+    } else if (isBuiltinDeclaration(scopeItem.node)) {
       this.ctx.stack.push(new CompileTimeFunctionReference(scopeItem));
     } else if (isFunctionDeclaration(scopeItem.node)) {
       this.ctx.stack.push(new CompileTimeFunctionReference(scopeItem));
@@ -912,7 +895,6 @@ export class CompilationPass extends WhackoPass {
       this.LLVM._LLVMBuildRetVoid(this.builder);
     } else {
       if (node.expression) {
-
         const compiledValue = this.ensureCompiled(obtainValue(node.expression, this));
         if (compiledValue.ty.isAssignableTo(returnType)) {
           this.LLVM._LLVMBuildRet(this.builder, compiledValue.ref);
@@ -1083,7 +1065,7 @@ export class CompilationPass extends WhackoPass {
       const method = ty.getOperatorMethod("[]=");
       
       if (method) {
-        if (method.typeParameters.length === 0) {
+        if (method.typeParameters.length === 0 && method.parameters.length === 2) {
           // we are now safe to compile the method
           const func = assert(
             this.compileCallable(
@@ -1096,10 +1078,30 @@ export class CompilationPass extends WhackoPass {
             "The function must be compilable at this point."
           );
 
-          const { root, value } = lhs;
+          assert(func.ty instanceof MethodType);
+          const methodType = func.ty as MethodType;
+          const root = lhs.root;
+          const index = lhs.value;
+          const compiledValue = this.ensureCompiled(value);
 
+          if (methodType.returnType instanceof VoidType) {
+            const callRefName = this.getTempNameRef();
+            const loweredExpressions = this.program.LLVMUtil.lowerPointerArray([root.ref, index.ref, compiledValue.ref]);
+            this.LLVM._LLVMBuildCall2(
+              this.builder,
+              methodType.llvmType(this.LLVM, this.program.LLVMUtil)!,
+              func.funcRef,
+              loweredExpressions,
+              3,
+              0 as LLVMStringRef
+            );
+            this.LLVM._free(callRefName);
+            // this.LLVM._free(loweredExpressions);
+          } else {
+            this.error("Semnatic", node, `Assignment operator must return void.`);
+          }
         } else {
-          this.error("Sematic", node, `Assignment operator must have no generic type parameters.`);
+          this.error("Sematic", node, `Assignment operator must have no generic type parameters, and only a single parameter.`);
         }
       } else {
         this.error("Sematic", node, `Cannot assign to class reference with no assignment operator.`);
@@ -1109,9 +1111,15 @@ export class CompilationPass extends WhackoPass {
       if (variable.immutable) {
         this.error("Sematic", node, `Cannot assign to immutable variable.`);
       } else {
-        if (value.ty.isAssignableTo(variable.ty)) {
+        const variableType = assert(variable.ty, "The variable type must be set.");
+        if (value.ty.isAssignableTo(variableType)) {
           // we can actually perform the assignment
           variable.value = value;
+          this.LLVM._LLVMBuildStore(
+            this.builder,
+            this.ensureCompiled(value).ref,
+            variable.ptr!
+          );
         } else {
           this.error("Type", node, `Cannot assign to variable ${variable.name}, invalid type.`);
         }
@@ -1572,7 +1580,6 @@ export class CompilationPass extends WhackoPass {
   }
 
   override visitCallExpression(node: CallExpression): void {
-    logNode(node.callRoot);
     const callRootValue = this.ensureDereferenced(obtainValue(node.callRoot, this));
 
     // evaluate each expression in the call expression
@@ -2120,7 +2127,7 @@ export class CompilationPass extends WhackoPass {
 
   ensureDereferenced(value: ExecutionContextValue): ExecutionContextValue {
     if (value instanceof CompileTimeVariableReference) {
-      return value.value.value;
+      return assert(value.value.value, "Compile time varaible reference should be set at this point.");
     } else if (value instanceof CompileTimeFieldReference) {
       return this.ensureCompiled(value);
     }
@@ -2208,7 +2215,16 @@ export class CompilationPass extends WhackoPass {
       );
       return new RuntimeValue(ref, new BoolType(null, value.ty.node));
     } else if (value instanceof CompileTimeVariableReference) {
-      return this.ensureCompiled(value.value.value);
+      const loadedName = this.getTempNameRef();
+      const loaded = this.LLVM._LLVMBuildLoad2(
+        this.builder,
+        value.ty.llvmType(this.program.LLVM, this.program.LLVMUtil)!,
+        value.value.ptr!,
+        loadedName
+      );
+      const result = new RuntimeValue(loaded, value.value.ty ?? new InvalidType(value.ty.node));
+      this.LLVM._free(loadedName);
+      return result;
     } else if (value instanceof CompileTimeFieldReference) {
       // we need to create a load here and push it to the stack
       const field = value.value;
@@ -2449,7 +2465,7 @@ export class CompilationPass extends WhackoPass {
   }
 
   override visitThisLiteral(expression: ThisLiteral): void {
-    const self = this.ctx.vars.get("&self");
+    const self = this.ctx.self;
     if (self) {
       this.ctx.stack.push(new CompileTimeVariableReference(self));
     } else {

@@ -6,7 +6,6 @@ import { DiagnosticLevel, IDiagnostic } from "./util";
 
 export class WhackoModule {
   exports = new Map<string, ScopeElement>();
-  scopes = new Map<AstNode, Scope>();
   constructor(
     public ast: Program,
     public path: string,
