@@ -41,6 +41,8 @@ export class ScopeCollectionPass extends WhackoPass {
     );
 
     const getParam = LLVM._LLVMGetParam(this.pass.func.funcRef, node.$containerIndex!);
+    if (!variable.ptr) console.log(variable);
+    console.log(getParam);
     LLVM._LLVMBuildStore(
       this.pass.builder,
       getParam,

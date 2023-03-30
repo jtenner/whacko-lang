@@ -140,8 +140,8 @@ export function getIntegerPredicate(node: BinaryExpression, signed: boolean, pas
   if (signed) {
     switch (node.op) {
       case ">":  return pass.program.LLVMUtil.LLVMIntPredicate.Sgt;
-      case "<":  return pass.program.LLVMUtil.LLVMIntPredicate.Slt;
-      case "<=": return pass.program.LLVMUtil.LLVMIntPredicate.Sle;
+      case "_<":  return pass.program.LLVMUtil.LLVMIntPredicate.Slt;
+      case "_<=": return pass.program.LLVMUtil.LLVMIntPredicate.Sle;
       case ">=": return pass.program.LLVMUtil.LLVMIntPredicate.Sge;
       case "==": return pass.program.LLVMUtil.LLVMIntPredicate.Eq;
       case "!=": return pass.program.LLVMUtil.LLVMIntPredicate.Ne;
@@ -149,8 +149,8 @@ export function getIntegerPredicate(node: BinaryExpression, signed: boolean, pas
   } else {
     switch (node.op) {
       case ">":  return pass.program.LLVMUtil.LLVMIntPredicate.Ugt;
-      case "<":  return pass.program.LLVMUtil.LLVMIntPredicate.Ult;
-      case "<=": return pass.program.LLVMUtil.LLVMIntPredicate.Ule;
+      case "_<":  return pass.program.LLVMUtil.LLVMIntPredicate.Ult;
+      case "_<=": return pass.program.LLVMUtil.LLVMIntPredicate.Ule;
       case ">=": return pass.program.LLVMUtil.LLVMIntPredicate.Uge;
       case "==": return pass.program.LLVMUtil.LLVMIntPredicate.Eq;
       case "!=": return pass.program.LLVMUtil.LLVMIntPredicate.Ne;
@@ -163,8 +163,8 @@ export function getIntegerPredicate(node: BinaryExpression, signed: boolean, pas
 export function getRealPredicate(node: BinaryExpression, pass: CompilationPass) {
   switch (node.op) {
     case ">":  return pass.program.LLVMUtil.LLVMRealPredicate.Ogt;
-    case "<":  return pass.program.LLVMUtil.LLVMRealPredicate.Olt;
-    case "<=": return pass.program.LLVMUtil.LLVMRealPredicate.Ole;
+    case "_<":  return pass.program.LLVMUtil.LLVMRealPredicate.Olt;
+    case "_<=": return pass.program.LLVMUtil.LLVMRealPredicate.Ole;
     case ">=": return pass.program.LLVMUtil.LLVMRealPredicate.Oge;
     case "==": return pass.program.LLVMUtil.LLVMRealPredicate.Oeq;
     case "!=": return pass.program.LLVMUtil.LLVMRealPredicate.One;
@@ -925,6 +925,8 @@ export class CompilationPass extends WhackoPass {
         if (compiledValue.ty.isAssignableTo(returnType)) {
           this.LLVM._LLVMBuildRet(this.builder, compiledValue.ref);
         } else {
+          logNode(node.expression);
+          console.log(compiledValue);
           this.error(
             "Type",
             node.expression,
@@ -1010,12 +1012,12 @@ export class CompilationPass extends WhackoPass {
       case "-=":
       case "/":
       case "/=":
-      case "<":
+      case "_<":
       case "<<":
       case "<<=":
       case ">>>":
       case ">>>=":
-      case "<=":
+      case "_<=":
       case "==":
       case ">":  
       case ">=":  
@@ -1259,8 +1261,8 @@ export class CompilationPass extends WhackoPass {
       let value: number | null = null;
       switch (node.op) {
         case ">": return new CompileTimeBool(lhs.value > rhs.value, node);
-        case "<": return new CompileTimeBool(lhs.value < rhs.value, node);
-        case "<=": return new CompileTimeBool(lhs.value <= rhs.value, node);
+        case "_<": return new CompileTimeBool(lhs.value < rhs.value, node);
+        case "_<=": return new CompileTimeBool(lhs.value <= rhs.value, node);
         case ">=": return new CompileTimeBool(lhs.value >= rhs.value, node);
         case "==": return new CompileTimeBool(lhs.value == rhs.value, node);
         case "!=": return new CompileTimeBool(lhs.value != rhs.value, node);
@@ -1295,8 +1297,8 @@ export class CompilationPass extends WhackoPass {
     // create the instructions for each op
     switch (node.op) {
       case ">": 
-      case "<":
-      case "<=":
+      case "_<":
+      case "_<=":
       case ">=":
       case "==":
       case "!=": {
@@ -1380,8 +1382,8 @@ export class CompilationPass extends WhackoPass {
       switch (node.op) {
         case "!=": return new CompileTimeBool(lhs.value !== rhs.value, node);
         case "==": return new CompileTimeBool(lhs.value === rhs.value, node);
-        case "<":  return new CompileTimeBool(lhs.value < rhs.value, node);
-        case "<=": return new CompileTimeBool(lhs.value <= rhs.value, node);
+        case "_<":  return new CompileTimeBool(lhs.value < rhs.value, node);
+        case "_<=": return new CompileTimeBool(lhs.value <= rhs.value, node);
         case ">":  return new CompileTimeBool(lhs.value > rhs.value, node);
         case ">=": return new CompileTimeBool(lhs.value >= rhs.value, node);
         case "+":
@@ -1447,12 +1449,13 @@ export class CompilationPass extends WhackoPass {
     rhs = this.ensureCompiled(rhs);
     
     let operation: LLVMValueRef | null = null;
+    let outputTy: ConcreteType = new IntegerType(lhs.ty.ty as any, null, node);
     const name = this.getTempNameRef();
     switch (node.op) {
       case "!=": 
       case "==": 
-      case "<":  
-      case "<=": 
+      case "_<":  
+      case "_<=": 
       case ">":  
       case ">=":
         operation = this.LLVM._LLVMBuildICmp(
@@ -1462,6 +1465,7 @@ export class CompilationPass extends WhackoPass {
           (rhs as RuntimeValue).ref,
           name
         );
+        outputTy = new BoolType(null, node);
         break;
       case "+":
       case "+=":
@@ -1589,7 +1593,7 @@ export class CompilationPass extends WhackoPass {
       return new CompileTimeInvalid(node);
     }
 
-    return new RuntimeValue(operation, new IntegerType(lhs.ty.ty as any, null, node));
+    return new RuntimeValue(operation, outputTy);
   }
 
   override visitCallExpression(node: CallExpression): void {
@@ -1936,6 +1940,7 @@ export class CompilationPass extends WhackoPass {
               if (compiledMethod) {
                 const methodType = compiledMethod.ty;
                 if (!methodType.isAssignableTo(func.ty)) {
+                  console.log("we aren't assignable.");
                   this.error("Type", node, `Extending class does not match signature for method ${functionToBeCompiled.name.name}`);
                   this.ctx.stack.push(new CompileTimeInvalid(node));
                   return;

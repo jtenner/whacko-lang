@@ -175,7 +175,7 @@ EqualityExpression infers Expression:
     ComaprisonExpression ({infer BinaryExpression.lhs=current} op=("==" | "!=") rhs=ComaprisonExpression)*;
 
 ComaprisonExpression infers Expression:
-    BitShiftExpression ({infer BinaryExpression.lhs=current} op=("<=" | "<" | ">=" | ">") rhs=BitShiftExpression)*;
+    BitShiftExpression ({infer BinaryExpression.lhs=current} op=("<=" | Less_Than | ">=" | ">") rhs=BitShiftExpression)*;
 
 BitShiftExpression infers Expression:
     SumExpression ({infer BinaryExpression.lhs=current} op=("<<" | ">>>" | ">>") rhs=SumExpression)*;
@@ -297,7 +297,7 @@ terminal Hex: /0x[0-9a-fA-F]+/;
 terminal Octal: /0o[0-7]+/;
 terminal Float: /[-+]?[0-9]+[.][0-9]+([eE][-+]?[0-9]+)?/;
 terminal Integer: /[-+]?[0-9]+/;
-
+terminal Less_Than: /</;
 // hidden stuff
 hidden terminal WS: /\s+/;
 hidden terminal ML_COMMENT: /\/\*[\s\S]*?\*\//;

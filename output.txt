@@ -1,0 +1,17 @@
+RuntimeError: unreachable
+    at wasm://wasm/04d186a6:wasm-function[2343]:0x19c1a5
+    at wasm://wasm/04d186a6:wasm-function[154]:0x233a3
+    at wasm://wasm/04d186a6:wasm-function[384]:0x47a9f
+    at wasm://wasm/04d186a6:wasm-function[15024]:0xd80520
+    at ScopeCollectionPass.visitParameter (/home/jtenner/whacko-lang/src/language-server/passes/ScopeCollectionPass.ts:46:10)
+    at ScopeCollectionPass.visit (/home/jtenner/whacko-lang/src/language-server/WhackoVisitor.ts:122:21)
+    at ScopeCollectionPass.visitAll (/home/jtenner/whacko-lang/src/language-server/WhackoVisitor.ts:96:36)
+    at ScopeCollectionPass.visitConstructorClassMember (/home/jtenner/whacko-lang/src/language-server/WhackoVisitor.ts:387:10)
+    at ScopeCollectionPass.visit (/home/jtenner/whacko-lang/src/language-server/WhackoVisitor.ts:144:21)
+    at CompilationPass.exhaustQueue (/home/jtenner/whacko-lang/src/language-server/passes/CompilationPass.ts:593:44)
+/home/jtenner/whacko-lang/testFile.wo -> {
+  col: 2,
+  level: 2,
+  line: 4,
+  message: '[Type]: Extending class does not match signature for method next'
+}
