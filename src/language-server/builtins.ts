@@ -647,8 +647,16 @@ export function registerDefaultBuiltins(program: WhackoProgram) {
   );
 
   program.addBuiltin(
+    "types.isInteger",
+    ({ program, parameters, typeParameters, pass, ctx, ast }) => {
+      const [typeParameter] = typeParameters;
+      ctx.stack.push(new CompileTimeBool(typeParameter instanceof IntegerType, ast));
+    }
+  );
+
+  program.addBuiltin(
     "types.ref",
-    ({ program, parameters, typeParameters, pass, ctx, ast }) =>{
+    ({ program, parameters, typeParameters, pass, ctx, ast }) => {
       const { LLVM, LLVMUtil } = program;
       const [classType] = typeParameters;
       const [ptr] = parameters;

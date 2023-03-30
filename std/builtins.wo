@@ -38,6 +38,7 @@ export namespace types {
   @name("types.ptr") export builtin ptr<T>(ref: T): usize;
   @name("types.ref") export builtin ref<T>(ptr: usize): T;
   @name("types.isReference") export builtin isReference<T>(): bool;
+  @name("types.isInteger") export builtin isInteger<T>(): bool;
 }
 
 export namespace math {

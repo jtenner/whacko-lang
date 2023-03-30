@@ -1,12 +1,6 @@
-export fn getBool(): bool {
-  return true;
-}
-
-class A {
-  test: i32 = getBool() ? i32(1) : i32(2);
-}
 
 export fn _start(): void {
-
-  let a = new A();
+  let a = new ForwardIterableRange<i64>(0, 10);
+  let b = new Box<i64>();
+  a.next(b);
 }

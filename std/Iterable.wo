@@ -3,3 +3,23 @@ export class Iterable<T> {
     return false;
   }
 }
+
+export class ForwardIterableRange<T> extends Iterable<T> {
+  current: T = types.castTo<i64, T>(0);
+  until: T = types.castTo<i64, T>(0);
+
+  constructor(start: T, until: T) {
+    if (types.isInteger<T>()) {
+      this.current = start;
+      this.until = until;
+    }
+  }
+
+  next(result: Box<T>): bool {
+    let current = this.current;
+    this.current = current + 1;
+    let until = this.until;
+    let result = (current < until);
+    return result;
+  }
+}
