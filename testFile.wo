@@ -1,16 +1,12 @@
-class B<C> {
- a: i32 = i32(99);
-
- b(): void {}
+export fn getBool(): bool {
+  return true;
 }
 
-class A extends B<i32> {
-  constructor() {
-    super();
-    super.b();
-  }
+class A {
+  test: i32 = getBool() ? i32(1) : i32(2);
 }
 
 export fn _start(): void {
+
   let a = new A();
 }

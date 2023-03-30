@@ -410,7 +410,6 @@ export class ConcreteClass extends ConcreteType {
         this,
         // previsit
         ({ pass, func }) => {
-          console.log("Preamble")
           const { LLVM, program: { LLVMUtil }, builder } = pass;
           const offset = this.offset;
           const intType = new IntegerType(Type.i32, null, this.node);
@@ -633,6 +632,17 @@ export class MethodType extends ConcreteType {
     );
     LLVM._free(loweredParameterTypes);
     return result;
+  }
+
+  override isAssignableTo(other: ConcreteType): boolean {
+    return other instanceof MethodType
+      && this.thisType.isAssignableTo(other.thisType)
+      && this.parameterTypes.length === other.parameterTypes.length
+      && this.parameterTypes.reduce(
+        (result, thisParameterType, i) => result && thisParameterType.isAssignableTo(other.parameterTypes[i]),
+        true 
+      )
+      && this.returnType.isAssignableTo(other.returnType);
   }
 }
 

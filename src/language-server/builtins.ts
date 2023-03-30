@@ -580,8 +580,34 @@ export function registerDefaultBuiltins(program: WhackoProgram) {
     }
   });
 
+  // @name("types.castTo") export builtin castTo<T, U>(val: U): T;
   program.addBuiltin(
-    "memory.ptr",
+    "types.castTo",
+    (props) =>{
+      const { program, parameters, typeParameters, pass, ctx, ast } = props;
+      const { LLVM, LLVMUtil } = program;
+      const [castFrom, castTo] = typeParameters;
+      const [castee] = parameters;
+      if (
+        castTo
+        && castTo.isNumeric
+        && castFrom
+        && castFrom.isNumeric
+        && castee
+        && castee.ty.isEqual(castFrom)
+      ) {
+        
+        // we can perform the cast
+        const builtinCast = assert(program.builtins.get(castTo.getName()), "The builtin cast must exist at this point.");
+        builtinCast(props);
+      } else {
+        ctx.stack.push(new CompileTimeInvalid(ast));
+      }
+    }
+  );
+
+  program.addBuiltin(
+    "types.ptr",
     ({ program, parameters, typeParameters, pass, ctx, ast }) =>{
       const { LLVM, LLVMUtil } = program;
       const [classType] = typeParameters;
@@ -616,6 +642,40 @@ export function registerDefaultBuiltins(program: WhackoProgram) {
       } else {
         ctx.stack.push(new CompileTimeInvalid(ast));
         pass.error("Type", ast, `Cannot convert value to pointer, ${classType.getName()} is not a class.`);
+      }
+    }
+  );
+
+  program.addBuiltin(
+    "types.ref",
+    ({ program, parameters, typeParameters, pass, ctx, ast }) =>{
+      const { LLVM, LLVMUtil } = program;
+      const [classType] = typeParameters;
+      const [ptr] = parameters;
+      const usizeType = new IntegerType(Type.usize, null, ast);
+      if (
+        ptr.ty.isEqual(usizeType)
+        && (
+          classType instanceof StringType
+          || classType instanceof ConcreteClass
+        ) 
+      ) {
+        const compiledValue = pass.ensureCompiled(ptr);
+
+        const name = pass.getTempNameRef();
+        const cast = LLVM._LLVMBuildIntToPtr(
+          pass.builder,
+          compiledValue.ref,
+          classType.llvmType(LLVM, LLVMUtil)!,
+          name
+        );
+        LLVM._free(name);
+
+        ctx.stack.push(new RuntimeValue(cast, classType));
+      } else {
+        // uhoh, invalid type
+        pass.error("Type", ast, `Cannot cast ${classType.getName()} to class type.`);
+        ctx.stack.push(new CompileTimeInvalid(ast));
       }
     }
   );
@@ -828,6 +888,12 @@ export function registerDefaultBuiltins(program: WhackoProgram) {
   program.addBuiltin("types.is", ({ typeParameters, ast, ctx }) => {
     const [left, right] = typeParameters;
     const result = left.isEqual(right);
+    ctx.stack.push(new CompileTimeBool(result, ast));
+  });
+
+  program.addBuiltin("types.isReference", ({ typeParameters, ast, ctx }) => {
+    const [refType] = typeParameters;
+    const result = refType instanceof StringType || refType instanceof ConcreteClass;
     ctx.stack.push(new CompileTimeBool(result, ast));
   });
 

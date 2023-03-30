@@ -576,17 +576,27 @@ export class CompilationPass extends WhackoPass {
         this.func = func;
         this.currentMod = module;
 
-        if (previsit) previsit({ pass: this, func });
+        
 
         if (isClassDeclaration(node)) {
           const constructorClassMember = (node as ClassDeclaration).members.find(e => isConstructorClassMember(e));
+          // then we need to stack allocate for each field that requires some form of stack allocation
+          const pass = new ScopeCollectionPass(this.program, this.ctx, this);
 
-          if (constructorClassMember) {
-            const pass = new ScopeCollectionPass(this.program, this.ctx, this);
-            pass.visit(constructorClassMember);
-            this.visit(constructorClassMember);
+          // visit each member and visit the initializers if they exist to create some stack allocations for these expressions
+          for (const member of node.members) {
+            if (isFieldClassMember(member) && member.initializer) {
+              pass.visit(member.initializer);
+            }
           }
+          // then visit the constructor if it exists
+          if (constructorClassMember) pass.visit(constructorClassMember);
+          // finally we can previsit 
+          if (previsit) previsit({ pass: this, func });
+          // .. and visit the constructor
+          if (constructorClassMember) this.visit(constructorClassMember);
         } else {
+          if (previsit) previsit({ pass: this, func });
           this.visit(node);
         }
 
@@ -861,7 +871,6 @@ export class CompilationPass extends WhackoPass {
 
       return;
     } else if (rootValue.ty instanceof ConcreteClass) {
-      console.log(rootValue);
       // we should ensure the value is compiled
       const compiledRootValue = this.ensureCompiled(rootValue);
       const ref = compiledRootValue.ref;
@@ -1803,6 +1812,17 @@ export class CompilationPass extends WhackoPass {
     } 
     
     if (elementParameters && functionToBeCompiled) {
+
+      if (callParameterValues.length !== elementParameters.length) {
+        this.ctx.stack.push(new CompileTimeInvalid(node));
+        this.error(
+          "Type",
+          node,
+          `Call to ${functionToBeCompiled.name.name} must have ${functionToBeCompiled.parameters.length} parameters.`
+        );
+        return;
+      }
+
       // we are good for parameter type checking
       for (let i = 0; i < elementParameters.length; i++) {
         const elementParameter = elementParameters[i];
@@ -1824,7 +1844,6 @@ export class CompilationPass extends WhackoPass {
               node,
               `Parameter ${callParameterTy.getName()} is not assignable to type ${ty.getName()}.`
             );
-            assert(false);
             return;
           }
         } else {
@@ -1898,9 +1917,46 @@ export class CompilationPass extends WhackoPass {
         loweredExpressionsLength = callParameterValues.length;
       }
 
-      const name = this.program.LLVMUtil.lower(this.getTempName());
-      
+      // we need to ensure that methods compiled via this method have the same signature all the way up the tree
+      if (classType && isMethodClassMember(functionToBeCompiled)) {
+        let current = classType.extendsClass;
+        
+        while (current) {
+          const parentMethod = current.element.members
+            .find(e => isMethodClassMember(e) && e.name.name === functionToBeCompiled!.name.name) as MethodClassMember | null ?? null;
+          if (parentMethod) {
+            if (functionToBeCompiled.typeParameters.length === parentMethod.typeParameters.length) {
+              const compiledMethod = this.compileCallable(
+                parentMethod,
+                callTypeParameters,
+                assert(getModule(parentMethod), "Module must exist at this point."),
+                [],
+                current,
+              );
+              if (compiledMethod) {
+                const methodType = compiledMethod.ty;
+                if (!methodType.isAssignableTo(func.ty)) {
+                  this.error("Type", node, `Extending class does not match signature for method ${functionToBeCompiled.name.name}`);
+                  this.ctx.stack.push(new CompileTimeInvalid(node));
+                  return;
+                }
+              } else {
+                this.error("Type", parentMethod, `Could not compile parent method.`);
+                this.ctx.stack.push(new CompileTimeInvalid(parentMethod));
+                return;
+              }
+            } else {
+              this.error("Type", node, `Extending class does not match signature for method ${functionToBeCompiled.name.name}`);
+              this.ctx.stack.push(new CompileTimeInvalid(node));
+              return;
+            }
+          }
+          current = current.extendsClass;
+        }
+      }
+
       // now that the function is garunteed to be compiled, we can make the llvm call
+      const name = this.program.LLVMUtil.lower(this.getTempName());
       const ref = this.LLVM._LLVMBuildCall2(
         this.builder,
         func.ty.llvmType(this.LLVM, this.program.LLVMUtil)!,
@@ -2370,8 +2426,15 @@ export class CompilationPass extends WhackoPass {
           }
         }
       }
+    } else if (value instanceof CompileTimeSuperReference) {
+      const self = this.ctx.self;
+      if (self) {
+        const value = self.value;
+        if (value instanceof RuntimeValue) {
+          return value;
+        } 
+      }
     }
-
     this.error(
       "Type",
       value.ty.node,

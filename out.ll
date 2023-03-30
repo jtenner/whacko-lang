@@ -2,6 +2,11 @@
 source_filename = "whacko"
 target triple = "wasm32-wasi"
 
+define i1 @"testFile.wo~getBool"() #0 {
+entry:
+  ret i1 true
+}
+
 define void @_start() #0 {
 entry:
   %"tmp0~" = alloca i128, align 8
@@ -14,25 +19,28 @@ entry:
 
 define ptr @"testFile.wo~A.constructor"(ptr %0) {
 entry:
+  %"tmp3~" = alloca i128, align 8
   store i32 4, ptr %0, align 4
-  %"tmp3~" = getelementptr i8, ptr %0, i32 4
+  %"tmp4~" = getelementptr i8, ptr %0, i32 4
+  store i32 1, ptr %"tmp4~", align 4
+  %"tmp5~" = getelementptr i8, ptr %0, i32 8
+  %"tmp6~" = call i1 @"testFile.wo~getBool"()
+  br i1 %"tmp6~", label %"tmp8~", label %"tmp9~"
+
+"tmp8~":                                          ; preds = %entry
+  store i32 1, ptr %"tmp3~", align 4
+  br label %"tmp10~"
+
+"tmp9~":                                          ; preds = %entry
   store i32 2, ptr %"tmp3~", align 4
-  %"tmp4~" = getelementptr i8, ptr %0, i32 8
-  store i32 99, ptr %"tmp4~", align 4
-  %1 = call ptr @"testFile.wo~B<i32>.constructor"(ptr %0)
+  br label %"tmp10~"
+
+"tmp10~":                                         ; preds = %"tmp9~", %"tmp8~"
+  %"tmp7~" = load i32, ptr %"tmp3~", align 4
+  store i32 %"tmp7~", ptr %"tmp5~", align 4
   ret ptr %0
 }
 
 declare noalias ptr @malloc(i32)
-
-define ptr @"testFile.wo~B<i32>.constructor"(ptr %0) {
-entry:
-  store i32 4, ptr %0, align 4
-  %"tmp5~" = getelementptr i8, ptr %0, i32 4
-  store i32 1, ptr %"tmp5~", align 4
-  %"tmp6~" = getelementptr i8, ptr %0, i32 8
-  store i32 99, ptr %"tmp6~", align 4
-  ret ptr %0
-}
 
 attributes #0 = { "target-features"="+simd128" }

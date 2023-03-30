@@ -26,7 +26,7 @@ export namespace memory {
   @name("memory.copy") export builtin copy(src: usize, dest: usize, count: usize): usize;
   @name("memory.store") export builtin store<T>(ptr: usize, value: T): void;
   @name("memory.load") export builtin load<T>(ptr: usize): T;
-  @name("memory.ptr") export builtin ptr<T>(ref: T): usize;
+
 }
 
 export namespace types {
@@ -34,6 +34,10 @@ export namespace types {
   @name("types.isAssignableTo") export builtin isAssignableTo<T, U>(): bool;
   @name("types.idOf") export builtin idOf<T>(): u32;
   @name("types.sizeOf") export builtin sizeOf<T>(val: T): usize;
+  @name("types.castTo") export builtin castTo<TFrom, TTo>(val: TFrom): TTo;
+  @name("types.ptr") export builtin ptr<T>(ref: T): usize;
+  @name("types.ref") export builtin ref<T>(ptr: usize): T;
+  @name("types.isReference") export builtin isReference<T>(): bool;
 }
 
 export namespace math {
