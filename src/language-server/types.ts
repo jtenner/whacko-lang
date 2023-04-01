@@ -12,10 +12,15 @@ import {
   EnumDeclaration,
   isEnumDeclaration,
   isTypeDeclaration,
+  isFieldClassMember,
+  FieldClassMember,
   TypeID,
   isTypeDeclarationStatement,
+  isClassDeclaration,
+  NamedTypeExpression,
+  FunctionTypeExpression,
 } from "./generated/ast";
-import { WhackoModule, WhackoProgram } from "./program";
+import { ConcreteFunction, WhackoModule, WhackoProgram } from "./program";
 import {
   Scope,
   ScopeElementType,
@@ -75,26 +80,31 @@ export interface ConcreteType {
 }
 
 export interface FunctionType extends ConcreteType {
-  kind: ConcreteTypeKind.Function;
+  kind: ConcreteTypeKind.Function | ConcreteTypeKind.Method;
   returnType: ConcreteType;
   parameterTypes: ConcreteType[];
 }
 
-export interface MethodType extends ConcreteType {
+export interface MethodType extends FunctionType {
   kind: ConcreteTypeKind.Method;
-  returnType: ConcreteType;
-  parameterTypes: ConcreteType[];
   thisType: ClassType;
+}
+
+export interface ConcreteField {
+  name: string;
+  type: ConcreteType;
 }
 
 export interface ClassType extends ConcreteType {
   kind: ConcreteTypeKind.Class;
   resolvedTypes: TypeMap;
   classNode: ClassDeclaration;
+  extendsClass: ClassType | null;
   // @ts-ignore TODO: Add cachable concrete constructors
-  classConstructor: ConcreteConstructor;
+  classConstructor: ConcreteConstructor | null;
   // @ts-ignore TODO: Add cachable concrete methods based on name of method and parameters
   methods: Map<string, ConcreteMethod>;
+  fields: ConcreteField[];
 }
 
 export function getSize(ty: ConcreteType): 1 | 2 | 4 | 8 | 16 {
@@ -152,7 +162,7 @@ export interface V128Type extends ConcreteType {
 }
 
 export interface IntegerType extends ConcreteType {
-  kind: ConcreteTypeKind.Integer;
+  kind: ConcreteTypeKind.Integer | ConcreteTypeKind.Enum;
   integerKind: IntegerKind;
 }
 
@@ -177,13 +187,16 @@ export function getLLVMType(
 
   switch (ty.kind) {
     case ConcreteTypeKind.Class:
+      // @ts-ignore
       return getLLVMStructType(program, ty as ClassType);
     case ConcreteTypeKind.Array:
     case ConcreteTypeKind.Str:
       return LLVM._LLVMPointerType(LLVM._LLVMInt8Type(), 0);
     case ConcreteTypeKind.Function:
+      // @ts-ignore
       return getLLVMFunctionType(program, ty as FunctionType);
     case ConcreteTypeKind.Method:
+      // @ts-ignore
       return getLLVMMethodType(program, ty as MethodType);
     case ConcreteTypeKind.Integer: {
       switch ((ty as IntegerType).integerKind) {
@@ -392,6 +405,10 @@ export function resolveEnumType(
   assert(isEnumDeclaration(node), "Node must be an enum declaration.");
 
   const name = getNodeName(node);
+  const classScope = assert(
+    getNodeName(node),
+    "Class declaration should have a scope."
+  );
   if (program.enums.has(name)) return program.enums.get(name)!;
 
   const enumType: EnumType = {
@@ -405,6 +422,206 @@ export function resolveEnumType(
   return enumType;
 }
 
+export function resolveClass(
+  program: WhackoProgram,
+  module: WhackoModule,
+  classElement: ScopeElement,
+  scope: Scope,
+  typeParameters: ConcreteType[],
+  typeMap: TypeMap
+): ClassType | null {
+  const node = classElement.node as ClassDeclaration;
+  assert(
+    isClassDeclaration(node),
+    "Scope element must have a class declaration inside it."
+  );
+  const nodeScope = assert(
+    getScope(node),
+    "Class must have a scope at this point."
+  );
+
+  if (typeParameters.length !== node.typeParameters.length) {
+    reportErrorDiagnostic(
+      program,
+      "type",
+      node,
+      module,
+      "Number of type parameters given does not match the declaration."
+    );
+    return null;
+  }
+
+  const newTypeMap: TypeMap = new Map();
+  for (let i = 0; i < typeParameters.length; i++) {
+    newTypeMap.set(node.typeParameters[i].name, typeParameters[i]);
+  }
+
+  let extendsClass: ClassType | null = null;
+
+  if (node.extends) {
+    const result = resolveType(
+      program,
+      module,
+      node.extends,
+      nodeScope,
+      newTypeMap
+    );
+    if (!result) {
+      reportErrorDiagnostic(
+        program,
+        "type",
+        node.extends,
+        module,
+        "Super class could not be resolved"
+      );
+      return null;
+    } else if (result.kind !== ConcreteTypeKind.Class) {
+      reportErrorDiagnostic(
+        program,
+        "type",
+        node.extends,
+        module,
+        "Super class resolved to a non-class type"
+      );
+      return null;
+    }
+    extendsClass = result as ClassType;
+  }
+
+  const fields: ConcreteField[] = [];
+  // do we have getters?
+  for (const member of node.members) {
+    if (!isFieldClassMember(member)) continue;
+
+    const field: FieldClassMember = member;
+
+    const type = field.type;
+    if (!type) {
+      reportErrorDiagnostic(
+        program,
+        "type",
+        field,
+        module,
+        "TODO: Field types are mandatory for now."
+      );
+      return null;
+    }
+
+    const concreteFieldType = resolveType(
+      program,
+      module,
+      type,
+      nodeScope,
+      newTypeMap
+    );
+
+    if (!concreteFieldType) {
+      reportErrorDiagnostic(
+        program,
+        "type",
+        field,
+        module,
+        "Field type failed to resolve."
+      );
+      return null;
+    }
+
+    fields.push({
+      name: field.name.name,
+      type: concreteFieldType,
+    });
+  }
+
+  return {
+    classNode: node,
+    classConstructor: null,
+    extendsClass,
+    llvmType: null,
+    methods: new Map(),
+    fields,
+    kind: ConcreteTypeKind.Class,
+    resolvedTypes: newTypeMap,
+  };
+}
+
+export function resolveNamedTypeScopeElement(
+  program: WhackoProgram,
+  module: WhackoModule,
+  scopeElement: ScopeElement,
+  scope: Scope,
+  typeParameters: TypeExpression[],
+  typeMap: TypeMap
+): ConcreteType | null {
+  const concreteTypeParameters: ConcreteType[] = [];
+
+  for (const parameterExpression of typeParameters) {
+    const concreteTypeParameter = resolveType(
+      program,
+      module,
+      parameterExpression,
+      scope,
+      typeMap
+    );
+    if (!concreteTypeParameter) {
+      // There should already be an emitted diagnostic
+      reportErrorDiagnostic(
+        program,
+        "type",
+        parameterExpression,
+        module,
+        "Type parameter could not be resolved."
+      );
+      return null;
+    }
+    concreteTypeParameters.push(concreteTypeParameter);
+  }
+
+  switch (scopeElement.type) {
+    case ScopeElementType.BuiltinType: {
+      return resolveBuiltinType(
+        program,
+        module,
+        scopeElement,
+        scope,
+        concreteTypeParameters
+      );
+    }
+    case ScopeElementType.Class: {
+      return resolveClass(
+        program,
+        module,
+        scopeElement,
+        scope,
+        concreteTypeParameters,
+        typeMap
+      );
+    }
+    case ScopeElementType.Enum: {
+      return resolveEnumType(program, module, scopeElement);
+    }
+    case ScopeElementType.TypeDeclaration: {
+      return resolveTypeDeclaration(
+        program,
+        module,
+        scopeElement,
+        scope,
+        concreteTypeParameters,
+        typeMap
+      );
+    }
+    default: {
+      reportErrorDiagnostic(
+        program,
+        "type",
+        scopeElement.node,
+        module,
+        "Referenced element does not refer to a type"
+      );
+      return null;
+    }
+  }
+}
+
 export function resolveType(
   program: WhackoProgram,
   module: WhackoModule,
@@ -415,131 +632,184 @@ export function resolveType(
   switch (typeExpression.$type) {
     case "TypeID": {
       const node = typeExpression as TypeID;
-      const typeParameters: ConcreteType[] = [];
-      for (const parameterExpression of node.typeParameters) {
-        const concreteTypeParameter = resolveType(
-          program,
-          module,
-          parameterExpression,
-          scope,
-          typeMap
-        );
-        if (!concreteTypeParameter) {
-          // There should already be an emitted diagnostic
+
+      if (!typeExpression.typeParameters.length) {
+        switch (node.name) {
+          case "i8":
+            return getIntegerType(IntegerKind.I8);
+          case "u8":
+            return getIntegerType(IntegerKind.U8);
+          case "i16":
+            return getIntegerType(IntegerKind.I16);
+          case "u16":
+            return getIntegerType(IntegerKind.U16);
+          case "i32":
+            return getIntegerType(IntegerKind.I32);
+          case "u32":
+            return getIntegerType(IntegerKind.U32);
+          case "i64":
+            return getIntegerType(IntegerKind.I64);
+          case "u64":
+            return getIntegerType(IntegerKind.U64);
+          case "isize":
+            return getIntegerType(IntegerKind.ISize);
+          case "usize":
+            return getIntegerType(IntegerKind.USize);
+          case "f32":
+            return getFloatType(FloatKind.F32);
+          case "f64":
+            return getFloatType(FloatKind.F64);
+          case "i8x16":
+            return getV128Type(V128Kind.I8x16);
+          case "u8x16":
+            return getV128Type(V128Kind.U8x16);
+          case "i16x8":
+            return getV128Type(V128Kind.I16x8);
+          case "u16x8":
+            return getV128Type(V128Kind.U16x8);
+          case "i32x4":
+            return getV128Type(V128Kind.I32x4);
+          case "u32x4":
+            return getV128Type(V128Kind.U32x4);
+          case "f32x4":
+            return getV128Type(V128Kind.F32x4);
+          case "i64x2":
+            return getV128Type(V128Kind.I64x2);
+          case "u64x2":
+            return getV128Type(V128Kind.U64x2);
+          case "f64x2":
+            return getV128Type(V128Kind.F64x2);
+        }
+
+        if (typeMap.has(node.name)) return typeMap.get(node.name)!;
+
+        const scopeElement = getElementInScope(scope, node.name);
+        if (scopeElement) {
+          return resolveNamedTypeScopeElement(
+            program,
+            module,
+            scopeElement,
+            scope,
+            node.typeParameters,
+            typeMap
+          );
+        } else {
           reportErrorDiagnostic(
             program,
             "type",
-            parameterExpression,
+            node,
             module,
-            "Type parameter could not be resolved."
+            "Named type could not be resolved"
           );
           return null;
         }
-        typeParameters.push(concreteTypeParameter);
-      }
-
-      switch (node.name) {
-        case "i8":
-          return getIntegerType(IntegerKind.I8);
-        case "u8":
-          return getIntegerType(IntegerKind.U8);
-        case "i16":
-          return getIntegerType(IntegerKind.I16);
-        case "u16":
-          return getIntegerType(IntegerKind.U16);
-        case "i32":
-          return getIntegerType(IntegerKind.I32);
-        case "u32":
-          return getIntegerType(IntegerKind.U32);
-        case "i64":
-          return getIntegerType(IntegerKind.I64);
-        case "u64":
-          return getIntegerType(IntegerKind.U64);
-        case "isize":
-          return getIntegerType(IntegerKind.ISize);
-        case "usize":
-          return getIntegerType(IntegerKind.USize);
-        case "f32":
-          return getFloatType(FloatKind.F32);
-        case "f64":
-          return getFloatType(FloatKind.F64);
-        case "i8x16":
-          return getV128Type(V128Kind.I8x16);
-        case "u8x16":
-          return getV128Type(V128Kind.U8x16);
-        case "i16x8":
-          return getV128Type(V128Kind.I16x8);
-        case "u16x8":
-          return getV128Type(V128Kind.U16x8);
-        case "i32x4":
-          return getV128Type(V128Kind.I32x4);
-        case "u32x4":
-          return getV128Type(V128Kind.U32x4);
-        case "f32x4":
-          return getV128Type(V128Kind.F32x4);
-        case "i64x2":
-          return getV128Type(V128Kind.I64x2);
-        case "u64x2":
-          return getV128Type(V128Kind.U64x2);
-        case "f64x2":
-          return getV128Type(V128Kind.F64x2);
-      }
-
-      if (typeMap.has(node.name)) return typeMap.get(node.name)!;
-
-      const scopeElement = getElementInScope(scope, node.name);
-      if (scopeElement) {
-        switch (scopeElement.type) {
-          case ScopeElementType.BuiltinType: {
-            return resolveBuiltinType(
-              program,
-              module,
-              scopeElement,
-              scope,
-              typeParameters
-            );
-          }
-          case ScopeElementType.Class: {
-            // TODO: Resolve class
-            return resolveClass(program, module, scopeElement, scope, typeMap);
-          }
-          case ScopeElementType.Enum: {
-            return resolveEnumType(program, module, scopeElement);
-          }
-          case ScopeElementType.TypeDeclaration: {
-            return resolveTypeDeclaration(
-              program,
-              module,
-              scopeElement,
-              scope,
-              typeParameters,
-              typeMap
-            );
-          }
-          default: {
-          }
-        }
-      } else {
-        return null;
       }
     }
     case "NamedTypeExpression": {
-      // ...
+      const node = typeExpression as NamedTypeExpression;
+      const [root, ...rest] = node.path;
+      let accumulator = getElementInScope(scope, root.name);
+
+      if (!accumulator) {
+        reportErrorDiagnostic(
+          program,
+          "type",
+          root,
+          module,
+          `Namespace '${root.name}' does not exist.`
+        );
+        return null;
+      }
+
+      for (const id of rest) {
+        const name = id.name;
+        accumulator = accumulator.exports?.get(name) ?? null;
+        if (!accumulator) {
+          reportErrorDiagnostic(
+            program,
+            "type",
+            id,
+            module,
+            `Cannot resolve '${name}' in namespace.`
+          );
+          return null;
+        }
+      }
+
+      return resolveNamedTypeScopeElement(
+        program,
+        module,
+        accumulator,
+        scope,
+        node.typeParameters,
+        typeMap
+      );
     }
     case "TupleTypeExpression": {
-      // TODO
+      reportErrorDiagnostic(
+        program,
+        "type",
+        typeExpression,
+        module,
+        "TODO: Tuple types are not supported yet."
+      );
+      return null;
     }
     case "FunctionTypeExpression": {
-      //
-    }
-    case "HeldTypeExpression": {
-      // TODO
+      const functionTypeExpression = typeExpression as FunctionTypeExpression;
+      const parameterTypes: ConcreteType[] = [];
+      for (const parameter of functionTypeExpression.parameters) {
+        const parameterType = resolveType(
+          program,
+          module,
+          parameter,
+          scope,
+          typeMap
+        );
+        if (!parameterType) {
+          reportErrorDiagnostic(
+            program,
+            "type",
+            parameter,
+            module,
+            "Parameter type could not be resolved."
+          );
+          return null;
+        }
+        parameterTypes.push(parameterType);
+      }
+
+      const returnType = resolveType(
+        program,
+        module,
+        functionTypeExpression.returnType,
+        scope,
+        typeMap
+      );
+
+      if (!returnType) {
+        reportErrorDiagnostic(
+          program,
+          "type",
+          functionTypeExpression.returnType,
+          module,
+          "Return type could not be resolved."
+        );
+        return null;
+      }
+
+      const result: FunctionType = {
+        kind: ConcreteTypeKind.Function,
+        llvmType: null,
+        parameterTypes,
+        returnType,
+      };
+      return result;
     }
   }
-  return assert(false, "TODO") as never;
 }
 
-function getFunctionType(
+export function getFunctionType(
   program: WhackoProgram,
   module: WhackoModule,
   node: FunctionDeclaration,

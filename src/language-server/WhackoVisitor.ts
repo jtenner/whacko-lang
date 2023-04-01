@@ -13,7 +13,6 @@ import {
   TypeDeclaration,
   ClassDeclaration,
   TypeExpression,
-  HeldTypeExpression,
   FunctionTypeExpression,
   TupleTypeExpression,
   NamedTypeExpression,
@@ -122,8 +121,6 @@ export class WhackoVisitor {
         return this.visitTypeDeclaration(node);
       case "ClassDeclaration":
         return this.visitClassDeclaration(node);
-      case "HeldTypeExpression":
-        return this.visitHeldTypeExpression(node);
       case "FunctionTypeExpression":
         return this.visitFunctionTypeExpression(node);
       case "TupleTypeExpression":
@@ -318,10 +315,6 @@ export class WhackoVisitor {
     this.visitAll(node.members);
   }
 
-  visitHeldTypeExpression(node: HeldTypeExpression) {
-    this.visit(node.type);
-  }
-
   visitFunctionTypeExpression(node: FunctionTypeExpression) {
     this.visitAll(node.parameters);
     this.visit(node.returnType);
@@ -331,11 +324,13 @@ export class WhackoVisitor {
     this.visitAll(node.types);
   }
 
-  visitTypeID(node: TypeID) {}
+  visitTypeID(node: TypeID) {
+    this.visit(node.name);
+    this.visitAll(node.typeParameters);
+  }
 
   visitNamedTypeExpression(node: NamedTypeExpression) {
-    this.visit(node.namespace);
-    this.visit(node.element);
+    this.visitAll(node.path);
     this.visitAll(node.typeParameters);
   }
 
@@ -474,8 +469,7 @@ export class WhackoVisitor {
   }
 
   visitNewExpression(node: NewExpression) {
-    this.visit(node.expression);
-    this.visitAll(node.typeParameters);
+    this.visit(node.classType);
     this.visitAll(node.parameters);
   }
 

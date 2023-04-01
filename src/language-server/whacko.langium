@@ -71,10 +71,7 @@ ClassDeclaration:
     Decorators (export?="export")? (final?="final")? "class" Name NamedTypeParameters ("extends" extends=TypeExpression)? "{" members+=ClassMember* "}";
 
 TypeExpression:
-    HeldTypeExpression | FunctionTypeExpression | NamedTypeExpression | TupleTypeExpression;
-
-HeldTypeExpression:
-    "held" type=TypeExpression;
+    FunctionTypeExpression | NamedTypeExpression | TupleTypeExpression | TypeID;
 
 FunctionTypeExpression:
     "(" (parameters+=TypeExpression ("," parameters+=TypeExpression)* )? ")" "=>" ReturnType;
@@ -83,16 +80,17 @@ TupleTypeExpression:
     "(" types+=TypeExpression "," (types+=TypeExpression ("," types+=TypeExpression)* )? ")";
 
 TypeID:
-    name=Identifier;
+    name=Identifier TypeParameters;
 
-NamedTypeExpression:
-    TypeID ({infer NamedTypeExpression.namespace=current} "." element=ID)* TypeParameters;
+NamedTypeExpression: // what's this infer business for?
+    // ID ("." path+=ID)+ TypeParameters; maybe? OMG IF THIS WORKS I WILL BE SLIGHTLY HAPPIER
+    path+=ID ( "." path+=ID)+ TypeParameters;
 
 ClassMember:
     ConstructorClassMember | FieldClassMember | MethodClassMember | GetterClassMember | SetterClassMember;
 
 FieldClassMember:
-    Decorators (private?="private")? Name ":" type=TypeExpression ("=" initializer=Expression)? ";";
+    Decorators (private?="private")? Name (":" type=TypeExpression)? ("=" initializer=Expression)? ";";
 
 MethodClassMember:
     Decorators (private?="private")? Name NamedTypeParameters Parameters ":" ReturnType block=BlockStatement;
@@ -206,10 +204,7 @@ HoldExpression:
     "hold" expression=Expression;
 
 NewExpression:
-    "new" expression=NewPath TypeParameters CallParameters;
-
-NewPath:
-    RootIdentifier ({infer MemberAccessExpression.memberRoot=current} "." member=ID)*;
+    "new" classType=(NamedTypeExpression | TypeID) CallParameters;
 
 PathExpression:
     RootIdentifier (
