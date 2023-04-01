@@ -5,7 +5,7 @@ import { ConcreteType, getTypeName } from "./types";
 
 export function assert<T>(
   condition: T,
-  message: string = "No message provided"
+  message: string = "No message provided",
 ) {
   if (!condition) throw new Error(message);
   return condition;
@@ -22,7 +22,7 @@ export function cleanNode(node: AstNode): any {
       .map(([key, obj]) => [
         key,
         (obj.constructor === Object ? cleanNode(obj) : obj) as any,
-      ])
+      ]),
   );
 }
 
@@ -46,7 +46,7 @@ export function getNodeName(node: Nameable): string {
 export function getFullyQualifiedFunctionName(
   node: AstNode,
   typeParameters: ConcreteType[],
-  mod: WhackoModule
+  mod: WhackoModule,
 ): string {
   const typeParameterNames = typeParameters
     .map((e) => getTypeName(e))
@@ -55,3 +55,4 @@ export function getFullyQualifiedFunctionName(
     typeParameters.length ? "<" + typeParameterNames + ">" : ""
   }`;
 }
+

@@ -22,11 +22,11 @@ export interface Scope {
 export function addScopeElement(
   scope: Scope,
   name: string,
-  element: ScopeElement
+  element: ScopeElement,
 ) {
   assert(
     !scope.elements.has(name),
-    "Element has already been defined on this scope."
+    "Element has already been defined on this scope.",
   );
   scope.elements.set(name, element);
 }
@@ -91,7 +91,7 @@ export interface ScopeElement {
 export function createNewScopeElement(
   node: AstNode,
   type: ScopeElementType,
-  scope: Scope | null = null
+  scope: Scope | null = null,
 ): ScopeElement {
   return {
     exports: null,
@@ -116,7 +116,7 @@ export function isInLocalScope(scope: Scope, name: string): boolean {
 
 export function getElementInScope(
   scope: Scope,
-  name: string
+  name: string,
 ): ScopeElement | null {
   if (scope.elements.has(name)) return scope.elements.get(name)!;
   if (scope.parent) return getElementInScope(scope.parent, name);
@@ -126,11 +126,11 @@ export function getElementInScope(
 export function defineElementInScope(
   scope: Scope,
   name: string,
-  element: ScopeElement
+  element: ScopeElement,
 ) {
   assert(
     !isInLocalScope(scope, name),
-    "Element is already defined in this scope."
+    "Element is already defined in this scope.",
   );
   scope.elements.set(name, element);
 }
@@ -138,11 +138,11 @@ export function defineElementInScope(
 export function defineExportInParent(
   exportable: Exportable,
   name: string,
-  scopeElement: ScopeElement
+  scopeElement: ScopeElement,
 ) {
   assert(
     !exportable.exports!.has(name),
-    `Element ${name} already defined as an export.`
+    `Element ${name} already defined as an export.`,
   );
   exportable.exports!.set(name, scopeElement);
 }
@@ -152,7 +152,7 @@ export function putElementInScope(
   module: WhackoModule,
   name: ID,
   element: ScopeElement,
-  scope: Scope
+  scope: Scope,
 ) {
   if (isInLocalScope(scope, name.name)) {
     reportErrorDiagnostic(
@@ -160,7 +160,7 @@ export function putElementInScope(
       "scope",
       name,
       module,
-      `Element ${name.name} already defined in scope.`
+      `Element ${name.name} already defined in scope.`,
     );
   } else {
     defineElementInScope(scope, name.name, element);
@@ -172,7 +172,7 @@ export function putElementInExports(
   module: WhackoModule,
   name: ID,
   element: ScopeElement,
-  parent: Exportable
+  parent: Exportable,
 ) {
   if (parent.exports!.has(name.name)) {
     reportErrorDiagnostic(
@@ -180,7 +180,7 @@ export function putElementInExports(
       "scope",
       name,
       module,
-      `Element ${name.name} already defined in parent exports.`
+      `Element ${name.name} already defined in parent exports.`,
     );
   } else {
     defineExportInParent(parent, name.name, element);
@@ -191,20 +191,21 @@ export function putTypeParametersInScope(
   program: WhackoProgram,
   module: WhackoModule,
   typeParameters: ID[],
-  scope: Scope
+  scope: Scope,
 ) {
   for (const typeParameter of typeParameters) {
     const typeParameterElement = createNewScopeElement(
       typeParameter,
       ScopeElementType.TypeDeclaration,
-      scope
+      scope,
     );
     putElementInScope(
       program,
       module,
       typeParameter,
       typeParameterElement,
-      scope
+      scope,
     );
   }
 }
+

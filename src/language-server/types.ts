@@ -40,6 +40,7 @@ export const enum ConcreteTypeKind {
   Integer,
   Float,
   V128,
+  Never,
 }
 
 export const enum V128Kind {
@@ -179,7 +180,7 @@ export interface FloatType extends ConcreteType {
 
 export function getLLVMType(
   program: WhackoProgram,
-  ty: ConcreteType
+  ty: ConcreteType,
 ): LLVMTypeRef {
   const { LLVM } = program;
 
@@ -296,12 +297,12 @@ export function resolveTypeDeclaration(
   scopeElement: ScopeElement,
   scope: Scope,
   typeParameters: ConcreteType[],
-  typeMap: TypeMap
+  typeMap: TypeMap,
 ): ConcreteType | null {
   const node = scopeElement.node as TypeDeclaration;
   assert(
     isTypeDeclaration(node) || isTypeDeclarationStatement(node),
-    "Node must be a type declaration."
+    "Node must be a type declaration.",
   );
 
   if (node.typeParameters.length !== typeParameters.length) {
@@ -310,14 +311,14 @@ export function resolveTypeDeclaration(
       "Type",
       node.name,
       module,
-      `Type parameters do not match type declaration signature length.`
+      `Type parameters do not match type declaration signature length.`,
     );
     return null;
   }
 
   const declarationScope = assert(
     getScope(node),
-    "The scope must exist for the type declaration."
+    "The scope must exist for the type declaration.",
   );
 
   return resolveType(program, module, node.type, declarationScope, typeMap);
@@ -328,16 +329,16 @@ export function resolveBuiltinType(
   module: WhackoModule,
   scopeElement: ScopeElement,
   scope: Scope,
-  typeParameters: ConcreteType[]
+  typeParameters: ConcreteType[],
 ): ConcreteType | null {
   assert(
     scopeElement.type === ScopeElementType.BuiltinType,
-    "The scope element must be a builtin type."
+    "The scope element must be a builtin type.",
   );
   const node = scopeElement.node as BuiltinTypeDeclaration;
   assert(
     isBuiltinTypeDeclaration(node),
-    "The node of the scope element must be a builtin type declaration."
+    "The node of the scope element must be a builtin type declaration.",
   );
 
   if (typeParameters.length !== node.typeParameters.length) {
@@ -346,13 +347,13 @@ export function resolveBuiltinType(
       "type",
       node,
       module,
-      `Type parameter count does not match builtintype type parameter signature.`
+      `Type parameter count does not match builtintype type parameter signature.`,
     );
     return null;
   }
 
   const builtinNameDecorator = node.decorators.find(
-    (decorator) => decorator.name.name === "name"
+    (decorator) => decorator.name.name === "name",
   );
   if (!builtinNameDecorator) {
     reportErrorDiagnostic(
@@ -360,7 +361,7 @@ export function resolveBuiltinType(
       "type",
       node,
       module,
-      "Builtin type does not have a @name decorator."
+      "Builtin type does not have a @name decorator.",
     );
     return null;
   }
@@ -371,7 +372,7 @@ export function resolveBuiltinType(
       "type",
       node,
       module,
-      "Builtin type @name decorator has an incorrect number of parameters"
+      "Builtin type @name decorator has an incorrect number of parameters",
     );
     return null;
   }
@@ -384,14 +385,14 @@ export function resolveBuiltinType(
       "type",
       builtinName,
       module,
-      "Builtin type @name parameter is not a string literal"
+      "Builtin type @name parameter is not a string literal",
     );
     return null;
   }
 
   const builtinTypeFunction = assert(
     program.builtinTypeFunctions.get(builtinName.value),
-    `The builtin type definition for ${builtinName} does not exist.`
+    `The builtin type definition for ${builtinName} does not exist.`,
   );
   return builtinTypeFunction({ program, module, scope, typeParameters, node });
 }
@@ -399,7 +400,7 @@ export function resolveBuiltinType(
 export function resolveEnumType(
   program: WhackoProgram,
   module: WhackoModule,
-  scopeElement: ScopeElement
+  scopeElement: ScopeElement,
 ): EnumType | null {
   const node = scopeElement.node as EnumDeclaration;
   assert(isEnumDeclaration(node), "Node must be an enum declaration.");
@@ -407,7 +408,7 @@ export function resolveEnumType(
   const name = getNodeName(node);
   const classScope = assert(
     getNodeName(node),
-    "Class declaration should have a scope."
+    "Class declaration should have a scope.",
   );
   if (program.enums.has(name)) return program.enums.get(name)!;
 
@@ -428,16 +429,16 @@ export function resolveClass(
   classElement: ScopeElement,
   scope: Scope,
   typeParameters: ConcreteType[],
-  typeMap: TypeMap
+  typeMap: TypeMap,
 ): ClassType | null {
   const node = classElement.node as ClassDeclaration;
   assert(
     isClassDeclaration(node),
-    "Scope element must have a class declaration inside it."
+    "Scope element must have a class declaration inside it.",
   );
   const nodeScope = assert(
     getScope(node),
-    "Class must have a scope at this point."
+    "Class must have a scope at this point.",
   );
 
   if (typeParameters.length !== node.typeParameters.length) {
@@ -446,7 +447,7 @@ export function resolveClass(
       "type",
       node,
       module,
-      "Number of type parameters given does not match the declaration."
+      "Number of type parameters given does not match the declaration.",
     );
     return null;
   }
@@ -464,7 +465,7 @@ export function resolveClass(
       module,
       node.extends,
       nodeScope,
-      newTypeMap
+      newTypeMap,
     );
     if (!result) {
       reportErrorDiagnostic(
@@ -472,7 +473,7 @@ export function resolveClass(
         "type",
         node.extends,
         module,
-        "Super class could not be resolved"
+        "Super class could not be resolved",
       );
       return null;
     } else if (result.kind !== ConcreteTypeKind.Class) {
@@ -481,7 +482,7 @@ export function resolveClass(
         "type",
         node.extends,
         module,
-        "Super class resolved to a non-class type"
+        "Super class resolved to a non-class type",
       );
       return null;
     }
@@ -502,7 +503,7 @@ export function resolveClass(
         "type",
         field,
         module,
-        "TODO: Field types are mandatory for now."
+        "TODO: Field types are mandatory for now.",
       );
       return null;
     }
@@ -512,7 +513,7 @@ export function resolveClass(
       module,
       type,
       nodeScope,
-      newTypeMap
+      newTypeMap,
     );
 
     if (!concreteFieldType) {
@@ -521,7 +522,7 @@ export function resolveClass(
         "type",
         field,
         module,
-        "Field type failed to resolve."
+        "Field type failed to resolve.",
       );
       return null;
     }
@@ -550,7 +551,7 @@ export function resolveNamedTypeScopeElement(
   scopeElement: ScopeElement,
   scope: Scope,
   typeParameters: TypeExpression[],
-  typeMap: TypeMap
+  typeMap: TypeMap,
 ): ConcreteType | null {
   const concreteTypeParameters: ConcreteType[] = [];
 
@@ -560,7 +561,7 @@ export function resolveNamedTypeScopeElement(
       module,
       parameterExpression,
       scope,
-      typeMap
+      typeMap,
     );
     if (!concreteTypeParameter) {
       // There should already be an emitted diagnostic
@@ -569,7 +570,7 @@ export function resolveNamedTypeScopeElement(
         "type",
         parameterExpression,
         module,
-        "Type parameter could not be resolved."
+        "Type parameter could not be resolved.",
       );
       return null;
     }
@@ -583,7 +584,7 @@ export function resolveNamedTypeScopeElement(
         module,
         scopeElement,
         scope,
-        concreteTypeParameters
+        concreteTypeParameters,
       );
     }
     case ScopeElementType.Class: {
@@ -593,7 +594,7 @@ export function resolveNamedTypeScopeElement(
         scopeElement,
         scope,
         concreteTypeParameters,
-        typeMap
+        typeMap,
       );
     }
     case ScopeElementType.Enum: {
@@ -606,7 +607,7 @@ export function resolveNamedTypeScopeElement(
         scopeElement,
         scope,
         concreteTypeParameters,
-        typeMap
+        typeMap,
       );
     }
     default: {
@@ -615,7 +616,7 @@ export function resolveNamedTypeScopeElement(
         "type",
         scopeElement.node,
         module,
-        "Referenced element does not refer to a type"
+        "Referenced element does not refer to a type",
       );
       return null;
     }
@@ -627,7 +628,7 @@ export function resolveType(
   module: WhackoModule,
   typeExpression: TypeExpression,
   scope: Scope,
-  typeMap: TypeMap
+  typeMap: TypeMap,
 ): ConcreteType | null {
   switch (typeExpression.$type) {
     case "TypeID": {
@@ -691,7 +692,7 @@ export function resolveType(
             scopeElement,
             scope,
             node.typeParameters,
-            typeMap
+            typeMap,
           );
         } else {
           reportErrorDiagnostic(
@@ -699,7 +700,7 @@ export function resolveType(
             "type",
             node,
             module,
-            "Named type could not be resolved"
+            "Named type could not be resolved",
           );
           return null;
         }
@@ -716,7 +717,7 @@ export function resolveType(
           "type",
           root,
           module,
-          `Namespace '${root.name}' does not exist.`
+          `Namespace '${root.name}' does not exist.`,
         );
         return null;
       }
@@ -730,7 +731,7 @@ export function resolveType(
             "type",
             id,
             module,
-            `Cannot resolve '${name}' in namespace.`
+            `Cannot resolve '${name}' in namespace.`,
           );
           return null;
         }
@@ -742,7 +743,7 @@ export function resolveType(
         accumulator,
         scope,
         node.typeParameters,
-        typeMap
+        typeMap,
       );
     }
     case "TupleTypeExpression": {
@@ -751,7 +752,7 @@ export function resolveType(
         "type",
         typeExpression,
         module,
-        "TODO: Tuple types are not supported yet."
+        "TODO: Tuple types are not supported yet.",
       );
       return null;
     }
@@ -764,7 +765,7 @@ export function resolveType(
           module,
           parameter,
           scope,
-          typeMap
+          typeMap,
         );
         if (!parameterType) {
           reportErrorDiagnostic(
@@ -772,7 +773,7 @@ export function resolveType(
             "type",
             parameter,
             module,
-            "Parameter type could not be resolved."
+            "Parameter type could not be resolved.",
           );
           return null;
         }
@@ -784,7 +785,7 @@ export function resolveType(
         module,
         functionTypeExpression.returnType,
         scope,
-        typeMap
+        typeMap,
       );
 
       if (!returnType) {
@@ -793,7 +794,7 @@ export function resolveType(
           "type",
           functionTypeExpression.returnType,
           module,
-          "Return type could not be resolved."
+          "Return type could not be resolved.",
         );
         return null;
       }
@@ -813,11 +814,11 @@ export function getFunctionType(
   program: WhackoProgram,
   module: WhackoModule,
   node: FunctionDeclaration,
-  typeParameters: ConcreteType[]
+  typeParameters: ConcreteType[],
 ): FunctionType | null {
   const scope = assert(
     getScope(node),
-    "The scope for this node must exist at this point."
+    "The scope for this node must exist at this point.",
   );
 
   const typeMap: TypeMap = new Map();
@@ -828,7 +829,7 @@ export function getFunctionType(
       "type",
       node,
       module,
-      "Number of type parameters does not match function signature."
+      "Number of type parameters does not match function signature.",
     );
     return null;
   }
@@ -844,7 +845,7 @@ export function getFunctionType(
       module,
       parameter.type,
       scope,
-      typeMap
+      typeMap,
     );
     if (!parameterType) {
       reportErrorDiagnostic(
@@ -852,7 +853,7 @@ export function getFunctionType(
         "type",
         parameter.type,
         module,
-        "Could not resolve parameter"
+        "Could not resolve parameter",
       );
       return null;
     }
@@ -864,7 +865,7 @@ export function getFunctionType(
     module,
     node.returnType,
     scope,
-    typeMap
+    typeMap,
   );
   const result = {
     kind: ConcreteTypeKind.Function,
@@ -874,3 +875,4 @@ export function getFunctionType(
   } as FunctionType;
   return result;
 }
+

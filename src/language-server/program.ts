@@ -33,11 +33,11 @@ export interface ConcreteMethod {
 export function addBuiltinTypeToProgram(
   program: WhackoProgram,
   name: string,
-  builtinTypeFunc: BuiltinTypeFunction
+  builtinTypeFunc: BuiltinTypeFunction,
 ) {
   assert(
     !program.builtinTypeFunctions.has(name),
-    `Builtin type '${name}' already exists in the program.`
+    `Builtin type '${name}' already exists in the program.`,
   );
   program.builtinTypeFunctions.set(name, builtinTypeFunc);
 }
@@ -82,7 +82,7 @@ export async function addModuleToProgram(
   modulePath: string,
   absoluteBaseFolder: string,
   entry: boolean,
-  scope: Scope
+  scope: Scope,
 ): Promise<WhackoModule | null> {
   const absolutePath = join(absoluteBaseFolder, modulePath);
   const relativePath = relative(program.baseDir, absolutePath);
@@ -105,7 +105,7 @@ export async function addModuleToProgram(
     const contents = await readFile(absolutePath, "utf8");
     const parsedAst = assert(
       parse(contents, absolutePath),
-      `Unable to parse contents of file ${modulePath}.`
+      `Unable to parse contents of file ${modulePath}.`,
     );
     mod.contents = contents;
 
@@ -119,7 +119,7 @@ export async function addModuleToProgram(
         parserError.name,
         null,
         mod,
-        parserError.message
+        parserError.message,
       );
     }
     mod.ast = parsedAst.value;
@@ -143,8 +143,8 @@ export async function addModuleToProgram(
         moduleToAdd,
         dirnameOfModule,
         false,
-        createNewScope(program.globalScope)
-      )
+        createNewScope(program.globalScope),
+      ),
     );
   }
 
@@ -155,7 +155,7 @@ export async function addModuleToProgram(
 export function addStaticLibraryToProgram(
   program: WhackoProgram,
   filename: string,
-  dirname: string
+  dirname: string,
 ) {
   const absolutePath = join(dirname, filename);
   program.staticLibraries.add(absolutePath);
@@ -191,7 +191,7 @@ export function compile(program: WhackoProgram) {
         "initialization",
         startFunction,
         module,
-        "Found multiple exported _start functions."
+        "Found multiple exported _start functions.",
       );
     }
     return;
@@ -201,8 +201,9 @@ export function compile(program: WhackoProgram) {
       "initialization",
       null,
       null,
-      "Could not find an exported _start function."
+      "Could not find an exported _start function.",
     );
     return;
   }
 }
+

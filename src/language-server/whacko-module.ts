@@ -64,14 +64,15 @@ export function createWhackoServices(context: DefaultSharedModuleContext): {
 } {
   const shared = inject(
     createDefaultSharedModule(context),
-    WhackoGeneratedSharedModule
+    WhackoGeneratedSharedModule,
   );
   const Whacko = inject(
     createDefaultModule({ shared }),
     WhackoGeneratedModule,
-    WhackoModule
+    WhackoModule,
   );
   shared.ServiceRegistry.register(Whacko);
   registerValidationChecks(Whacko);
   return { shared, Whacko };
 }
+

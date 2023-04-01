@@ -23,19 +23,20 @@ const createDiagnosticReport =
     type: string,
     node: AstNode | null,
     module: WhackoModule | null,
-    message: string
+    message: string,
   ) => {
     program.diagnostics.push({ level, type, node, module, message });
   };
 
 export const reportInfoDiagnostic = createDiagnosticReport(
-  DiagnosticLevel.INFO
+  DiagnosticLevel.INFO,
 );
 
 export const reportWarningDiagnostic = createDiagnosticReport(
-  DiagnosticLevel.WARNING
+  DiagnosticLevel.WARNING,
 );
 
 export const reportErrorDiagnostic = createDiagnosticReport(
-  DiagnosticLevel.ERROR
+  DiagnosticLevel.ERROR,
 );
+

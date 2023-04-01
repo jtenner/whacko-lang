@@ -539,7 +539,7 @@ export class WhackoVisitor {
     let replacer: AstNode;
     if (isExpression(node)) {
       const result = this.services.parser.LangiumParser.parse<Program>(
-        `fn a(): void { ${contents}; });`
+        `fn a(): void { ${contents}; });`,
       );
       const expression = (
         (result.value.declarations[0] as FunctionDeclaration).block!
@@ -548,7 +548,7 @@ export class WhackoVisitor {
       replacer = expression;
     } else if (isStatement(node)) {
       const result = this.services.parser.LangiumParser.parse<Program>(
-        `fn a(): void { ${contents} });`
+        `fn a(): void { ${contents} });`,
       );
       const statement = (result.value.declarations[0] as FunctionDeclaration)
         .block!.statements[0];
@@ -586,3 +586,4 @@ export class WhackoVisitor {
     }
   }
 }
+

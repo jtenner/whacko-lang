@@ -10,3 +10,4 @@ const connection = createConnection(ProposedFeatures.all)!;
 
 // Start the language server with the shared services
 // startLanguageServer(shared);
+

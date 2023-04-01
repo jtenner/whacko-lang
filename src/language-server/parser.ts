@@ -7,7 +7,7 @@ const Whacko = createWhackoServices(NodeFileSystem).Whacko;
 
 export function parse(
   contents: string,
-  fullPath: string
+  fullPath: string,
 ): ParseResult<Program> | null {
   const ast = Whacko.parser.LangiumParser.parse<Program>(contents);
 
@@ -19,3 +19,4 @@ export function parse(
   return ast;
   // visitor.visit(ast);
 }
+
