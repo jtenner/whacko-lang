@@ -2,8 +2,7 @@ grammar Whacko
 
 entry Program:
     ( declarations+=DeclareDeclaration
-    | imports     +=ImportDeclaration
-    | exports     +=ExportDeclaration
+    | imports+=ImportDeclaration
     | declarations+=BuiltinDeclaration
     | declarations+=FunctionDeclaration
     | declarations+=ClassDeclaration
@@ -12,12 +11,12 @@ entry Program:
     | declarations+=BuiltinTypeDeclaration
     | declarations+=EnumDeclaration
     | declarations+=ExternDeclaration
+    | declarations+=ExportStarDeclaration
 )*;
 
 NamespaceDeclaration:
     Decorators (export?="export") "namespace" Name "{" ( 
       declarations+=DeclareDeclaration
-    | exports     +=ExportDeclaration
     | declarations+=FunctionDeclaration
     | declarations+=ClassDeclaration
     | declarations+=TypeDeclaration
@@ -26,7 +25,11 @@ NamespaceDeclaration:
     | declarations+=BuiltinTypeDeclaration
     | declarations+=EnumDeclaration
     | declarations+=ExternDeclaration
+    | declarations+=ExportStarDeclaration
     )* "}";
+
+ExportStarDeclaration:
+    Decorators "export" "*" "as" Name "from" path=StringLiteral ";";
 
 ExternDeclaration:
     Decorators (export?="export")? "extern" Name Parameters ":" ReturnType ";";
@@ -50,15 +53,9 @@ EnumDeclarator:
     name=ID ("=" initializer=IntegerLiteral)?;
 
 ImportDeclaration:
-    "import" "{" (declarators+=ImportDeclarator ("," declarators+=ImportDeclarator)*)? "}" "from" path=String ";";
+    "import" "{" (declarators+=ImportDeclarator ("," declarators+=ImportDeclarator)*)? "}" "from" path=StringLiteral ";";
 
 ImportDeclarator:
-    Name ("as" alias=ID)?;
-
-ExportDeclaration:
-    "export" "{" declarators+=ExportDeclarator ("," declarators+=ExportDeclarator)* "}";
-
-ExportDeclarator:
     Name ("as" alias=ID)?;
 
 FunctionDeclaration:
@@ -73,9 +70,10 @@ TypeDeclaration:
 ClassDeclaration:
     Decorators (export?="export")? (final?="final")? "class" Name NamedTypeParameters ("extends" extends=TypeExpression)? "{" members+=ClassMember* "}";
 
-TypeExpression: HeldTypeExpression | FunctionTypeExpression | NamedTypeExpression | TupleTypeExpression;
+TypeExpression:
+    HeldTypeExpression | FunctionTypeExpression | NamedTypeExpression | TupleTypeExpression;
 
-HeldTypeExpression: 
+HeldTypeExpression:
     "held" type=TypeExpression;
 
 FunctionTypeExpression:
@@ -84,10 +82,14 @@ FunctionTypeExpression:
 TupleTypeExpression:
     "(" types+=TypeExpression "," (types+=TypeExpression ("," types+=TypeExpression)* )? ")";
 
-NamedTypeExpression:
-    ID ({infer NamedTypeExpression.namespace=current} "." element=ID)* TypeParameters;
+TypeID:
+    name=Identifier;
 
-ClassMember: ConstructorClassMember | FieldClassMember | MethodClassMember | GetterClassMember | SetterClassMember;
+NamedTypeExpression:
+    TypeID ({infer NamedTypeExpression.namespace=current} "." element=ID)* TypeParameters;
+
+ClassMember:
+    ConstructorClassMember | FieldClassMember | MethodClassMember | GetterClassMember | SetterClassMember;
 
 FieldClassMember:
     Decorators (private?="private")? Name ":" type=TypeExpression ("=" initializer=Expression)? ";";
@@ -104,7 +106,8 @@ SetterClassMember:
 ConstructorClassMember:
     Decorators (private?="private")? "constructor" Parameters block=BlockStatement;
 
-Statement: BlockStatement | TypeDeclarationStatement | GrabStatement | WhileStatement | ContinueStatement | BreakStatement | IfElseStatement | ReturnStatement | VariableDeclarationStatement | ExpressionStatement;
+Statement:
+    BlockStatement | TypeDeclarationStatement | GrabStatement | WhileStatement | ContinueStatement | BreakStatement | IfElseStatement | ReturnStatement | VariableDeclarationStatement | ExpressionStatement;
 
 BlockStatement:
     "{" (statements+=Statement)* "}";
@@ -113,7 +116,7 @@ TypeDeclarationStatement:
     "type" Name NamedTypeParameters "=" type=TypeExpression ";";
 
 GrabStatement:
-    "grab" "(" heldExpression=Expression ")" statement=Statement;
+    "grab" "(" heldExpression=Expression "as" name=ID ")" statement=Statement;
 
 WhileStatement:
     "while" "(" expression=Expression ")" statement=Statement;
@@ -139,7 +142,8 @@ VariableDeclarator:
 ExpressionStatement:
     expression=Expression ";";
 
-Expression infers Expression: TupleExpression;
+Expression infers Expression:
+    TupleExpression;
 
 TupleExpression infers Expression:
     {infer TupleExpression} "(" expressions+=Expression "," (expressions+=Expression ("," expressions+=Expression)* )? ")"
@@ -186,10 +190,11 @@ SumExpression infers Expression:
 ProductExpression infers Expression:
     ExponentiationExpression ({infer BinaryExpression.lhs=current} op=("*" | "/" | "%") rhs=ExponentiationExpression)*;
 
-ExponentiationExpression infers Expression: 
+ExponentiationExpression infers Expression:
     LeftUnaryExpression ({infer BinaryExpression.lhs=current} op="**" rhs=LeftUnaryExpression)*;
 
-LeftUnaryExpression infers Expression: ({infer LeftUnaryExpression} op=("!" | "-" | "+" | "~") expression=LeftUnaryExpression) | Epsilon;
+LeftUnaryExpression infers Expression:
+    ({infer LeftUnaryExpression} op=("!" | "-" | "+" | "~") expression=LeftUnaryExpression) | Epsilon;
 
 Epsilon infers Expression:
     AwaitExpression | HoldExpression | NewExpression | PathExpression | PrimaryExpression;
@@ -213,7 +218,8 @@ PathExpression:
         | {infer ArrayAccessExpression.arrayRoot=current} "[" indexExpression=Expression "]"
     )*;
 
-PrimaryExpression infers Expression: FunctionLiteral | GroupLiteral | FloatLiteral | IntegerLiteral | HexLiteral | BinaryLiteral | OctalLiteral | StringLiteral | FalseLiteral | TrueLiteral | NullLiteral | AsyncBlockLiteral;
+PrimaryExpression infers Expression:
+    FunctionLiteral | GroupLiteral | FloatLiteral | IntegerLiteral | HexLiteral | BinaryLiteral | OctalLiteral | StringLiteral | FalseLiteral | TrueLiteral | NullLiteral | AsyncBlockLiteral;
 
 GroupLiteral infers Expression:
     "(" Expression ")";
@@ -231,10 +237,10 @@ fragment Parameters:
     "(" ( parameters+=Parameter ("," parameters+=Parameter)* )? ")";
 
 fragment TypeParameters:
-    ("<" typeParameters+=TypeExpression ("," typeParameters+=TypeExpression)* ">")?;
+    (Generics_Open typeParameters+=TypeExpression ("," typeParameters+=TypeExpression)* ">")?;
 
 fragment NamedTypeParameters:
-    ("<" typeParameters+=ID ("," typeParameters+=ID)* ">")?;
+    (Generics_Open typeParameters+=ID ("," typeParameters+=ID)* ">")?;
 
 fragment ReturnType:
     returnType=TypeExpression;
@@ -282,7 +288,7 @@ SuperLiteral:
     super?="super";
 
 AsyncBlockLiteral:
-    "async" ("<" type=TypeExpression ">")? block=BlockStatement;
+    "async" (Generics_Open type=TypeExpression ">")? block=BlockStatement;
 
 ID:
     name=Identifier;
@@ -292,12 +298,15 @@ terminal String: /"([^"\r\n]|\\\.)*"/;
 
 terminal Identifier: /[a-zA-Z$_][a-zA-Z$_0-9]*/;
 
+terminal Generics_Open: '<' (?= (/\s+/ | Identifier | "." | "," | "<" )+ '>');
+terminal Less_Than: /</;
+
 terminal Binary: /0b[10]+/;
 terminal Hex: /0x[0-9a-fA-F]+/;
 terminal Octal: /0o[0-7]+/;
 terminal Float: /[-+]?[0-9]+[.][0-9]+([eE][-+]?[0-9]+)?/;
 terminal Integer: /[-+]?[0-9]+/;
-terminal Less_Than: /</;
+
 // hidden stuff
 hidden terminal WS: /\s+/;
 hidden terminal ML_COMMENT: /\/\*[\s\S]*?\*\//;

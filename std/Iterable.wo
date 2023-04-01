@@ -19,6 +19,6 @@ export class ForwardIterableRange<T> extends Iterable<T> {
     let current = this.current;
     this.current = current + 1;
     let until = this.until;
-    return current _< until;
+    return current < until;
   }
 }

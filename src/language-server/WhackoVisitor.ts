@@ -7,8 +7,6 @@ import {
   Program,
   DeclareDeclaration,
   ImportDeclaration,
-  ExportDeclaration,
-  ExportDeclarator,
   ImportDeclarator,
   FunctionDeclaration,
   Parameter,
@@ -70,8 +68,10 @@ import {
   EnumDeclaration,
   EnumDeclarator,
   ExternDeclaration,
+  ExportStarDeclaration,
 } from "./generated/ast";
 import { createWhackoServices, WhackoServices } from "./whacko-module";
+import { TypeID } from "./generated/ast";
 
 const declarations = new Set([
   "DeclareDeclaration",
@@ -104,6 +104,8 @@ export class WhackoVisitor {
         return this.visitDeclareFunction(node);
       case "Program":
         return this.visitProgram(node);
+      case "ExportStarDeclaration":
+        return this.visitExportStarDeclaration(node);
       case "BuiltinDeclaration":
         return this.visitBuiltinDeclaration(node);
       case "DeclareDeclaration":
@@ -112,10 +114,6 @@ export class WhackoVisitor {
         return this.visitImportDeclaration(node);
       case "ImportDeclarator":
         return this.visitImportDeclarator(node);
-      case "ExportDeclaration":
-        return this.visitExportDeclaration(node);
-      case "ExportDeclarator":
-        return this.visitExportDeclarator(node);
       case "FunctionDeclaration":
         return this.visitFunctionDeclaration(node);
       case "Parameter":
@@ -224,6 +222,8 @@ export class WhackoVisitor {
         return this.visitEnumDeclarator(node);
       case "ExternDeclaration":
         return this.visitExternDeclaration(node);
+      case "TypeID":
+        return this.visitTypeID(node);
       // case "TypeCastExpression":
       //   return this.visitTypeCastExpression(node);
       default:
@@ -234,7 +234,12 @@ export class WhackoVisitor {
   visitProgram(node: Program) {
     this.visitAll(node.imports);
     this.visitAll(node.declarations);
-    this.visitAll(node.exports);
+  }
+
+  visitExportStarDeclaration(node: ExportStarDeclaration) {
+    this.visitAll(node.decorators);
+    this.visit(node.name);
+    this.visit(node.path);
   }
 
   visitBuiltinTypeDeclaration(node: BuiltinTypeDeclaration) {
@@ -246,7 +251,6 @@ export class WhackoVisitor {
   visitNamespaceDeclaration(node: NamespaceDeclaration) {
     this.visitAll(node.decorators);
     this.visitAll(node.declarations);
-    this.visitAll(node.exports);
   }
 
   visitDeclareDeclaration(node: DeclareDeclaration) {
@@ -279,15 +283,6 @@ export class WhackoVisitor {
   visitImportDeclaration(node: ImportDeclaration) {
     this.visitAll(node.declarators);
     this.visit(node.path);
-  }
-
-  visitExportDeclaration(node: ExportDeclaration) {
-    this.visitAll(node.declarators);
-  }
-
-  visitExportDeclarator(node: ExportDeclarator) {
-    this.visit(node.name);
-    if (node.alias) this.visit(node.alias);
   }
 
   visitImportDeclarator(node: ImportDeclarator) {
@@ -335,6 +330,8 @@ export class WhackoVisitor {
   visitTupleTypeExpression(node: TupleTypeExpression) {
     this.visitAll(node.types);
   }
+
+  visitTypeID(node: TypeID) {}
 
   visitNamedTypeExpression(node: NamedTypeExpression) {
     this.visit(node.namespace);
@@ -400,6 +397,7 @@ export class WhackoVisitor {
 
   visitGrabStatement(node: GrabStatement) {
     this.visit(node.heldExpression);
+    this.visit(node.name);
     this.visit(node.statement);
   }
 
@@ -565,9 +563,7 @@ export class WhackoVisitor {
       const result =
         this.services.parser.LangiumParser.parse<Program>(contents);
       const declaration =
-        result.value.declarations[0] ??
-        result.value.exports[0] ??
-        result.value.imports[0];
+        result.value.declarations[0] ?? result.value.imports[0];
       replacer = declaration;
     } else {
       throw new Error("Something went wrong!");
