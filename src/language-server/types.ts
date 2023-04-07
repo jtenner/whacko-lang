@@ -1,10 +1,14 @@
+import { AstNode } from "langium";
 import { LLVMTypeRef, LLVMValueRef } from "llvm-js";
 import { reportErrorDiagnostic } from "./diagnostic";
 import {
   TypeExpression,
   ClassDeclaration,
   FunctionDeclaration,
+  BuiltinDeclaration,
+  ConstructorClassMember,
   ID,
+  Parameter,
   isBuiltinTypeDeclaration,
   BuiltinTypeDeclaration,
   isStringLiteral,
@@ -19,18 +23,41 @@ import {
   isClassDeclaration,
   NamedTypeExpression,
   FunctionTypeExpression,
+  isMethodClassMember,
+  MethodClassMember,
+  StringLiteral,
+  BinaryExpression,
+  isConstructorClassMember,
+  DeclareFunction,
+  isDeclareFunction,
+  ExternDeclaration,
+  isExternDeclaration,
+  isBinaryExpression,
 } from "./generated/ast";
-import { ConcreteFunction, WhackoModule, WhackoProgram } from "./program";
+import {
+  BinaryOperator,
+  WhackoMethodContext,
+  WhackoFunctionContext,
+} from "./ir";
+import { ensureCallableCompiled, WhackoModule, WhackoProgram } from "./program";
 import {
   Scope,
   ScopeElementType,
   getScope,
   getElementInScope,
   ScopeElement,
+  traverseScopePath,
 } from "./scope";
-import { assert, getNodeName } from "./util";
+import {
+  assert,
+  getNodeName,
+  getNameDecoratorValue,
+  logNode,
+  UNREACHABLE,
+} from "./util";
 
 export const enum ConcreteTypeKind {
+  Invalid,
   Class,
   Function,
   Enum,
@@ -41,6 +68,8 @@ export const enum ConcreteTypeKind {
   Float,
   V128,
   Never,
+  Void,
+  Nullable,
 }
 
 export const enum V128Kind {
@@ -94,23 +123,98 @@ export interface MethodType extends FunctionType {
 export interface ConcreteField {
   name: string;
   type: ConcreteType;
+  node: FieldClassMember;
 }
 
 export interface ClassType extends ConcreteType {
   kind: ConcreteTypeKind.Class;
   resolvedTypes: TypeMap;
-  classNode: ClassDeclaration;
-  extendsClass: ClassType | null;
+  typeParameters: ConcreteType[];
+  node: ClassDeclaration;
   // @ts-ignore TODO: Add cachable concrete constructors
-  classConstructor: ConcreteConstructor | null;
+  classConstructor: WhackoFunctionContext | null;
   // @ts-ignore TODO: Add cachable concrete methods based on name of method and parameters
-  methods: Map<string, ConcreteMethod>;
-  fields: ConcreteField[];
+  methods: Map<string, WhackoFunctionContext>;
+  fields: Map<string, ConcreteField>;
+}
+
+export interface NullableType extends ConcreteType {
+  kind: ConcreteTypeKind.Nullable;
+  child: ClassType;
+}
+
+export function getNullableType(child: ClassType): NullableType {
+  return {
+    kind: ConcreteTypeKind.Nullable,
+    child,
+    llvmType: null,
+  };
+}
+
+export function getNonnullableType(type: ConcreteType): ConcreteType {
+  return type.kind === ConcreteTypeKind.Nullable
+    ? (type as NullableType).child
+    : type;
+}
+
+export interface InvalidType extends ConcreteType {
+  kind: ConcreteTypeKind.Invalid;
+}
+
+export const theInvalidType: InvalidType = {
+  kind: ConcreteTypeKind.Invalid,
+  llvmType: null,
+};
+
+export const theVoidType: ConcreteType = {
+  kind: ConcreteTypeKind.Void,
+  llvmType: null,
+};
+
+export function isSignedIntegerKind(kind: IntegerKind): boolean {
+  switch (kind) {
+    case IntegerKind.Bool:
+    case IntegerKind.U8:
+    case IntegerKind.U16:
+    case IntegerKind.U32:
+    case IntegerKind.U64:
+    case IntegerKind.USize:
+      return false;
+
+    case IntegerKind.I8:
+    case IntegerKind.I16:
+    case IntegerKind.I32:
+    case IntegerKind.I64:
+    case IntegerKind.ISize:
+      return true;
+  }
+}
+
+export function getIntegerBitCount(kind: IntegerKind): 1 | 8 | 16 | 32 | 64 {
+  switch (kind) {
+    case IntegerKind.Bool:
+      return 1;
+    case IntegerKind.I8:
+    case IntegerKind.U8:
+      return 8;
+    case IntegerKind.I16:
+    case IntegerKind.U16:
+      return 16;
+    case IntegerKind.I32:
+    case IntegerKind.U32:
+    case IntegerKind.ISize:
+    case IntegerKind.USize:
+      return 32;
+    case IntegerKind.I64:
+    case IntegerKind.U64:
+      return 64;
+  }
 }
 
 export function getSize(ty: ConcreteType): 1 | 2 | 4 | 8 | 16 {
   switch (ty.kind) {
     case ConcreteTypeKind.Array:
+    case ConcreteTypeKind.Nullable:
     case ConcreteTypeKind.Class:
     case ConcreteTypeKind.Str:
     case ConcreteTypeKind.Function:
@@ -118,25 +222,9 @@ export function getSize(ty: ConcreteType): 1 | 2 | 4 | 8 | 16 {
       return 4;
     }
     case ConcreteTypeKind.Integer: {
-      switch ((ty as IntegerType).integerKind) {
-        case IntegerKind.Bool:
-        case IntegerKind.I8:
-        case IntegerKind.U8:
-          return 1;
-        case IntegerKind.I16:
-        case IntegerKind.U16:
-          return 2;
-        case IntegerKind.I32:
-        case IntegerKind.U32:
-        case IntegerKind.ISize:
-        case IntegerKind.USize:
-          return 4;
-        case IntegerKind.I64:
-        case IntegerKind.U64:
-          return 8;
-        default:
-          return assert(false, "Unknown integer kind") as never;
-      }
+      const { integerKind } = ty as IntegerType;
+      if (integerKind === IntegerKind.Bool) return 1;
+      else return getIntegerBitCount(integerKind) as 1 | 2 | 4 | 8;
     }
     case ConcreteTypeKind.Float: {
       switch ((ty as FloatType).floatKind) {
@@ -169,6 +257,7 @@ export interface IntegerType extends ConcreteType {
 
 export interface EnumType extends IntegerType {
   kind: ConcreteTypeKind.Enum;
+  node: EnumDeclaration;
   integerKind: IntegerKind.I32;
   name: string;
 }
@@ -176,6 +265,10 @@ export interface EnumType extends IntegerType {
 export interface FloatType extends ConcreteType {
   kind: ConcreteTypeKind.Float;
   floatKind: FloatKind;
+}
+
+export interface ArrayType extends ConcreteType {
+  childType: ConcreteType;
 }
 
 export function getLLVMType(
@@ -187,8 +280,11 @@ export function getLLVMType(
   if (ty.llvmType) return ty.llvmType;
 
   switch (ty.kind) {
+    case ConcreteTypeKind.Nullable:
+      // @ts-ignore TODO
+      return getLLVMStructType(program, (ty as NullableType).child);
     case ConcreteTypeKind.Class:
-      // @ts-ignore
+      // @ts-ignore TODO
       return getLLVMStructType(program, ty as ClassType);
     case ConcreteTypeKind.Array:
     case ConcreteTypeKind.Str:
@@ -257,11 +353,6 @@ export function getLLVMType(
   }
 }
 
-export function getTypeName(ty: ConcreteType): string {
-  // TODO: Make type names at some point
-  return "";
-}
-
 export function getFloatType(kind: FloatKind): FloatType {
   // TODO: Cache this?
   return {
@@ -308,9 +399,9 @@ export function resolveTypeDeclaration(
   if (node.typeParameters.length !== typeParameters.length) {
     reportErrorDiagnostic(
       program,
-      "Type",
-      node.name,
       module,
+      "type",
+      node.name,
       `Type parameters do not match type declaration signature length.`,
     );
     return null;
@@ -344,55 +435,21 @@ export function resolveBuiltinType(
   if (typeParameters.length !== node.typeParameters.length) {
     reportErrorDiagnostic(
       program,
+      module,
       "type",
       node,
-      module,
       `Type parameter count does not match builtintype type parameter signature.`,
     );
     return null;
   }
 
-  const builtinNameDecorator = node.decorators.find(
-    (decorator) => decorator.name.name === "name",
-  );
-  if (!builtinNameDecorator) {
-    reportErrorDiagnostic(
-      program,
-      "type",
-      node,
-      module,
-      "Builtin type does not have a @name decorator.",
-    );
-    return null;
-  }
-
-  if (builtinNameDecorator.parameters.length !== 1) {
-    reportErrorDiagnostic(
-      program,
-      "type",
-      node,
-      module,
-      "Builtin type @name decorator has an incorrect number of parameters",
-    );
-    return null;
-  }
-
-  const [builtinName] = builtinNameDecorator.parameters;
-
-  if (!isStringLiteral(builtinName)) {
-    reportErrorDiagnostic(
-      program,
-      "type",
-      builtinName,
-      module,
-      "Builtin type @name parameter is not a string literal",
-    );
-    return null;
-  }
+  const builtinName = getNameDecoratorValue(node) ?? node.name.name;
 
   const builtinTypeFunction = assert(
-    program.builtinTypeFunctions.get(builtinName.value),
-    `The builtin type definition for ${builtinName} does not exist.`,
+    program.builtinTypeFunctions.get(builtinName),
+    `The builtin type definition ${builtinName} for ${getNodeName(
+      node,
+    )} does not exist.`,
   );
   return builtinTypeFunction({ program, module, scope, typeParameters, node });
 }
@@ -414,6 +471,7 @@ export function resolveEnumType(
 
   const enumType: EnumType = {
     kind: ConcreteTypeKind.Enum,
+    node,
     name,
     integerKind: IntegerKind.I32,
     llvmType: null,
@@ -427,9 +485,7 @@ export function resolveClass(
   program: WhackoProgram,
   module: WhackoModule,
   classElement: ScopeElement,
-  scope: Scope,
   typeParameters: ConcreteType[],
-  typeMap: TypeMap,
 ): ClassType | null {
   const node = classElement.node as ClassDeclaration;
   assert(
@@ -444,9 +500,9 @@ export function resolveClass(
   if (typeParameters.length !== node.typeParameters.length) {
     reportErrorDiagnostic(
       program,
+      module,
       "type",
       node,
-      module,
       "Number of type parameters given does not match the declaration.",
     );
     return null;
@@ -457,39 +513,7 @@ export function resolveClass(
     newTypeMap.set(node.typeParameters[i].name, typeParameters[i]);
   }
 
-  let extendsClass: ClassType | null = null;
-
-  if (node.extends) {
-    const result = resolveType(
-      program,
-      module,
-      node.extends,
-      nodeScope,
-      newTypeMap,
-    );
-    if (!result) {
-      reportErrorDiagnostic(
-        program,
-        "type",
-        node.extends,
-        module,
-        "Super class could not be resolved",
-      );
-      return null;
-    } else if (result.kind !== ConcreteTypeKind.Class) {
-      reportErrorDiagnostic(
-        program,
-        "type",
-        node.extends,
-        module,
-        "Super class resolved to a non-class type",
-      );
-      return null;
-    }
-    extendsClass = result as ClassType;
-  }
-
-  const fields: ConcreteField[] = [];
+  const fields = new Map<string, ConcreteField>();
   // do we have getters?
   for (const member of node.members) {
     if (!isFieldClassMember(member)) continue;
@@ -500,9 +524,9 @@ export function resolveClass(
     if (!type) {
       reportErrorDiagnostic(
         program,
+        module,
         "type",
         field,
-        module,
         "TODO: Field types are mandatory for now.",
       );
       return null;
@@ -519,29 +543,30 @@ export function resolveClass(
     if (!concreteFieldType) {
       reportErrorDiagnostic(
         program,
+        module,
         "type",
         field,
-        module,
         "Field type failed to resolve.",
       );
       return null;
     }
 
-    fields.push({
+    fields.set(field.name.name, {
       name: field.name.name,
+      node: field,
       type: concreteFieldType,
     });
   }
 
   return {
-    classNode: node,
+    node,
     classConstructor: null,
-    extendsClass,
     llvmType: null,
     methods: new Map(),
     fields,
     kind: ConcreteTypeKind.Class,
     resolvedTypes: newTypeMap,
+    typeParameters,
   };
 }
 
@@ -567,9 +592,9 @@ export function resolveNamedTypeScopeElement(
       // There should already be an emitted diagnostic
       reportErrorDiagnostic(
         program,
+        module,
         "type",
         parameterExpression,
-        module,
         "Type parameter could not be resolved.",
       );
       return null;
@@ -592,9 +617,7 @@ export function resolveNamedTypeScopeElement(
         program,
         module,
         scopeElement,
-        scope,
         concreteTypeParameters,
-        typeMap,
       );
     }
     case ScopeElementType.Enum: {
@@ -613,9 +636,9 @@ export function resolveNamedTypeScopeElement(
     default: {
       reportErrorDiagnostic(
         program,
+        module,
         "type",
         scopeElement.node,
-        module,
         "Referenced element does not refer to a type",
       );
       return null;
@@ -680,6 +703,8 @@ export function resolveType(
             return getV128Type(V128Kind.U64x2);
           case "f64x2":
             return getV128Type(V128Kind.F64x2);
+          case "void":
+            return theVoidType;
         }
 
         if (typeMap.has(node.name)) return typeMap.get(node.name)!;
@@ -697,9 +722,9 @@ export function resolveType(
         } else {
           reportErrorDiagnostic(
             program,
+            module,
             "type",
             node,
-            module,
             "Named type could not be resolved",
           );
           return null;
@@ -708,39 +733,19 @@ export function resolveType(
     }
     case "NamedTypeExpression": {
       const node = typeExpression as NamedTypeExpression;
-      const [root, ...rest] = node.path;
-      let accumulator = getElementInScope(scope, root.name);
+      const relevantScopeElement = traverseScopePath(
+        program,
+        module,
+        scope,
+        node.path,
+      );
 
-      if (!accumulator) {
-        reportErrorDiagnostic(
-          program,
-          "type",
-          root,
-          module,
-          `Namespace '${root.name}' does not exist.`,
-        );
-        return null;
-      }
-
-      for (const id of rest) {
-        const name = id.name;
-        accumulator = accumulator.exports?.get(name) ?? null;
-        if (!accumulator) {
-          reportErrorDiagnostic(
-            program,
-            "type",
-            id,
-            module,
-            `Cannot resolve '${name}' in namespace.`,
-          );
-          return null;
-        }
-      }
+      if (!relevantScopeElement) return null;
 
       return resolveNamedTypeScopeElement(
         program,
         module,
-        accumulator,
+        relevantScopeElement,
         scope,
         node.typeParameters,
         typeMap,
@@ -749,9 +754,9 @@ export function resolveType(
     case "TupleTypeExpression": {
       reportErrorDiagnostic(
         program,
+        module,
         "type",
         typeExpression,
-        module,
         "TODO: Tuple types are not supported yet.",
       );
       return null;
@@ -770,9 +775,9 @@ export function resolveType(
         if (!parameterType) {
           reportErrorDiagnostic(
             program,
+            module,
             "type",
             parameter,
-            module,
             "Parameter type could not be resolved.",
           );
           return null;
@@ -791,9 +796,9 @@ export function resolveType(
       if (!returnType) {
         reportErrorDiagnostic(
           program,
+          module,
           "type",
           functionTypeExpression.returnType,
-          module,
           "Return type could not be resolved.",
         );
         return null;
@@ -810,36 +815,15 @@ export function resolveType(
   }
 }
 
-export function getFunctionType(
+export function getParameterTypes(
   program: WhackoProgram,
   module: WhackoModule,
-  node: FunctionDeclaration,
-  typeParameters: ConcreteType[],
-): FunctionType | null {
-  const scope = assert(
-    getScope(node),
-    "The scope for this node must exist at this point.",
-  );
-
-  const typeMap: TypeMap = new Map();
-
-  if (typeParameters.length !== node.typeParameters.length) {
-    reportErrorDiagnostic(
-      program,
-      "type",
-      node,
-      module,
-      "Number of type parameters does not match function signature.",
-    );
-    return null;
-  }
-
-  for (let i = 0; i < node.typeParameters.length; i++) {
-    typeMap.set(node.typeParameters[i].name, typeParameters[i]);
-  }
-
+  parameters: Parameter[],
+  scope: Scope,
+  typeMap: TypeMap,
+): ConcreteType[] | null {
   const parameterTypes = [] as ConcreteType[];
-  for (const parameter of node.parameters) {
+  for (const parameter of parameters) {
     const parameterType = resolveType(
       program,
       module,
@@ -850,29 +834,418 @@ export function getFunctionType(
     if (!parameterType) {
       reportErrorDiagnostic(
         program,
+        module,
         "type",
         parameter.type,
-        module,
         "Could not resolve parameter",
       );
       return null;
     }
     parameterTypes.push(parameterType);
   }
+  return parameterTypes;
+}
 
-  const returnType = resolveType(
+export function getCallableType(
+  program: WhackoProgram,
+  module: WhackoModule,
+  node:
+    | MethodClassMember
+    | FunctionDeclaration
+    | BuiltinDeclaration
+    | DeclareFunction
+    | ExternDeclaration,
+  thisType: ClassType | null,
+  typeParameters: ConcreteType[],
+): FunctionType | null {
+  const scope = assert(
+    getScope(node),
+    "The scope for this node must exist at this point.",
+  );
+
+  const typeMap: TypeMap = thisType?.resolvedTypes ?? new Map();
+
+  const nodeTypeParameters =
+    isDeclareFunction(node) || isExternDeclaration(node)
+      ? []
+      : node.typeParameters;
+
+  if (typeParameters.length !== nodeTypeParameters.length) {
+    reportErrorDiagnostic(
+      program,
+      module,
+      "type",
+      node,
+      "Number of type parameters does not match function/method signature.",
+    );
+    return null;
+  }
+
+  for (let i = 0; i < nodeTypeParameters.length; i++) {
+    typeMap.set(nodeTypeParameters[i].name, typeParameters[i]);
+  }
+
+  const parameterTypes = getParameterTypes(
+    program,
+    module,
+    node.parameters,
+    scope,
+    typeMap,
+  );
+  if (!parameterTypes) return null;
+
+  let returnType: ConcreteType;
+
+  const maybeReturnType = resolveType(
     program,
     module,
     node.returnType,
     scope,
     typeMap,
   );
-  const result = {
+
+  if (!maybeReturnType) {
+    reportErrorDiagnostic(
+      program,
+      module,
+      "type",
+      node.returnType,
+      "Could not resolve return type of function/method",
+    );
+    return null;
+  }
+
+  returnType = maybeReturnType;
+
+  if (isMethodClassMember(node)) {
+    // We have an extra branch here in case we forget to initialize MethodType properties
+    const result: MethodType = {
+      kind: ConcreteTypeKind.Method,
+      llvmType: null,
+      parameterTypes,
+      returnType,
+      thisType: assert(thisType),
+    };
+    return result;
+  }
+
+  return {
     kind: ConcreteTypeKind.Function,
     llvmType: null,
     parameterTypes,
     returnType,
-  } as FunctionType;
+  };
+}
+
+export function getConstructorType(
+  program: WhackoProgram,
+  module: WhackoModule,
+  thisType: ClassType,
+  constructor: ConstructorClassMember | null,
+): MethodType | null {
+  let parameterTypes: ConcreteType[] = [];
+
+  if (constructor) {
+    const scope = assert(getScope(thisType.node));
+    const result = getParameterTypes(
+      program,
+      module,
+      constructor.parameters,
+      scope,
+      thisType.resolvedTypes,
+    );
+    if (!result) return null;
+    parameterTypes = result;
+  }
+
+  return {
+    kind: ConcreteTypeKind.Method,
+    thisType,
+    returnType: theVoidType,
+    llvmType: null,
+    parameterTypes,
+  };
+}
+
+export function typesEqual(left: ConcreteType, right: ConcreteType): boolean {
+  if (left === right) return true;
+  if (left.kind !== right.kind) return false;
+
+  switch (left.kind) {
+    case ConcreteTypeKind.Integer:
+      return (
+        (left as IntegerType).integerKind === (right as IntegerType).integerKind
+      );
+    case ConcreteTypeKind.Float:
+      return (left as FloatType).floatKind === (right as FloatType).floatKind;
+    case ConcreteTypeKind.V128:
+      return (left as V128Type).v128Kind === (right as V128Type).v128Kind;
+    case ConcreteTypeKind.Array:
+      return typesEqual(
+        (left as ArrayType).childType,
+        (right as ArrayType).childType,
+      );
+
+    case ConcreteTypeKind.Nullable: {
+      return typesEqual(
+        (left as NullableType).child,
+        (right as NullableType).child,
+      );
+    }
+    case ConcreteTypeKind.Void:
+    case ConcreteTypeKind.Never:
+    case ConcreteTypeKind.Str:
+      return true;
+    case ConcreteTypeKind.Invalid:
+    case ConcreteTypeKind.Function:
+    case ConcreteTypeKind.Class:
+    case ConcreteTypeKind.Enum:
+    case ConcreteTypeKind.Method:
+      return false; // cached
+  }
+}
+
+export const theStrType = {
+  kind: ConcreteTypeKind.Str,
+  llvmType: null,
+};
+
+export function getOperatorOverloadMethod(
+  program: WhackoProgram,
+  module: WhackoModule,
+  lhsType: ConcreteType,
+  rhsType: ConcreteType | null,
+  op: string,
+  operatorNode: AstNode,
+): WhackoMethodContext | null {
+  if (lhsType.kind !== ConcreteTypeKind.Class) return null;
+
+  const members = (lhsType as ClassType).node.members;
+
+  let methodAst: MethodClassMember | null = null;
+  let reportFirstDuplicate = true;
+  for (const member of members) {
+    if (isMethodClassMember(member)) {
+      if (member.typeParameters.length !== 0) {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          member.name,
+          `TODO: Support generic operator methods.`,
+        );
+        continue;
+      }
+
+      const decorator = member.decorators.find(
+        (e) => e.name.name === "operator",
+      );
+      if (!decorator) continue;
+      if (
+        decorator.parameters.length !== 1 &&
+        isStringLiteral(decorator.parameters[0])
+      ) {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          decorator,
+          `The operator decorator must have a single string parameter.`,
+        );
+      }
+
+      const operator = (decorator.parameters[0] as StringLiteral).value;
+
+      // Do nothing here, this isn't the overload we're looking for
+      if (operator !== op) continue;
+
+      if (methodAst) {
+        if (reportFirstDuplicate) {
+          reportFirstDuplicate = false;
+          reportErrorDiagnostic(
+            program,
+            module,
+            "type",
+            methodAst.name,
+            `Found duplicate operator method for operator ${op}`,
+          );
+        }
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          member.name,
+          `Found duplicate operator method for operator ${op}`,
+        );
+        continue;
+      }
+
+      const typeMap = (lhsType as ClassType).resolvedTypes;
+      const scope = assert(
+        getScope(member),
+        "The scope for this member must exist at this point.",
+      );
+
+      const hasParameter = isBinaryExpression(operatorNode);
+
+      // Expected length: 1 for binary overloads, 0 for unary overloads
+      if (member.parameters.length !== Number(hasParameter)) {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          operatorNode,
+          hasParameter
+            ? "Binary operator overloads must have one parameter."
+            : "Unary operator overloads must have zero parameters.",
+        );
+        continue;
+      }
+
+      const returnType = resolveType(
+        program,
+        module,
+        member.returnType,
+        scope,
+        typeMap,
+      );
+
+      if (!returnType) {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          operatorNode,
+          "Return type of operator overload could not be resolved.",
+        );
+        continue;
+      }
+
+      if (typesEqual(returnType, theVoidType)) {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          operatorNode,
+          "Return type of operator overload must not be void.",
+        );
+      }
+
+      // Binary expressions only
+      if (hasParameter) {
+        const parameterType = resolveType(
+          program,
+          module,
+          member.parameters[0].type,
+          scope,
+          typeMap,
+        );
+
+        if (!parameterType) {
+          reportErrorDiagnostic(
+            program,
+            module,
+            "type",
+            member.parameters[0].type,
+            `Parameter type of operator ${op} overload could not be resolved.`,
+          );
+          continue;
+        }
+
+        // Do nothing here, this isn't the overload we're looking for
+        if (!isAssignable(parameterType, assert(rhsType))) continue;
+      }
+
+      methodAst = member;
+    }
+  }
+
+  if (!methodAst) {
+    reportErrorDiagnostic(
+      program,
+      module,
+      "type",
+      operatorNode,
+      `Could not find valid operator ${op} overload.`,
+    );
+    return null;
+  }
+
+  const result = ensureCallableCompiled(
+    program,
+    module,
+    methodAst,
+    lhsType as ClassType,
+    [],
+    (lhsType as ClassType).resolvedTypes,
+  ) as WhackoMethodContext | null;
+
+  assert(
+    !result || result.thisType,
+    "ensureCallableCompiled did not return a MethodContext",
+  );
   return result;
 }
 
+export function isAssignable(
+  superType: ConcreteType,
+  subType: ConcreteType,
+): boolean {
+  // TODO: Interfaces
+  // if (
+  //   superType.kind === ConcreteTypeKind.Class &&
+  //   subType.kind === ConcreteTypeKind.Class
+  // ) {
+  //   const superClassType = superType as ClassType;
+  //   let accumulator = subType as ClassType | null;
+
+  //   while (accumulator) {
+  //     if (typesEqual(superClassType, accumulator)) return true;
+  //     accumulator = accumulator.extendsClass;
+  //   }
+
+  //   return false;
+  // }
+
+  return typesEqual(superType, subType);
+}
+
+export function getBinaryOperatorString(op: BinaryOperator): string {
+  switch (op) {
+    case BinaryOperator.Add:
+      return "Add";
+    case BinaryOperator.Sub:
+      return "Sub";
+    case BinaryOperator.Mul:
+      return "Mul";
+    case BinaryOperator.Div:
+      return "Div";
+    case BinaryOperator.Exp:
+      return "Exp";
+    case BinaryOperator.BitwiseAnd:
+      return "BitwiseAnd";
+    case BinaryOperator.LogicalAnd:
+      return "LogicalAnd";
+    case BinaryOperator.BitwiseOr:
+      return "BitwiseOr";
+    case BinaryOperator.LogicalOr:
+      return "LogicalOr";
+    case BinaryOperator.BitwiseXor:
+      return "BitwiseXor";
+    case BinaryOperator.Shl:
+      return "Shl";
+    case BinaryOperator.Eq:
+      return "Eq";
+    case BinaryOperator.Shr:
+      return "Shr";
+    case BinaryOperator.Neq:
+      return "Neq";
+  }
+}
+
+export function isNumeric(type: ConcreteType): boolean {
+  return (
+    type.kind === ConcreteTypeKind.Float ||
+    type.kind === ConcreteTypeKind.Integer
+  );
+}

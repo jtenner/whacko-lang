@@ -9,20 +9,30 @@ import fs from "node:fs/promises";
 import {
   addModuleToProgram,
   addStaticLibraryToProgram,
+  CompilationOutput,
   compile,
   WhackoModule,
   WhackoProgram,
 } from "../language-server/program";
-import { createNewScope } from "../language-server/scope";
+import { createChildScope, createNewScope } from "../language-server/scope";
 import { Module as LLVMModule } from "llvm-js";
 import { DiagnosticLevel } from "../language-server/diagnostic";
 import { inspect } from "node:util";
+import {
+  printFunctionContextToString,
+  printProgramToString,
+} from "../language-server/ir";
 
 const options = {};
 
-export default async function main(args: string[]): Promise<void> {
+export interface CompilerOutput {
+  program: WhackoProgram;
+  files: Record<string, Buffer | string>;
+}
+
+export default async function main(args: string[]): Promise<CompilerOutput> {
   const LLVMUtil = (await eval(
-    `import("llvm-js")`
+    `import("llvm-js")`,
   )) as typeof import("llvm-js");
   const LLVM = (await LLVMUtil.load()) as LLVMModule;
   const { default: loadLLC } = await eval(`import("llvm-js/build/llc.js")`);
@@ -36,6 +46,7 @@ export default async function main(args: string[]): Promise<void> {
       outLL: { type: "string" },
       outBC: { type: "string" },
       outO: { type: "string" },
+      outIR: { type: "string" },
     },
     allowPositionals: true,
   }) as any;
@@ -47,7 +58,7 @@ export default async function main(args: string[]): Promise<void> {
     enums: new Map(),
     diagnostics: [],
     functions: new Map(),
-    globalScope: createNewScope(),
+    globalScope: createNewScope(null),
     LLVM,
     llvmBuilder: LLVM._LLVMCreateBuilder(),
     llvmCtx: LLVM._LLVMContextCreate(),
@@ -55,6 +66,8 @@ export default async function main(args: string[]): Promise<void> {
     LLVMUtil,
     modules: new Map(),
     staticLibraries: new Set(),
+    builtinFunctions: new Map(),
+    queue: [],
   };
   LLVM._free(moduleName);
 
@@ -73,10 +86,10 @@ export default async function main(args: string[]): Promise<void> {
         basename,
         dirname,
         false,
-        program.globalScope
+        program.globalScope,
       );
       return assert(module, `std lib ${stdLib} failed to create a module.`);
-    })
+    }),
   );
 
   // then we register static lib files
@@ -93,40 +106,73 @@ export default async function main(args: string[]): Promise<void> {
 
   // whacko input.wo
   for (const positional of positionals) {
-    await addModuleToProgram(
+    const scope = createChildScope(program.globalScope);
+    scope.module = await addModuleToProgram(
       program,
       positional,
       process.cwd(),
       true,
-      createNewScope(program.globalScope)
+      scope,
     );
   }
 
+  const result = {
+    program,
+    files: {},
+  } as CompilerOutput;
+
   try {
-    compile(program);
-    // const { bcFile, llFile, oFile } = program.compile();
+    const { bcFile, llFile, oFile } = compile(program);
+
+    if (values.outBC && bcFile) result.files[values.outBC] = bcFile as Buffer;
+    if (values.outLL && llFile)
+      result.files[values.outLL] = llFile.toString("utf8") as string;
+    if (values.outO && oFile) result.files[values.outO] = oFile as Buffer;
+
+    if (values.outIR)
+      result.files[values.outIR] = inspect(
+        program.functions,
+        false,
+        Infinity,
+        false,
+      );
+
     // if (values.outWasm) "Can't output wasm files yet"; // fs.writeFile("./out.wasm", wasmFile);
-    // if (values.outLL) await fs.writeFile("./out.ll", llFile);
-    // if (values.outBC) await fs.writeFile("./out.bc", bcFile);
-    // if (values.outO) await fs.writeFile("./out.o", oFile);
   } catch (ex) {
     console.error(ex);
   }
 
   for (const diagnostic of program.diagnostics) {
-    let level: string;
+    let level!: string;
 
     if (diagnostic.level === DiagnosticLevel.INFO) level = "INFO";
     else if (diagnostic.level === DiagnosticLevel.WARNING) level = "WARNING";
     else if (diagnostic.level === DiagnosticLevel.ERROR) level = "ERROR";
     else assert(false, "Received an invalid diagnostic level");
 
-    console.error(
-      diagnostic.module?.relativePath ?? "(no module)",
-      "->",
-      diagnostic.level,
-      diagnostic.type,
-      diagnostic.message
-    );
+    if (diagnostic.module) {
+      const range = diagnostic.node?.$cstNode?.range;
+      if (range) {
+        console.error(
+          `${diagnostic.module.relativePath}:${range.start.line + 1}:${
+            range.start.character + 1
+          } ->`,
+          level,
+          diagnostic.message,
+        );
+      } else {
+        console.error(diagnostic.module.relativePath, "->", level, diagnostic);
+      }
+    } else {
+      console.error(
+        "(No Module) ->",
+        diagnostic.level,
+        diagnostic.type,
+        diagnostic.message,
+      );
+    }
   }
+
+  console.log(printProgramToString(program));
+  return result;
 }

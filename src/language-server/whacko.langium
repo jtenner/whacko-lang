@@ -68,7 +68,7 @@ TypeDeclaration:
     Decorators (export?="export")? "type" Name NamedTypeParameters "=" type=TypeExpression ";";
 
 ClassDeclaration:
-    Decorators (export?="export")? (final?="final")? "class" Name NamedTypeParameters ("extends" extends=TypeExpression)? "{" members+=ClassMember* "}";
+    Decorators (export?="export")? (final?="final")? "class" Name NamedTypeParameters "{" members+=ClassMember* "}";
 
 TypeExpression:
     FunctionTypeExpression | NamedTypeExpression | TupleTypeExpression | TypeID;
@@ -82,15 +82,14 @@ TupleTypeExpression:
 TypeID:
     name=Identifier TypeParameters;
 
-NamedTypeExpression: // what's this infer business for?
-    // ID ("." path+=ID)+ TypeParameters; maybe? OMG IF THIS WORKS I WILL BE SLIGHTLY HAPPIER
+NamedTypeExpression:
     path+=ID ( "." path+=ID)+ TypeParameters;
 
 ClassMember:
     ConstructorClassMember | FieldClassMember | MethodClassMember | GetterClassMember | SetterClassMember;
 
 FieldClassMember:
-    Decorators (private?="private")? Name (":" type=TypeExpression)? ("=" initializer=Expression)? ";";
+    Decorators (private?="private")? Name ":" type=TypeExpression ";";
 
 MethodClassMember:
     Decorators (private?="private")? Name NamedTypeParameters Parameters ":" ReturnType block=BlockStatement;
@@ -174,9 +173,9 @@ BitwiseAndExpression infers Expression:
     EqualityExpression ({infer BinaryExpression.lhs=current} op=("&") rhs=EqualityExpression)*;
 
 EqualityExpression infers Expression:
-    ComaprisonExpression ({infer BinaryExpression.lhs=current} op=("==" | "!=") rhs=ComaprisonExpression)*;
+    ComparisonExpression ({infer BinaryExpression.lhs=current} op=("==" | "!=") rhs=ComparisonExpression)*;
 
-ComaprisonExpression infers Expression:
+ComparisonExpression infers Expression:
     BitShiftExpression ({infer BinaryExpression.lhs=current} op=("<=" | Less_Than | ">=" | ">") rhs=BitShiftExpression)*;
 
 BitShiftExpression infers Expression:
@@ -189,10 +188,16 @@ ProductExpression infers Expression:
     ExponentiationExpression ({infer BinaryExpression.lhs=current} op=("*" | "/" | "%") rhs=ExponentiationExpression)*;
 
 ExponentiationExpression infers Expression:
-    LeftUnaryExpression ({infer BinaryExpression.lhs=current} op="**" rhs=LeftUnaryExpression)*;
+    RightUnaryExpression ({infer BinaryExpression.lhs=current} op="**" rhs=RightUnaryExpression)*;
+
+RightUnaryExpression infers Expression:
+    LeftUnaryExpression
+        ({infer RightUnaryExpression.operand=current} op="!")?
+        ({infer RightUnaryExpression.operand=current} op=("++" | "--"))?
+        ({infer RightUnaryExpression.operand=current} op="!")?;
 
 LeftUnaryExpression infers Expression:
-    ({infer LeftUnaryExpression} op=("!" | "-" | "+" | "~") expression=LeftUnaryExpression) | Epsilon;
+    ({infer LeftUnaryExpression} op=("!" | "-" | "~") operand=LeftUnaryExpression) | Epsilon;
 
 Epsilon infers Expression:
     AwaitExpression | HoldExpression | NewExpression | PathExpression | PrimaryExpression;

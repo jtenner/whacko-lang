@@ -3,6 +3,7 @@
     "target": "ESNext",
     "module": "NodeNext",
     "lib": ["ESNext"],
+    "declaration": true,
     "sourceMap": true,
     "outDir": "out",
     "strict": true,

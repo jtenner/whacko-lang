@@ -18,7 +18,7 @@ interface Pathable extends AstNode {
 function findImportedModule(
   program: WhackoProgram,
   module: WhackoModule,
-  declaration: Pathable
+  declaration: Pathable,
 ): WhackoModule | null {
   const modulePath = module.absolutePath;
   const absolutePath = join(dirname(modulePath), declaration.path.value);
@@ -27,10 +27,10 @@ function findImportedModule(
   if (!importedModule) {
     reportErrorDiagnostic(
       program,
+      module,
       "import",
       declaration.path,
-      module,
-      `Could not find imported module "${declaration.path}"`
+      `Could not find imported module "${declaration.path}"`,
     );
     return null;
   }
@@ -54,7 +54,7 @@ export class ImportCollectionPass extends WhackoVisitor {
     const importedModule = findImportedModule(
       this.program,
       this.currentModule,
-      node
+      node,
     );
     const currentModuleScope = this.currentModule.scope;
 
@@ -68,10 +68,10 @@ export class ImportCollectionPass extends WhackoVisitor {
       if (!importedElement) {
         reportErrorDiagnostic(
           this.program,
+          this.currentModule,
           "import",
           node,
-          this.currentModule,
-          `Could not find export from module "${node.path}"`
+          `Could not find export from module "${node.path}"`,
         );
         continue;
       }
@@ -81,7 +81,7 @@ export class ImportCollectionPass extends WhackoVisitor {
         this.currentModule,
         aliasName,
         importedElement,
-        currentModuleScope
+        currentModuleScope,
       );
     }
   }
@@ -95,7 +95,7 @@ export class ImportCollectionPass extends WhackoVisitor {
 
     const stub = assert(
       currentModule.exports.get(node.name.name),
-      "The namespace stub should exist at this point."
+      "The namespace stub should exist at this point.",
     );
 
     stub.type = ScopeElementType.Namespace;

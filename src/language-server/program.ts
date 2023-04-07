@@ -5,30 +5,71 @@ import {
   LLVMModuleRef,
   LLVMValueRef,
   Module as LLVMModule,
+  Module,
 } from "llvm-js";
 import { dirname, join, relative } from "node:path";
-import { Scope, createNewScope, ScopeElement, ScopeElementType } from "./scope";
+import {
+  Scope,
+  createNewScope,
+  ScopeElement,
+  ScopeElementType,
+  createChildScope,
+} from "./scope";
 import { readFile } from "node:fs/promises";
-import { Diagnostic, reportErrorDiagnostic } from "./diagnostic";
+import {
+  Diagnostic,
+  DiagnosticLevel,
+  reportErrorDiagnostic,
+} from "./diagnostic";
 import { parse } from "./parser";
-import { assert } from "./util";
+import {
+  ConstructorSentinel,
+  assert,
+  getFullyQualifiedCallableName,
+  getFullyQualifiedTypeName,
+  getNameDecoratorValue,
+  idCounter,
+  theConstructorSentinel,
+} from "./util";
 import { AstNode } from "langium";
 import { parseArgs } from "node:util";
 import { ModuleCollectionPass } from "./passes/ModuleCollectionPass";
 import { ScopePopulationPass } from "./passes/ScopePopulationPass";
 import { ImportCollectionPass } from "./passes/ImportCollectionPass";
-import { isFunctionDeclaration } from "./generated/ast";
-import { ConcreteType, EnumType, FunctionType, MethodType } from "./types";
-
-export interface ConcreteFunction {
-  funcType: FunctionType;
-  funcRef: LLVMValueRef;
-}
-
-export interface ConcreteMethod {
-  funcType: MethodType;
-  funcRef: LLVMValueRef;
-}
+import {
+  BuiltinDeclaration,
+  ConstructorClassMember,
+  FunctionDeclaration,
+  isConstructorClassMember,
+  isFunctionDeclaration,
+  isMethodClassMember,
+  isStringLiteral,
+  MethodClassMember,
+  StringLiteral,
+} from "./generated/ast";
+import {
+  ClassType,
+  ConcreteType,
+  EnumType,
+  FunctionType,
+  getCallableType,
+  getConstructorType,
+  MethodType,
+  TypeMap,
+} from "./types";
+import {
+  BlockContext,
+  BlockInstruction,
+  CallableFunctionContext,
+  WhackoMethodContext,
+  WhackoFunctionContext,
+  Value,
+  createVariableReference,
+} from "./ir";
+import { FunctionContextResolutionPass } from "./passes/FunctionContextResolutionPass";
+import { registerDefaultBuiltins } from "./builtins";
+import { inspect } from "node:util";
+import { ClassRulesPass } from "./passes/ClassRulesPass";
 
 export function addBuiltinTypeToProgram(
   program: WhackoProgram,
@@ -50,6 +91,42 @@ export type BuiltinTypeFunction = (ctx: {
   node: AstNode;
 }) => ConcreteType;
 
+export interface BuiltinFunctionParameters {
+  args: Value[];
+  caller: WhackoFunctionContext;
+  funcType: FunctionType;
+  module: WhackoModule;
+  node: AstNode;
+  program: WhackoProgram;
+  typeParameters: ConcreteType[];
+  getCurrentBlock: () => BlockContext;
+  setCurrentBlock: (block: BlockContext) => void;
+}
+
+export type BuiltinFunction = (parameters: BuiltinFunctionParameters) => Value;
+
+export function addBuiltinToProgram(
+  program: WhackoProgram,
+  name: string,
+  builtinFunc: BuiltinFunction,
+): void {
+  assert(
+    !program.builtinFunctions.has(name),
+    `Builtin type '${name}' already exists in the program.`,
+  );
+  program.builtinFunctions.set(name, builtinFunc);
+}
+
+export function getBuiltinFunction(
+  program: WhackoProgram,
+  builtin: BuiltinDeclaration,
+): BuiltinFunction | null {
+  const builtinName = getNameDecoratorValue(builtin);
+  if (!builtinName) return null;
+
+  return program.builtinFunctions.get(builtinName) ?? null;
+}
+
 export interface WhackoProgram {
   LLVM: LLVMModule;
   LLVMUtil: Awaited<typeof import("llvm-js")>;
@@ -63,8 +140,10 @@ export interface WhackoProgram {
   /** Absolute path to module. */
   modules: Map<string, WhackoModule>;
   baseDir: string;
-  functions: Map<string, ConcreteFunction>;
+  functions: Map<string, CallableFunctionContext>;
+  queue: WhackoFunctionContext[];
   builtinTypeFunctions: Map<string, BuiltinTypeFunction>;
+  builtinFunctions: Map<string, BuiltinFunction>;
 }
 
 export interface WhackoModule {
@@ -99,6 +178,7 @@ export async function addModuleToProgram(
     relativePath,
     scope,
   };
+  scope.module = mod;
   program.modules.set(absolutePath, mod);
 
   try {
@@ -110,22 +190,22 @@ export async function addModuleToProgram(
     mod.contents = contents;
 
     for (const lexerError of parsedAst.lexerErrors) {
-      reportErrorDiagnostic(program, "lexer", null, mod, lexerError.message);
+      reportErrorDiagnostic(program, mod, "lexer", null, lexerError.message);
     }
 
     for (const parserError of parsedAst.parserErrors) {
       reportErrorDiagnostic(
         program,
+        mod,
         parserError.name,
         null,
-        mod,
         parserError.message,
       );
     }
     mod.ast = parsedAst.value;
   } catch (e: unknown) {
     const err = e as Error;
-    reportErrorDiagnostic(program, err.name, null, mod, err.message);
+    reportErrorDiagnostic(program, mod, err.name, null, err.message);
     return null;
   }
 
@@ -143,7 +223,7 @@ export async function addModuleToProgram(
         moduleToAdd,
         dirnameOfModule,
         false,
-        createNewScope(program.globalScope),
+        createChildScope(program.globalScope),
       ),
     );
   }
@@ -161,7 +241,13 @@ export function addStaticLibraryToProgram(
   program.staticLibraries.add(absolutePath);
 }
 
-export function compile(program: WhackoProgram) {
+export interface CompilationOutput {
+  bcFile?: Buffer;
+  oFile?: Buffer;
+  llFile?: Buffer;
+}
+
+export function compile(program: WhackoProgram): CompilationOutput {
   const scopePopulationPass = new ScopePopulationPass(program);
   const modules = Array.from(program.modules.values());
   for (const module of modules) {
@@ -171,6 +257,20 @@ export function compile(program: WhackoProgram) {
   const importCollectionPass = new ImportCollectionPass(program);
   for (const module of modules) {
     importCollectionPass.visitModule(module);
+  }
+
+  const classRulesPass = new ClassRulesPass(program);
+  for (const module of modules) {
+    classRulesPass.visitModule(module);
+  }
+
+  // if there are any errors at this point, we need to stop because codegen is unsafe
+  if (
+    program.diagnostics.filter(
+      (diagnostic) => diagnostic.level === DiagnosticLevel.ERROR,
+    ).length
+  ) {
+    return {};
   }
 
   const mainModuleMaybe = modules.filter((module) => {
@@ -188,22 +288,162 @@ export function compile(program: WhackoProgram) {
       const startFunction = module.exports.get("_start")!.node;
       reportErrorDiagnostic(
         program,
+        module,
         "initialization",
         startFunction,
-        module,
         "Found multiple exported _start functions.",
       );
     }
-    return;
+    return {};
   } else if (mainModuleMaybe.length === 0) {
     reportErrorDiagnostic(
       program,
-      "initialization",
       null,
+      "initialization",
       null,
       "Could not find an exported _start function.",
     );
-    return;
+    return {};
+  }
+
+  const [mainModule] = mainModuleMaybe;
+  mainModule.entry = true;
+
+  ensureCallableCompiled(
+    program,
+    mainModule,
+    mainModule.exports.get("_start")!.node as FunctionDeclaration,
+    null,
+    [],
+    new Map(),
+  );
+
+  registerDefaultBuiltins(program);
+
+  const cache = new WeakMap();
+  const cleanIR = (obj: any) => {
+    if (obj === null || typeof obj !== "object") return obj;
+
+    const isArray = Array.isArray(obj);
+    let result = isArray ? [] : {};
+
+    if (cache.has(obj)) return cache.get(obj);
+    cache.set(obj, result);
+
+    if (isArray) (result as any[]).push(...obj.map(cleanIR));
+    else
+      Object.assign(
+        result,
+        Object.fromEntries(
+          Object.entries(obj)
+            .filter(
+              ([k]) =>
+                k !== "ast" && k !== "node" && k !== "contents" && k[0] !== "$",
+            )
+            .map(([k, v]) => [k, cleanIR(v)]),
+        ),
+      );
+
+    return result;
+  };
+
+  churnQueue(program);
+  // TODO: RETURN FILES YOU MORON
+  return {};
+}
+
+export function churnQueue(program: WhackoProgram) {
+  const pass = new FunctionContextResolutionPass(program);
+
+  while (program.queue.length) {
+    const func = assert(program.queue.pop());
+
+    if (!program.functions.has(func.name)) {
+      program.functions.set(func.name, func);
+      pass.visitWhackoFunction(func);
+    }
   }
 }
 
+export function ensureCallableCompiled(
+  program: WhackoProgram,
+  module: WhackoModule,
+  callableAst: MethodClassMember | FunctionDeclaration,
+  thisType: ClassType | null,
+  typeParameters: ConcreteType[],
+  typeMap: TypeMap,
+): WhackoFunctionContext | null {
+  const contextType = getCallableType(
+    program,
+    module,
+    callableAst,
+    thisType,
+    typeParameters,
+  );
+  if (!contextType) return null;
+
+  const ctx: WhackoFunctionContext = {
+    attributes: [],
+    blocks: new Map(),
+    entry: null,
+    funcRef: null,
+    id: 0,
+    instructions: new Map(),
+    module,
+    node: callableAst,
+    name:
+      module.entry && isFunctionDeclaration(callableAst) && callableAst.export
+        ? callableAst.name.name
+        : getFullyQualifiedCallableName(callableAst, contextType),
+    type: contextType,
+    typeMap,
+    variables: new Map(),
+    isWhackoFunction: true,
+    isWhackoMethod: isMethodClassMember(callableAst),
+  };
+
+  if (isMethodClassMember(callableAst)) {
+    const method = ctx as WhackoMethodContext;
+    method.thisType = assert(
+      thisType,
+      "The class type for this method must exist.",
+    );
+  }
+
+  program.queue.push(ctx);
+  return ctx;
+}
+
+export function ensureConstructorCompiled(
+  module: WhackoModule,
+  concreteClass: ClassType,
+  constructorType: MethodType,
+  constructor: ConstructorClassMember,
+): WhackoMethodContext {
+  const ctx: WhackoMethodContext = {
+    attributes: [],
+    blocks: new Map(),
+    entry: null,
+    funcRef: null,
+    id: idCounter.value++,
+    instructions: new Map(),
+    isWhackoFunction: true,
+    isWhackoMethod: true,
+    module,
+    name: "placeholder hack",
+    node: constructor,
+    typeMap: concreteClass.resolvedTypes,
+    variables: new Map(),
+    thisType: concreteClass,
+    thisValue: createVariableReference({
+      immutable: true,
+      ref: null,
+      type: concreteClass,
+      node: concreteClass.node, // Placeholder
+    }),
+    type: constructorType,
+  };
+
+  ctx.name = getFullyQualifiedCallableName(ctx.node, ctx.type);
+  return ctx;
+}

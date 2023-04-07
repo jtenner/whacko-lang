@@ -17,6 +17,7 @@ export interface Scope {
   id: number;
   parent: Scope | null;
   elements: Map<string, ScopeElement>;
+  module: WhackoModule | null;
 }
 
 export function addScopeElement(
@@ -50,11 +51,12 @@ export function setScope(node: AstNode, scope: Scope) {
   scopes.set(node, scope);
 }
 
-export function makeChildScope(scope: Scope): Scope {
+export function createChildScope(scope: Scope): Scope {
   return {
     elements: new Map(),
     id: scopeIDs++,
     parent: scope,
+    module: scope.module,
   };
 }
 
@@ -102,11 +104,14 @@ export function createNewScopeElement(
   };
 }
 
-export function createNewScope(scope?: Scope): Scope {
+export function createNewScope(module: WhackoModule | null): Scope {
+  // it was the global scope :(
+  if (!module) console.error(new Error("why").stack);
   return {
     id: scopeIDs++,
     elements: new Map(),
-    parent: scope ?? null,
+    parent: null,
+    module,
   };
 }
 
@@ -157,9 +162,9 @@ export function putElementInScope(
   if (isInLocalScope(scope, name.name)) {
     reportErrorDiagnostic(
       program,
+      module,
       "scope",
       name,
-      module,
       `Element ${name.name} already defined in scope.`,
     );
   } else {
@@ -177,9 +182,9 @@ export function putElementInExports(
   if (parent.exports!.has(name.name)) {
     reportErrorDiagnostic(
       program,
+      module,
       "scope",
       name,
-      module,
       `Element ${name.name} already defined in parent exports.`,
     );
   } else {
@@ -209,3 +214,39 @@ export function putTypeParametersInScope(
   }
 }
 
+export function traverseScopePath(
+  program: WhackoProgram,
+  module: WhackoModule,
+  scope: Scope,
+  [root, ...rest]: ID[],
+): ScopeElement | null {
+  let accumulator = getElementInScope(scope, root.name);
+
+  if (!accumulator) {
+    reportErrorDiagnostic(
+      program,
+      module,
+      "type",
+      root,
+      `Namespace '${root.name}' does not exist.`,
+    );
+    return null;
+  }
+
+  for (const id of rest) {
+    const name = id.name;
+    accumulator = accumulator.exports?.get(name) ?? null;
+    if (!accumulator) {
+      reportErrorDiagnostic(
+        program,
+        module,
+        "type",
+        id,
+        `Cannot resolve '${name}' in namespace.`,
+      );
+      return null;
+    }
+  }
+
+  return accumulator;
+}

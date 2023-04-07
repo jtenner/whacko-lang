@@ -68,6 +68,7 @@ import {
   EnumDeclarator,
   ExternDeclaration,
   ExportStarDeclaration,
+  RightUnaryExpression,
 } from "./generated/ast";
 import { createWhackoServices, WhackoServices } from "./whacko-module";
 import { TypeID } from "./generated/ast";
@@ -169,6 +170,8 @@ export class WhackoVisitor {
         return this.visitBinaryExpression(node);
       case "LeftUnaryExpression":
         return this.visitLeftUnaryExpression(node);
+      case "RightUnaryExpression":
+        return this.visitRightUnaryExpression(node);
       case "AwaitExpression":
         return this.visitAwaitExpression(node);
       case "HoldExpression":
@@ -311,7 +314,6 @@ export class WhackoVisitor {
   visitClassDeclaration(node: ClassDeclaration) {
     this.visitAll(node.decorators);
     this.visit(node.name);
-    if (node.extends) this.visit(node.extends);
     this.visitAll(node.members);
   }
 
@@ -325,7 +327,6 @@ export class WhackoVisitor {
   }
 
   visitTypeID(node: TypeID) {
-    this.visit(node.name);
     this.visitAll(node.typeParameters);
   }
 
@@ -349,7 +350,7 @@ export class WhackoVisitor {
     this.visitAll(node.decorators);
     this.visit(node.name);
     this.visit(node.type);
-    if (node.initializer) this.visit(node.initializer);
+    // if (node.initializer) this.visit(node.initializer);
   }
 
   visitMethodClassMember(node: MethodClassMember) {
@@ -451,7 +452,7 @@ export class WhackoVisitor {
   }
 
   visitLeftUnaryExpression(node: LeftUnaryExpression) {
-    this.visit(node.expression);
+    this.visit(node.operand);
   }
 
   visitAwaitExpression(node: AwaitExpression) {
@@ -530,6 +531,10 @@ export class WhackoVisitor {
     this.visit(node.returnType);
   }
 
+  visitRightUnaryExpression(node: RightUnaryExpression): void {
+    this.visit(node.operand);
+  }
+
   // visitTypeCastExpression(expression: TypeCastExpression) {
   //   this.visit(expression.expression);
   //   this.visit(expression.type);
@@ -586,4 +591,3 @@ export class WhackoVisitor {
     }
   }
 }
-

@@ -1,5 +1,0 @@
-export fn assert(cond: bool): void {
-  if (!cond) {
-    Unreachable();
-  }
-}

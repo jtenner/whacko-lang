@@ -75,4 +75,3 @@ export function createWhackoServices(context: DefaultSharedModuleContext): {
   registerValidationChecks(Whacko);
   return { shared, Whacko };
 }
-

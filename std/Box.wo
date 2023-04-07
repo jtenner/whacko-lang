@@ -1,5 +1,8 @@
 export class Box<T> {
-  value: T = types.isReference<T>()
-    ? types.ref<T>(usize(0))
-    : types.castTo<i64, T>(0);
+  value: T;
+  constructor() {
+    this.value = types.isReference<T>()
+      ? types.ref<T>(usize(0))
+      : types.castTo<i64, T>(0);
+  }
 }

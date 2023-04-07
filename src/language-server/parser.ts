@@ -19,4 +19,3 @@ export function parse(
   return ast;
   // visitor.visit(ast);
 }
-
