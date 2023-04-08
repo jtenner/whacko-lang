@@ -70,7 +70,7 @@ import {
   VariableReferenceValue,
   ConstFloatValue,
   createFloatValue,
-  Variable,
+  StackAllocationSite,
   createVariableReference,
   buildLoadInstruction,
   theNullValue,
@@ -83,6 +83,8 @@ import {
   ComptimeConditional,
   buildBrIfInstruction,
   buildBrInstruction,
+  buildReturnInstruction,
+  theVoidValue,
 } from "../ir";
 import {
   ensureCallableCompiled,
@@ -127,6 +129,7 @@ import {
   ClassType,
   NullableType,
   getNonnullableType,
+  getNullableType,
 } from "../types";
 import {
   assert,
@@ -640,6 +643,15 @@ export function buildIntegerLiteralLike(
   return createIntegerValue(value, type);
 }
 
+export function getThis(ctx: WhackoMethodContext): VariableReferenceValue {
+  return createVariableReference(
+    assert(
+      ctx.stackAllocationSites.get(ctx.thisType.node),
+      "Hey, get this! getThis() didn't get `this`!",
+    ),
+  );
+}
+
 export class FunctionContextResolutionPass extends WhackoVisitor {
   constructor(public program: WhackoProgram) {
     super();
@@ -690,6 +702,30 @@ export class FunctionContextResolutionPass extends WhackoVisitor {
     ctx.entry = this.currentBlock = buildBasicBlock(ctx, "entry");
 
     this.visit(node);
+
+    const lastBlock = this.currentBlock;
+    if (
+      ctx.type.returnType.kind === ConcreteTypeKind.Void &&
+      !lastBlock.terminator
+    ) {
+      buildReturnInstruction(this.ctx, lastBlock, theVoidValue);
+    } else if (!lastBlock.terminator) {
+      reportErrorDiagnostic(
+        this.program,
+        this.module,
+        "type",
+        node,
+        "Functions/methods that return values must be terminated by a return statement.",
+      );
+    }
+
+    for (const block of ctx.blocks.values()) {
+      if (block === lastBlock) continue;
+      assert(
+        block.terminator,
+        "All blocks should have terminators at this point",
+      );
+    }
   }
 
   override visitParameter(node: Parameter): void {
@@ -724,7 +760,7 @@ export class FunctionContextResolutionPass extends WhackoVisitor {
     //     if (isParameter(node))
     //          ... = node.$containerIndex! + (isMethodClassMember(node.$container) ? 1 : 0)
 
-    const variable: Variable = {
+    const variable: StackAllocationSite = {
       immutable: false,
       type: parameterType,
       ref: null,
@@ -735,7 +771,7 @@ export class FunctionContextResolutionPass extends WhackoVisitor {
     // In codegen, we can populate the .ref fields of each Variable entry with
     // alloca instructions. We will never have to declare allocas up front.
 
-    this.ctx.variables.set(node, variable);
+    this.ctx.stackAllocationSites.set(node, variable);
   }
 
   override visitIntegerLiteral(expression: IntegerLiteral): void {
@@ -799,14 +835,22 @@ export class FunctionContextResolutionPass extends WhackoVisitor {
       }
       buildStoreInstruction(
         this.ctx,
+        this.currentBlock,
         lhsValue as FieldReferenceValue | VariableReferenceValue,
-        ensureRuntime(this.ctx, this.currentBlock, lhsValue),
+        ensureRuntime(this.ctx, this.currentBlock, rhsValue),
       );
       this.value = rhsValue;
       return;
     }
 
-    if (!isNumeric(lhsValue.type)) {
+    const isLogicalOperator =
+      node.op === "&&" ||
+      node.op === "&&=" ||
+      node.op === "||" ||
+      node.op === "||=";
+
+    // wait, I can make this simple
+    if (!isLogicalOperator && !isNumeric(lhsValue.type)) {
       // TODO: Strings and function references
       // we could special-case regular "="
       if (lhsValue.type.kind === ConcreteTypeKind.Str)
@@ -822,7 +866,45 @@ export class FunctionContextResolutionPass extends WhackoVisitor {
       return;
     }
 
-    if (!typesEqual(lhsValue.type, rhsValue.type)) {
+    // LHS must be nullable, an integer, or a float
+    // RHS must be nullable, a class, an integer, or a float
+    // and the result type is the LHS type for && and RHS type for ||
+    if (isLogicalOperator) {
+      if (
+        lhsValue.type.kind !== ConcreteTypeKind.Nullable &&
+        lhsValue.type.kind !== ConcreteTypeKind.Integer &&
+        lhsValue.type.kind !== ConcreteTypeKind.Float
+      ) {
+        reportErrorDiagnostic(
+          this.program,
+          this.module,
+          "type",
+          node.lhs,
+          "The LHS value of logical AND/OR must be an integer, float, or nullable class",
+        );
+        this.value = theInvalidValue;
+        return;
+      }
+
+      // By this point, we know that the LHS value type is a nullable class, an integer, or a float.
+      // Nothing can go wrong with the below check. (I hope!)
+      if (
+        !typesEqual(
+          getNonnullableType(lhsValue.type),
+          getNonnullableType(rhsValue.type),
+        )
+      ) {
+        reportErrorDiagnostic(
+          this.program,
+          this.module,
+          "type",
+          node.rhs,
+          "The RHS type must equal or be the nullable version of the LHS type.",
+        );
+        this.value = theInvalidValue;
+        return;
+      }
+    } else if (!typesEqual(lhsValue.type, rhsValue.type)) {
       reportErrorDiagnostic(
         this.program,
         this.module,
@@ -875,20 +957,165 @@ export class FunctionContextResolutionPass extends WhackoVisitor {
           );
       }
     } else {
-      resultValue =
-        node.op === "="
-          ? rhsValue
-          : createRuntimeValue(
-              buildBinaryInstruction(
-                this.ctx,
-                this.currentBlock,
-                ensureRuntime(this.ctx, this.currentBlock, lhsValue),
-                stringOpToEnum(
-                  assertIsBinaryOpString(node.op),
-                ) as BinaryOperator,
-                ensureRuntime(this.ctx, this.currentBlock, rhsValue),
-              ),
+      if (node.op === "**" || node.op === "**=")
+        UNREACHABLE("TODO: Handle exponentiation");
+
+      switch (node.op) {
+        case "&&":
+        case "&&=":
+        case "||":
+        case "||=": {
+          const lhsType = lhsValue.type;
+          const rhsType = rhsValue.type;
+          if (
+            lhsType.kind !== ConcreteTypeKind.Integer &&
+            lhsType.kind !== ConcreteTypeKind.Float &&
+            lhsType.kind !== ConcreteTypeKind.Nullable
+          ) {
+            this.value = theInvalidValue;
+            reportErrorDiagnostic(
+              this.program,
+              this.module,
+              "type",
+              node.lhs,
+              "The LHS of logical and expression must be a integer, float, or nullable type.",
             );
+            return;
+          }
+
+          const isLogicalAnd = node.op === "&&" || node.op === "&&=";
+          const site = {
+            immutable: false,
+            ref: null,
+            node,
+            type: isLogicalAnd ? lhsType : rhsType,
+          };
+          this.ctx.stackAllocationSites.set(node, site);
+
+          const truthyBlock = buildBasicBlock(this.ctx, "truthy");
+          const falsyBlock = buildBasicBlock(this.ctx, "falsy");
+          const nextBlock = buildBasicBlock(this.ctx, "next");
+
+          if (isLogicalAnd) {
+            // isTruthy(lhs) ? rhs : lhs
+
+            const runtimeLhsValue = ensureRuntime(
+              this.ctx,
+              this.currentBlock,
+              lhsValue,
+            );
+
+            buildBrIfInstruction(
+              this.ctx,
+              this.currentBlock,
+              runtimeLhsValue,
+              truthyBlock,
+              falsyBlock,
+            );
+
+            // LHS is truthy: set the temporary variable to contain the LHS
+            this.currentBlock = truthyBlock;
+            const runtimeRhsValue = ensureRuntime(
+              this.ctx,
+              this.currentBlock,
+              rhsValue,
+            );
+            buildStoreInstruction(
+              this.ctx,
+              this.currentBlock,
+              createVariableReference(site),
+              runtimeRhsValue,
+            );
+            buildBrInstruction(this.ctx, this.currentBlock, nextBlock);
+
+            // LHS is falsy: set the temporary variable to contain the LHS
+            this.currentBlock = falsyBlock;
+            buildStoreInstruction(
+              this.ctx,
+              this.currentBlock,
+              createVariableReference(site),
+              runtimeLhsValue,
+            );
+            buildBrInstruction(this.ctx, this.currentBlock, nextBlock);
+
+            // Extract the result value from the temporary variable
+            this.currentBlock = nextBlock;
+            const loadInst = buildLoadInstruction(
+              this.ctx,
+              this.currentBlock,
+              createVariableReference(site),
+            );
+            resultValue = createRuntimeValue(loadInst, rhsType);
+          } else {
+            // isTruthy(lhs) ? lhs : rhs
+
+            const runtimeLhsValue = ensureRuntime(
+              this.ctx,
+              this.currentBlock,
+              lhsValue,
+            );
+
+            buildBrIfInstruction(
+              this.ctx,
+              this.currentBlock,
+              runtimeLhsValue,
+              truthyBlock,
+              falsyBlock,
+            );
+
+            // LHS is truthy: set the temporary variable to contain the LHS
+            this.currentBlock = truthyBlock;
+            buildStoreInstruction(
+              this.ctx,
+              this.currentBlock,
+              createVariableReference(site),
+              runtimeLhsValue,
+            );
+            buildBrInstruction(this.ctx, this.currentBlock, nextBlock);
+
+            // LHS is falsy: set the temporary variable to contain the RHS
+            this.currentBlock = falsyBlock;
+            const runtimeRhsValue = ensureRuntime(
+              this.ctx,
+              this.currentBlock,
+              rhsValue,
+            );
+            buildStoreInstruction(
+              this.ctx,
+              this.currentBlock,
+              createVariableReference(site),
+              runtimeRhsValue,
+            );
+            buildBrInstruction(this.ctx, this.currentBlock, nextBlock);
+
+            // Extract the result value from the temporary variable
+            this.currentBlock = nextBlock;
+            const loadInst = buildLoadInstruction(
+              this.ctx,
+              this.currentBlock,
+              createVariableReference(site),
+            );
+            resultValue = createRuntimeValue(loadInst, rhsType);
+          }
+          break;
+        }
+        default: {
+          resultValue =
+            node.op === "="
+              ? rhsValue
+              : createRuntimeValue(
+                  buildBinaryInstruction(
+                    this.ctx,
+                    this.currentBlock,
+                    ensureRuntime(this.ctx, this.currentBlock, lhsValue),
+                    stringOpToEnum(
+                      assertIsBinaryOpString(node.op),
+                    ) as BinaryOperator,
+                    ensureRuntime(this.ctx, this.currentBlock, rhsValue),
+                  ),
+                );
+        }
+      }
     }
 
     if (isAssignmentOperator(node)) {
@@ -907,6 +1134,7 @@ export class FunctionContextResolutionPass extends WhackoVisitor {
 
       buildStoreInstruction(
         this.ctx,
+        this.currentBlock,
         lhsValue as FieldReferenceValue | VariableReferenceValue,
         ensureRuntime(this.ctx, this.currentBlock, resultValue),
       );
@@ -1046,7 +1274,7 @@ export class FunctionContextResolutionPass extends WhackoVisitor {
       assert(assert(scopeElement.scope).module),
       concreteClass,
       constructorType,
-      assert(constructorMaybe), // ASSERT THERE IS A CONSTRUCTOR
+      assert(constructorMaybe),
     );
 
     if (!compiledConstructor) {
@@ -1055,7 +1283,7 @@ export class FunctionContextResolutionPass extends WhackoVisitor {
     }
 
     const result = createRuntimeValue(
-      buildNewInstruction(this.ctx, concreteClass),
+      buildNewInstruction(this.ctx, this.currentBlock, concreteClass),
     );
 
     argumentValues.unshift(result);
@@ -1114,7 +1342,8 @@ export class FunctionContextResolutionPass extends WhackoVisitor {
 
   override visitThisLiteral(expression: ThisLiteral): void {
     if (this.ctx.isWhackoMethod) {
-      this.value = (this.ctx as WhackoMethodContext).thisValue;
+      const methodCtx = this.ctx as WhackoMethodContext;
+      this.value = getThis(methodCtx);
       return;
     }
     reportErrorDiagnostic(
@@ -1139,7 +1368,7 @@ export class FunctionContextResolutionPass extends WhackoVisitor {
         // or an enum
         case ScopeElementType.VariableDeclarator: {
           // We need to handle pushing fields if it's a class
-          const variable = this.ctx.variables.get(scopeElement.node);
+          const variable = this.ctx.stackAllocationSites.get(scopeElement.node);
           if (!variable) {
             reportErrorDiagnostic(
               this.program,
@@ -1154,7 +1383,11 @@ export class FunctionContextResolutionPass extends WhackoVisitor {
 
           // It needs to be a field reference or a variable reference
           const rootValue = createRuntimeValue(
-            buildLoadInstruction(this.ctx, createVariableReference(variable)),
+            buildLoadInstruction(
+              this.ctx,
+              this.currentBlock,
+              createVariableReference(variable),
+            ),
           );
           const rootInstructionType = variable.type;
           if (rootInstructionType.kind === ConcreteTypeKind.Class) {
@@ -1469,6 +1702,7 @@ export class FunctionContextResolutionPass extends WhackoVisitor {
             );
 
             const callable = buildDeclareFunction(
+              this.program,
               this.module,
               funcType,
               declaration,
@@ -1532,6 +1766,7 @@ export class FunctionContextResolutionPass extends WhackoVisitor {
             );
 
             const callable = buildExternFunction(
+              this.program,
               this.module,
               funcType,
               declaration,
@@ -1562,7 +1797,6 @@ export class FunctionContextResolutionPass extends WhackoVisitor {
       }
       case ValueKind.Method: {
         const methodReference = callRoot as MethodReferenceValue;
-        const methodCtx = this.ctx as WhackoMethodContext;
         const declaration = methodReference.target;
         assert(isMethodClassMember(declaration));
         const scope = assert(getScope(node));
@@ -1579,11 +1813,17 @@ export class FunctionContextResolutionPass extends WhackoVisitor {
           concreteTypeParameters,
         );
 
+        const thisType = methodReference.thisValue.type;
+        assert(
+          thisType.kind === ConcreteTypeKind.Class,
+          "thisType must be of a class type",
+        );
+
         const compiledFunctionMaybe = ensureCallableCompiled(
           this.program,
           module,
           declaration,
-          methodCtx.thisType,
+          thisType as ClassType,
           inferredTypeParameters,
           thisTypeMap,
         );
@@ -1604,7 +1844,7 @@ export class FunctionContextResolutionPass extends WhackoVisitor {
         );
 
         assert(
-          isAssignable(methodCtx.thisType, funcType.thisType),
+          isAssignable(thisType, funcType.thisType),
           `'this' must be assignable to the method signature.`,
         );
 
@@ -1613,10 +1853,7 @@ export class FunctionContextResolutionPass extends WhackoVisitor {
           return;
         }
 
-        // okay, smart guy, how do we turn this into a runtime value
-        // load from literally nothing? isn't that what I just tried to do?
-        // you convinced yourself actually
-        argumentValues.unshift((this.ctx as WhackoMethodContext).thisValue);
+        argumentValues.unshift(methodReference.thisValue);
         const compiledArguments = argumentValues.map((value) =>
           ensureRuntime(this.ctx, this.currentBlock, value),
         );
@@ -1806,7 +2043,7 @@ export class FunctionContextResolutionPass extends WhackoVisitor {
           | FieldReferenceValue
           | VariableReferenceValue;
         const loaded = createRuntimeValue(
-          buildLoadInstruction(this.ctx, operandReference),
+          buildLoadInstruction(this.ctx, this.currentBlock, operandReference),
         );
 
         const operandType = assert(operand.type);
@@ -1826,7 +2063,12 @@ export class FunctionContextResolutionPass extends WhackoVisitor {
           ),
         );
 
-        buildStoreInstruction(this.ctx, operandReference, modified);
+        buildStoreInstruction(
+          this.ctx,
+          this.currentBlock,
+          operandReference,
+          modified,
+        );
 
         this.value = loaded;
         return;
@@ -1836,7 +2078,11 @@ export class FunctionContextResolutionPass extends WhackoVisitor {
 
   override visitLeftUnaryExpression(node: LeftUnaryExpression): void {
     this.visit(node.operand);
-    const operand = ensureDereferenced(this.ctx, this.assertValue);
+    const operand = ensureDereferenced(
+      this.ctx,
+      this.currentBlock,
+      this.assertValue,
+    );
 
     if (!operand.type) {
       reportErrorDiagnostic(
@@ -1906,7 +2152,11 @@ export class FunctionContextResolutionPass extends WhackoVisitor {
             }
 
             this.value = createRuntimeValue(
-              buildLogicalNotInstruction(this.ctx, operand as RuntimeValue),
+              buildLogicalNotInstruction(
+                this.ctx,
+                this.currentBlock,
+                operand as RuntimeValue,
+              ),
             );
 
             return;
@@ -1969,7 +2219,11 @@ export class FunctionContextResolutionPass extends WhackoVisitor {
               return;
             }
             this.value = createRuntimeValue(
-              buildNegateInstruction(this.ctx, operand as RuntimeValue),
+              buildNegateInstruction(
+                this.ctx,
+                this.currentBlock,
+                operand as RuntimeValue,
+              ),
             );
             return;
           }
@@ -1994,7 +2248,11 @@ export class FunctionContextResolutionPass extends WhackoVisitor {
         ) {
           if (operand.kind === ValueKind.Runtime) {
             this.value = createRuntimeValue(
-              buildBitwiseNotInstruction(this.ctx, operand as RuntimeValue),
+              buildBitwiseNotInstruction(
+                this.ctx,
+                this.currentBlock,
+                operand as RuntimeValue,
+              ),
             );
             return;
           } else {
@@ -2033,7 +2291,11 @@ export class FunctionContextResolutionPass extends WhackoVisitor {
 
   override visitIfElseStatement(node: IfElseStatement): void {
     this.visit(node.condition);
-    const condition = ensureDereferenced(this.ctx, this.assertValue);
+    const condition = ensureDereferenced(
+      this.ctx,
+      this.currentBlock,
+      this.assertValue,
+    );
 
     switch (asComptimeConditional(condition)) {
       case ComptimeConditional.Truthy: {
@@ -2046,26 +2308,27 @@ export class FunctionContextResolutionPass extends WhackoVisitor {
       }
       case ComptimeConditional.Runtime: {
         const truthy = buildBasicBlock(this.ctx, "truthy");
-        const falsy = node.falsy ? buildBasicBlock(this.ctx, "falsy") : null;
         const end = buildBasicBlock(this.ctx, "end");
+        const falsy = node.falsy ? buildBasicBlock(this.ctx, "falsy") : end;
 
-        // terminator
         buildBrIfInstruction(
           this.ctx,
           this.currentBlock,
           ensureRuntime(this.ctx, this.currentBlock, condition),
-          truthy.name,
-          falsy?.name ?? null,
+          truthy,
+          falsy,
         );
 
         this.currentBlock = truthy;
         this.visit(node.truthy);
-        buildBrInstruction(this.ctx, truthy, end.name);
+        if (!truthy.terminator)
+          buildBrInstruction(this.ctx, this.currentBlock, end);
 
         if (node.falsy) {
           this.currentBlock = falsy!;
           this.visit(node.falsy);
-          buildBrInstruction(this.ctx, falsy!, end.name);
+          if (!falsy!.terminator)
+            buildBrInstruction(this.ctx, this.currentBlock, end);
         }
 
         this.currentBlock = end;

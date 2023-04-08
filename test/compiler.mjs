@@ -7,6 +7,10 @@ const files = glob.sync("test/programs/*.wo");
 const { dirname, basename, extname, join } = await import("node:path");
 const { readFile, writeFile } = await import("node:fs/promises");
 
+// TODO: Turn this into an argument
+// const update = process.argv.includes("--update") // very lazy
+const update = true;
+
 for (const file of files) {
   const fileDir = dirname(file);
   const fileExt = extname(file);
@@ -14,11 +18,14 @@ for (const file of files) {
   const oFileName = join(fileDir, fileBase + ".o");
   const llFileName = join(fileDir, fileBase + ".ll");
   const bcFileName = join(fileDir, fileBase + ".bc");
+  const wirFileName = join(fileDir, fileBase + ".wir");
 
   const result = await main([
     file,
     "--outO",
     oFileName,
+    "--outWIR",
+    wirFileName,
     "--outLL",
     llFileName,
     "--outBC",
@@ -27,6 +34,7 @@ for (const file of files) {
 
   let success = true;
 
+  // For each output file:
   for (const [outputFileName, outputFileContents] of Object.entries(
     result.files,
   )) {

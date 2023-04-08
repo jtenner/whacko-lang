@@ -1,0 +1,14 @@
+; ModuleID = 'whacko'
+source_filename = "whacko"
+target triple = "wasm32-wasi"
+
+define void @_start() {
+entry:
+  %"3~inst" = call float @asinf(float 1.000000e+00)
+  %"6~inst" = call double @asin(double 1.000000e+00)
+  ret void
+}
+
+declare float @asinf(float)
+
+declare double @asin(double)

@@ -17,11 +17,7 @@ import {
 import { createChildScope, createNewScope } from "../language-server/scope";
 import { Module as LLVMModule } from "llvm-js";
 import { DiagnosticLevel } from "../language-server/diagnostic";
-import { inspect } from "node:util";
-import {
-  printFunctionContextToString,
-  printProgramToString,
-} from "../language-server/ir";
+import { printProgramToString } from "../language-server/ir";
 
 const options = {};
 
@@ -43,6 +39,7 @@ export default async function main(args: string[]): Promise<CompilerOutput> {
     args,
     options: {
       outWasm: { type: "string" },
+      outWIR: { type: "string" },
       outLL: { type: "string" },
       outBC: { type: "string" },
       outO: { type: "string" },
@@ -122,20 +119,14 @@ export default async function main(args: string[]): Promise<CompilerOutput> {
   } as CompilerOutput;
 
   try {
-    const { bcFile, llFile, oFile } = compile(program);
+    const { bitcode: bcFile, textIR: llFile, object: oFile } = compile(program);
 
-    if (values.outBC && bcFile) result.files[values.outBC] = bcFile as Buffer;
+    if (values.outBC && bcFile) result.files[values.outBC] = bcFile;
     if (values.outLL && llFile)
-      result.files[values.outLL] = llFile.toString("utf8") as string;
-    if (values.outO && oFile) result.files[values.outO] = oFile as Buffer;
-
-    if (values.outIR)
-      result.files[values.outIR] = inspect(
-        program.functions,
-        false,
-        Infinity,
-        false,
-      );
+      result.files[values.outLL] = llFile.toString("utf8");
+    if (values.outO && oFile) result.files[values.outO] = oFile;
+    if (values.outWIR)
+      result.files[values.outWIR] = printProgramToString(program);
 
     // if (values.outWasm) "Can't output wasm files yet"; // fs.writeFile("./out.wasm", wasmFile);
   } catch (ex) {
@@ -173,6 +164,5 @@ export default async function main(args: string[]): Promise<CompilerOutput> {
     }
   }
 
-  console.log(printProgramToString(program));
   return result;
 }

@@ -2,7 +2,7 @@ import { Module } from "llvm-js";
 import { reportErrorDiagnostic, reportWarningDiagnostic } from "./diagnostic";
 import {
   buildFloatCastInstruction,
-  buildIntCastInstruction,
+  buildIntCastInstruction as buildIntegerCastInstruction,
   ConstFloatValue,
   ConstIntegerValue,
   createIntegerValue,
@@ -44,7 +44,14 @@ import { isNumberObject } from "util/types";
 
 const integerCast =
   (integerKind: IntegerKind) =>
-  ({ args, caller, program, module, node }: BuiltinFunctionParameters) => {
+  ({
+    args,
+    caller,
+    program,
+    module,
+    node,
+    getCurrentBlock,
+  }: BuiltinFunctionParameters) => {
     const [value] = args;
 
     if (value === theInvalidValue) {
@@ -72,8 +79,16 @@ const integerCast =
       value.type &&
       isNumeric(value.type)
     ) {
+      // i'm smort that's why
+      // i copy-pastad
+      // actually, since it's not imported, it might be autocomplete for all we know
       return createRuntimeValue(
-        buildFloatCastInstruction(caller, value as RuntimeValue, integerType),
+        buildIntegerCastInstruction(
+          caller,
+          getCurrentBlock(),
+          value as RuntimeValue,
+          integerType,
+        ),
       );
     } else {
       reportErrorDiagnostic(
@@ -89,7 +104,14 @@ const integerCast =
 
 const floatCast =
   (floatKind: FloatKind) =>
-  ({ program, module, args, caller, node }: BuiltinFunctionParameters) => {
+  ({
+    program,
+    module,
+    args,
+    caller,
+    node,
+    getCurrentBlock,
+  }: BuiltinFunctionParameters) => {
     const [value] = args;
 
     if (value === theInvalidValue) {
@@ -111,7 +133,12 @@ const floatCast =
       isNumeric(value.type)
     ) {
       return createRuntimeValue(
-        buildFloatCastInstruction(caller, value as RuntimeValue, floatType),
+        buildFloatCastInstruction(
+          caller,
+          getCurrentBlock(),
+          value as RuntimeValue,
+          floatType,
+        ),
       );
     } else {
       reportErrorDiagnostic(
@@ -152,7 +179,7 @@ export function registerDefaultBuiltins(program: WhackoProgram): void {
       typeParameters: [typeParam],
       args: [arg],
     }) => {
-      arg = ensureDereferenced(caller, arg);
+      arg = ensureDereferenced(caller, getCurrentBlock(), arg);
       switch (arg.kind) {
         case ValueKind.Integer:
         case ValueKind.Float: {
@@ -190,8 +217,8 @@ export function registerDefaultBuiltins(program: WhackoProgram): void {
             caller,
             currentBlock,
             arg as RuntimeValue,
-            next.name,
-            falsy.name,
+            next,
+            falsy,
           );
 
           setCurrentBlock(falsy);

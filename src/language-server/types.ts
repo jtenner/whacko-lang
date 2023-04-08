@@ -35,9 +35,10 @@ import {
   isBinaryExpression,
 } from "./generated/ast";
 import {
-  BinaryOperator,
   WhackoMethodContext,
   WhackoFunctionContext,
+  TypedValue,
+  ValueKind,
 } from "./ir";
 import { ensureCallableCompiled, WhackoModule, WhackoProgram } from "./program";
 import {
@@ -69,6 +70,7 @@ export const enum ConcreteTypeKind {
   V128,
   Never,
   Void,
+  Null,
   Nullable,
 }
 
@@ -161,12 +163,25 @@ export interface InvalidType extends ConcreteType {
   kind: ConcreteTypeKind.Invalid;
 }
 
+export interface VoidType extends ConcreteType {
+  kind: ConcreteTypeKind.Void;
+}
+
+export interface NullType extends ConcreteType {
+  kind: ConcreteTypeKind.Null;
+}
+
+export const theNullType: NullType = {
+  kind: ConcreteTypeKind.Null,
+  llvmType: null,
+};
+
 export const theInvalidType: InvalidType = {
   kind: ConcreteTypeKind.Invalid,
   llvmType: null,
 };
 
-export const theVoidType: ConcreteType = {
+export const theVoidType: VoidType = {
   kind: ConcreteTypeKind.Void,
   llvmType: null,
 };
@@ -188,6 +203,28 @@ export function isSignedIntegerKind(kind: IntegerKind): boolean {
     case IntegerKind.ISize:
       return true;
   }
+}
+
+export function isSignedV128Kind(kind: V128Kind): boolean {
+  switch (kind) {
+    case V128Kind.U8x16:
+    case V128Kind.U16x8:
+    case V128Kind.U32x4:
+    case V128Kind.U64x2:
+      return false;
+
+    case V128Kind.F32x4:
+    case V128Kind.F64x2:
+    case V128Kind.I8x16:
+    case V128Kind.I16x8:
+    case V128Kind.I32x4:
+    case V128Kind.I64x2:
+      return true;
+  }
+}
+
+export function isFloatV128Kind(kind: V128Kind): boolean {
+  return kind === V128Kind.F32x4 || kind === V128Kind.F64x2;
 }
 
 export function getIntegerBitCount(kind: IntegerKind): 1 | 8 | 16 | 32 | 64 {
@@ -258,7 +295,7 @@ export interface IntegerType extends ConcreteType {
 export interface EnumType extends IntegerType {
   kind: ConcreteTypeKind.Enum;
   node: EnumDeclaration;
-  integerKind: IntegerKind.I32;
+  integerKind: IntegerKind.I64;
   name: string;
 }
 
@@ -269,88 +306,6 @@ export interface FloatType extends ConcreteType {
 
 export interface ArrayType extends ConcreteType {
   childType: ConcreteType;
-}
-
-export function getLLVMType(
-  program: WhackoProgram,
-  ty: ConcreteType,
-): LLVMTypeRef {
-  const { LLVM } = program;
-
-  if (ty.llvmType) return ty.llvmType;
-
-  switch (ty.kind) {
-    case ConcreteTypeKind.Nullable:
-      // @ts-ignore TODO
-      return getLLVMStructType(program, (ty as NullableType).child);
-    case ConcreteTypeKind.Class:
-      // @ts-ignore TODO
-      return getLLVMStructType(program, ty as ClassType);
-    case ConcreteTypeKind.Array:
-    case ConcreteTypeKind.Str:
-      return LLVM._LLVMPointerType(LLVM._LLVMInt8Type(), 0);
-    case ConcreteTypeKind.Function:
-      // @ts-ignore
-      return getLLVMFunctionType(program, ty as FunctionType);
-    case ConcreteTypeKind.Method:
-      // @ts-ignore
-      return getLLVMMethodType(program, ty as MethodType);
-    case ConcreteTypeKind.Integer: {
-      switch ((ty as IntegerType).integerKind) {
-        case IntegerKind.Bool:
-          return LLVM._LLVMInt1Type();
-        case IntegerKind.I8:
-        case IntegerKind.U8:
-          return LLVM._LLVMInt8Type();
-        case IntegerKind.I16:
-        case IntegerKind.U16:
-          return LLVM._LLVMInt16Type();
-        case IntegerKind.I32:
-        case IntegerKind.U32:
-        case IntegerKind.ISize:
-        case IntegerKind.USize:
-          return LLVM._LLVMInt32Type();
-        case IntegerKind.I64:
-        case IntegerKind.U64:
-          return LLVM._LLVMInt64Type();
-        default:
-          return assert(false, "Unknown integer kind") as never;
-      }
-    }
-    case ConcreteTypeKind.Float: {
-      switch ((ty as FloatType).floatKind) {
-        case FloatKind.F32:
-          return LLVM._LLVMFloatType();
-        case FloatKind.F64:
-          return LLVM._LLVMDoubleType();
-        default:
-          return assert(false, "Unknown float kind") as never;
-      }
-    }
-    case ConcreteTypeKind.V128: {
-      switch ((ty as V128Type).v128Kind) {
-        case V128Kind.I8x16:
-        case V128Kind.U8x16:
-          return LLVM._LLVMVectorType(LLVM._LLVMInt8Type(), 16);
-        case V128Kind.I16x8:
-        case V128Kind.U16x8:
-          return LLVM._LLVMVectorType(LLVM._LLVMInt16Type(), 8);
-        case V128Kind.I32x4:
-        case V128Kind.U32x4:
-          return LLVM._LLVMVectorType(LLVM._LLVMInt32Type(), 4);
-        case V128Kind.F32x4:
-          return LLVM._LLVMVectorType(LLVM._LLVMFloatType(), 4);
-        case V128Kind.I64x2:
-        case V128Kind.U64x2:
-          return LLVM._LLVMVectorType(LLVM._LLVMInt64Type(), 2);
-        case V128Kind.F64x2:
-          return LLVM._LLVMVectorType(LLVM._LLVMDoubleType(), 2);
-      }
-    }
-    default: {
-      return assert(false, "Unknown type kind") as never;
-    }
-  }
 }
 
 export function getFloatType(kind: FloatKind): FloatType {
@@ -463,17 +418,17 @@ export function resolveEnumType(
   assert(isEnumDeclaration(node), "Node must be an enum declaration.");
 
   const name = getNodeName(node);
-  const classScope = assert(
-    getNodeName(node),
-    "Class declaration should have a scope.",
-  );
+
   if (program.enums.has(name)) return program.enums.get(name)!;
+
+  // TODO: Ensure enum members are not duplicated
+  // TODO: Add enum member values to the EnumType
 
   const enumType: EnumType = {
     kind: ConcreteTypeKind.Enum,
     node,
     name,
-    integerKind: IntegerKind.I32,
+    integerKind: IntegerKind.I64,
     llvmType: null,
   };
 
@@ -514,7 +469,7 @@ export function resolveClass(
   }
 
   const fields = new Map<string, ConcreteField>();
-  // do we have getters?
+
   for (const member of node.members) {
     if (!isFieldClassMember(member)) continue;
 
@@ -730,6 +685,19 @@ export function resolveType(
           return null;
         }
       }
+
+      const relevantScopeElement = getElementInScope(scope, node.name);
+
+      if (!relevantScopeElement) return null;
+
+      return resolveNamedTypeScopeElement(
+        program,
+        module,
+        relevantScopeElement,
+        scope,
+        node.typeParameters,
+        typeMap,
+      );
     }
     case "NamedTypeExpression": {
       const node = typeExpression as NamedTypeExpression;
@@ -995,6 +963,7 @@ export function typesEqual(left: ConcreteType, right: ConcreteType): boolean {
     case ConcreteTypeKind.Void:
     case ConcreteTypeKind.Never:
     case ConcreteTypeKind.Str:
+    case ConcreteTypeKind.Null:
       return true;
     case ConcreteTypeKind.Invalid:
     case ConcreteTypeKind.Function:
@@ -1208,39 +1177,6 @@ export function isAssignable(
   // }
 
   return typesEqual(superType, subType);
-}
-
-export function getBinaryOperatorString(op: BinaryOperator): string {
-  switch (op) {
-    case BinaryOperator.Add:
-      return "Add";
-    case BinaryOperator.Sub:
-      return "Sub";
-    case BinaryOperator.Mul:
-      return "Mul";
-    case BinaryOperator.Div:
-      return "Div";
-    case BinaryOperator.Exp:
-      return "Exp";
-    case BinaryOperator.BitwiseAnd:
-      return "BitwiseAnd";
-    case BinaryOperator.LogicalAnd:
-      return "LogicalAnd";
-    case BinaryOperator.BitwiseOr:
-      return "BitwiseOr";
-    case BinaryOperator.LogicalOr:
-      return "LogicalOr";
-    case BinaryOperator.BitwiseXor:
-      return "BitwiseXor";
-    case BinaryOperator.Shl:
-      return "Shl";
-    case BinaryOperator.Eq:
-      return "Eq";
-    case BinaryOperator.Shr:
-      return "Shr";
-    case BinaryOperator.Neq:
-      return "Neq";
-  }
 }
 
 export function isNumeric(type: ConcreteType): boolean {

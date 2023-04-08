@@ -1,4 +1,3 @@
-// import { Scope } from "langium";
 import {
   LLVMBuilderRef,
   LLVMContextRef,
@@ -70,6 +69,7 @@ import { FunctionContextResolutionPass } from "./passes/FunctionContextResolutio
 import { registerDefaultBuiltins } from "./builtins";
 import { inspect } from "node:util";
 import { ClassRulesPass } from "./passes/ClassRulesPass";
+import { codegen } from "./codegen";
 
 export function addBuiltinTypeToProgram(
   program: WhackoProgram,
@@ -242,12 +242,13 @@ export function addStaticLibraryToProgram(
 }
 
 export interface CompilationOutput {
-  bcFile?: Buffer;
-  oFile?: Buffer;
-  llFile?: Buffer;
+  bitcode?: Buffer;
+  object?: Buffer;
+  textIR?: Buffer;
 }
 
 export function compile(program: WhackoProgram): CompilationOutput {
+  const { LLVM, LLVMUtil } = program;
   const scopePopulationPass = new ScopePopulationPass(program);
   const modules = Array.from(program.modules.values());
   for (const module of modules) {
@@ -348,8 +349,13 @@ export function compile(program: WhackoProgram): CompilationOutput {
   };
 
   churnQueue(program);
-  // TODO: RETURN FILES YOU MORON
-  return {};
+
+  const { bitcode, textIR } = codegen(program);
+
+  return {
+    bitcode,
+    textIR,
+  };
 }
 
 export function churnQueue(program: WhackoProgram) {
@@ -397,7 +403,7 @@ export function ensureCallableCompiled(
         : getFullyQualifiedCallableName(callableAst, contextType),
     type: contextType,
     typeMap,
-    variables: new Map(),
+    stackAllocationSites: new Map(),
     isWhackoFunction: true,
     isWhackoMethod: isMethodClassMember(callableAst),
   };
@@ -433,17 +439,21 @@ export function ensureConstructorCompiled(
     name: "placeholder hack",
     node: constructor,
     typeMap: concreteClass.resolvedTypes,
-    variables: new Map(),
+    stackAllocationSites: new Map(),
     thisType: concreteClass,
-    thisValue: createVariableReference({
-      immutable: true,
-      ref: null,
-      type: concreteClass,
-      node: concreteClass.node, // Placeholder
-    }),
     type: constructorType,
   };
 
+  ctx.stackAllocationSites.set(concreteClass.node, {
+    immutable: true,
+    node: concreteClass.node,
+    ref: null,
+    type: concreteClass,
+  });
+
   ctx.name = getFullyQualifiedCallableName(ctx.node, ctx.type);
+
+  // okay
+  program.functions.FOOOSETMEHEHEHE;
   return ctx;
 }

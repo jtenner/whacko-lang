@@ -171,7 +171,7 @@ export namespace math {
 // @name("UDiv") export builtin UDiv(): void; // UDiv(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("UIToFP") export builtin UIToFP(): void; // UIToFP(Builder: LLVMBuilderRef, Val: LLVMValueRef, DestTy: LLVMTypeRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("URem") export builtin URem(): void; // URem(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
-@name("Unreachable") export builtin Unreachable(): void; // Unreachable(Builder: LLVMBuilderRef): LLVMValueRef;
+@name("unreachable") export builtin unreachable(): void; // Unreachable(Builder: LLVMBuilderRef): LLVMValueRef;
 // @name("Xor") export builtin Xor(): void; // Xor(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("ZExt") export builtin ZExt(): void; // ZExt(Builder: LLVMBuilderRef, Val: LLVMValueRef, DestTy: LLVMTypeRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("ZExtOrBitCast") export builtin ZExtOrBitCast(): void; // ZExtOrBitCast(Builder: LLVMBuilderRef, Val: LLVMValueRef, DestTy: LLVMTypeRef, Name: LLVMStringRef): LLVMValueRef;

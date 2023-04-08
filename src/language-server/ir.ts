@@ -23,7 +23,6 @@ import {
   FloatType,
   InvalidType,
   FunctionType,
-  getBinaryOperatorString,
   getFloatType,
   getIntegerType,
   theStrType,
@@ -35,6 +34,11 @@ import {
   TypeMap,
   ConcreteField,
   getIntegerBitCount,
+  NullType,
+  theNullType,
+  isNumeric,
+  VoidType,
+  theVoidType,
 } from "./types";
 import {
   assert,
@@ -46,6 +50,7 @@ import {
   UNREACHABLE,
   ConstructorSentinel,
   getElementName,
+  getBinaryOperatorString,
 } from "./util";
 
 export const enum ComptimeConditional {
@@ -59,11 +64,8 @@ export const enum BinaryOperator {
   Sub,
   Mul,
   Div,
-  Exp,
   BitwiseAnd,
-  LogicalAnd,
   BitwiseOr,
-  LogicalOr,
   BitwiseXor,
   Shl,
   Eq,
@@ -78,22 +80,23 @@ export const enum InstructionKind {
   BrIf,
   Invalid,
   Binary,
-  Unary,
   Alloca,
   Unreachable,
   New,
   Call,
-  IntCast,
+  IntegerCast,
   FloatCast,
   Load,
   Store,
   LogicalNot,
   BitwiseNot,
   Negate,
+  Return,
 }
 
 export const enum ValueKind {
   Invalid,
+  Void,
   Null,
   Integer,
   Float,
@@ -111,13 +114,21 @@ export interface Value {
   type: ConcreteType | null;
 }
 
-export interface RuntimeValue extends Value {
+export interface UntypedValue extends Value {
+  type: null;
+}
+
+export interface TypedValue extends Value {
+  type: ConcreteType;
+}
+
+export interface RuntimeValue extends TypedValue {
   kind: ValueKind.Runtime;
   instruction: string; // Corresponds to a BlockInstruction
   valueRef: LLVMValueRef | null;
 }
 
-export interface Variable {
+export interface StackAllocationSite {
   immutable: boolean;
   type: ConcreteType;
   ref: LLVMValueRef | null;
@@ -169,7 +180,7 @@ export interface WhackoFunctionContext extends CallableFunctionContext {
   instructions: Map<string, BlockInstruction>;
 
   /** A map of AstNodes to stack pointers */
-  variables: Map<AstNode, Variable>;
+  stackAllocationSites: Map<AstNode, StackAllocationSite>;
 
   /** The llvm function ref. */
   funcRef: LLVMValueRef | null;
@@ -187,9 +198,6 @@ export interface WhackoMethodContext extends WhackoFunctionContext {
 
   /** The `this` type of this method. */
   thisType: ClassType;
-
-  /** The this value. */
-  thisValue: VariableReferenceValue;
 }
 
 export interface BlockContext {
@@ -204,7 +212,7 @@ export interface BlockContext {
   /** Label terminator. */
   terminator: BlockInstruction | null;
   /** The llvm block ref */
-  block: LLVMBasicBlockRef | null;
+  llvmBlock: LLVMBasicBlockRef | null;
 }
 
 export interface BlockInstruction {
@@ -213,14 +221,22 @@ export interface BlockInstruction {
   /** The LLVMValueRef associated with this instruction. */
   ref: LLVMValueRef | null;
   /** The name of this instruction. */
-  name: string | null;
+  name: string;
   /** The type of this instruction. */
   kind: InstructionKind;
   /** The concrete type of this instruction. */
   type: ConcreteType | null;
 }
 
-export interface BinaryInstruction extends BlockInstruction {
+export interface TypedBlockInstruction extends BlockInstruction {
+  type: ConcreteType;
+}
+
+export interface UntypedBlockInstruction extends BlockInstruction {
+  type: null;
+}
+
+export interface BinaryInstruction extends TypedBlockInstruction {
   /** Left hand side of the operation. */
   lhs: RuntimeValue;
   /** Right hand side of the operation. */
@@ -253,7 +269,7 @@ export function buildLabel(
   const name = `${id}~label`;
 
   const label = {
-    block: null,
+    llvmBlock: null,
     children: [],
     id,
     instructions: [],
@@ -281,13 +297,13 @@ type ExtendedBlockInstructionFields<T extends BlockInstruction> = {
 
 export function buildInstruction<T extends BlockInstruction>(
   func: WhackoFunctionContext,
+  currentBlock: BlockContext,
   type: T["type"],
   instructionKind: T["kind"],
   others: Partial<BlockInstruction> & ExtendedBlockInstructionFields<T>,
 ): T {
   const id = idCounter.value++;
   const name = `${id}~inst`;
-
   const inst = {
     id,
     kind: instructionKind,
@@ -296,7 +312,9 @@ export function buildInstruction<T extends BlockInstruction>(
     type,
     ...others,
   } as T;
+
   func.instructions.set(name, inst);
+  currentBlock.instructions.push(inst);
   return inst;
 }
 
@@ -307,13 +325,11 @@ export function buildBinaryInstruction(
   op: BinaryOperator,
   rhs: RuntimeValue,
 ): BinaryInstruction {
-  const inst = buildInstruction(func, lhs.type, InstructionKind.Binary, {
+  const inst = buildInstruction(func, block, lhs.type, InstructionKind.Binary, {
     lhs,
     op,
     rhs,
   }) as BinaryInstruction;
-  // push the instruction to the end
-  block.instructions.push(inst);
   return inst;
 }
 
@@ -323,6 +339,7 @@ export function buildUnreachable(
 ): BlockInstruction {
   const inst = buildInstruction(
     func,
+    currentBlock,
     {
       kind: ConcreteTypeKind.Never,
       llvmType: null,
@@ -334,22 +351,11 @@ export function buildUnreachable(
     !currentBlock.terminator,
     "Tried to build unreachable with a block that already has a terminator.",
   );
-  currentBlock.instructions.push(inst);
   currentBlock.terminator = inst;
   return inst;
 }
 
-export function buildMalloc(
-  func: WhackoFunctionContext,
-  block: BlockContext,
-  type: ConcreteType,
-): BlockInstruction {
-  const inst = buildInstruction(func, type, InstructionKind.New, {});
-  block.instructions.push(inst);
-  return inst;
-}
-
-export interface ConstIntegerValue extends Value {
+export interface ConstIntegerValue extends TypedValue {
   kind: ValueKind.Integer;
   type: IntegerType;
   value: bigint;
@@ -366,7 +372,7 @@ export function createIntegerValue(
   };
 }
 
-export interface ConstFloatValue extends Value {
+export interface ConstFloatValue extends TypedValue {
   kind: ValueKind.Float;
   type: FloatType;
   value: number;
@@ -383,7 +389,7 @@ export function createFloatValue(
   };
 }
 
-export interface ConstStrValue extends Value {
+export interface ConstStrValue extends TypedValue {
   kind: ValueKind.Str;
   value: string;
 }
@@ -396,19 +402,24 @@ export function createStrValue(value: string, type: FloatType): ConstStrValue {
   };
 }
 
-interface NullValue extends Value {
+interface NullValue extends TypedValue {
   kind: ValueKind.Null;
-  type: null;
+  type: NullType;
 }
 
 export const theNullValue: NullValue = {
   kind: ValueKind.Null,
-  type: null,
+  type: theNullType,
 };
 
-interface InvalidValue extends Value {
+export interface InvalidValue extends TypedValue {
   kind: ValueKind.Invalid;
   type: InvalidType;
+}
+
+export interface VoidValue extends TypedValue {
+  kind: ValueKind.Void;
+  type: VoidType;
 }
 
 export const theInvalidValue: InvalidValue = {
@@ -416,7 +427,12 @@ export const theInvalidValue: InvalidValue = {
   type: theInvalidType,
 };
 
-export interface ScopeElementValue extends Value {
+export const theVoidValue: VoidValue = {
+  kind: ValueKind.Void,
+  type: theVoidType,
+};
+
+export interface ScopeElementValue extends UntypedValue {
   kind: ValueKind.ScopeElement;
   element: ScopeElement;
 }
@@ -433,7 +449,7 @@ export function isCompileTimeValue(value: Value): boolean {
   return value.kind !== ValueKind.Runtime;
 }
 
-interface CallInstruction extends BlockInstruction {
+export interface CallInstruction extends TypedBlockInstruction {
   kind: InstructionKind.Call;
   callee: CallableFunctionContext;
   args: RuntimeValue[];
@@ -441,12 +457,13 @@ interface CallInstruction extends BlockInstruction {
 
 export function buildCallInstruction(
   caller: WhackoFunctionContext,
-  block: BlockContext,
+  currentBlock: BlockContext,
   callee: CallableFunctionContext,
   args: RuntimeValue[],
 ): CallInstruction {
   const insn: CallInstruction = buildInstruction(
     caller,
+    currentBlock,
     callee.type.returnType,
     InstructionKind.Call,
     {
@@ -454,21 +471,21 @@ export function buildCallInstruction(
       args,
     },
   );
-  block.instructions.push(insn);
   return insn;
 }
 
 export function buildBasicBlock(
   ctx: WhackoFunctionContext,
-  name: string,
+  blockName: string,
 ): BlockContext {
   const id = idCounter.value++;
+  const name = `${blockName}~${id}`;
   const block = {
-    block: null,
+    llvmBlock: null,
     children: [],
     id,
     instructions: [],
-    name: `${name}~${id}`,
+    name,
     terminator: null,
   };
   assert(
@@ -480,12 +497,17 @@ export function buildBasicBlock(
 }
 
 export function buildDeclareFunction(
+  program: WhackoProgram,
   module: WhackoModule,
   type: FunctionType,
   declaration: DeclareFunction,
 ): CallableFunctionContext {
   const functionName = declaration.name.name;
   const moduleName = declaration.$container.namespace.value;
+
+  const name = getFullyQualifiedCallableName(declaration, type);
+
+  if (program.functions.has(name)) return program.functions.get(name)!;
 
   const result: CallableFunctionContext = {
     attributes: [
@@ -497,21 +519,24 @@ export function buildDeclareFunction(
     isWhackoFunction: false,
     isWhackoMethod: false,
     module,
-    name: getFullyQualifiedCallableName(declaration, type),
+    name,
     node: declaration,
     type,
   };
+  program.functions.set(name, result);
   return result;
 }
 
 export function buildExternFunction(
+  program: WhackoProgram,
   module: WhackoModule,
   type: FunctionType,
   declaration: ExternDeclaration,
 ): CallableFunctionContext {
   const name = getNameDecoratorValue(declaration) ?? declaration.name.name;
+  if (program.functions.has(name)) return program.functions.get(name)!;
 
-  return {
+  const result = {
     attributes: [],
     funcRef: null,
     id: idCounter.value++,
@@ -522,53 +547,72 @@ export function buildExternFunction(
     name,
     type,
   };
+  program.functions.set(name, result);
+  return result;
 }
 
-export interface IntCastInstruction extends BlockInstruction {
-  kind: InstructionKind.IntCast;
+export interface IntegerCastInstruction extends TypedBlockInstruction {
+  kind: InstructionKind.IntegerCast;
+  type: IntegerType;
   value: RuntimeValue;
 }
 
 export function buildIntCastInstruction(
   ctx: WhackoFunctionContext,
+  currentBlock: BlockContext,
   value: RuntimeValue,
-  type: ConcreteType,
-): IntCastInstruction {
-  return buildInstruction(ctx, type, InstructionKind.IntCast, {
-    value,
-  });
+  type: IntegerType,
+): IntegerCastInstruction {
+  return buildInstruction(
+    ctx,
+    currentBlock,
+    type,
+    InstructionKind.IntegerCast,
+    {
+      value,
+    },
+  );
 }
 
-export interface FloatCastInstruction extends BlockInstruction {
+export interface FloatCastInstruction extends TypedBlockInstruction {
   kind: InstructionKind.FloatCast;
+  type: FloatType;
   value: RuntimeValue;
 }
 
 export function buildFloatCastInstruction(
   ctx: WhackoFunctionContext,
+  currentBlock: BlockContext,
   value: RuntimeValue,
-  type: ConcreteType,
+  type: FloatType,
 ): FloatCastInstruction {
-  return buildInstruction(ctx, type, InstructionKind.FloatCast, {
+  return buildInstruction(ctx, currentBlock, type, InstructionKind.FloatCast, {
     value,
   });
 }
 
-export interface LoadInstruction extends BlockInstruction {
+export interface LoadInstruction extends TypedBlockInstruction {
   kind: InstructionKind.Load;
   source: FieldReferenceValue | VariableReferenceValue;
 }
 
 export function buildLoadInstruction(
   ctx: WhackoFunctionContext,
+  currentBlock: BlockContext,
   source: LoadInstruction["source"],
 ): LoadInstruction {
-  return buildInstruction(ctx, source.type, InstructionKind.Load, {
-    source,
-  });
+  return buildInstruction(
+    ctx,
+    currentBlock,
+    source.type,
+    InstructionKind.Load,
+    {
+      source,
+    },
+  );
 }
 
-export interface StoreInstruction extends BlockInstruction {
+export interface StoreInstruction extends UntypedBlockInstruction {
   kind: InstructionKind.Store;
   target: FieldReferenceValue | VariableReferenceValue;
   value: RuntimeValue;
@@ -576,28 +620,58 @@ export interface StoreInstruction extends BlockInstruction {
 
 export function buildStoreInstruction(
   ctx: WhackoFunctionContext,
+  currentBlock: BlockContext,
   target: StoreInstruction["target"],
   value: RuntimeValue,
 ): StoreInstruction {
-  return buildInstruction(ctx, target.type, InstructionKind.Store, {
+  return buildInstruction(ctx, currentBlock, null, InstructionKind.Store, {
     target,
     value,
   });
 }
 
-export interface NewInstruction extends BlockInstruction {
+export interface NewInstruction extends TypedBlockInstruction {
   kind: InstructionKind.New;
+  type: ClassType;
 }
 
 export function buildNewInstruction(
   ctx: WhackoFunctionContext,
+  currentBlock: BlockContext,
   classType: ClassType,
 ): NewInstruction {
-  return buildInstruction(ctx, classType, InstructionKind.New, {});
+  return buildInstruction(
+    ctx,
+    currentBlock,
+    classType,
+    InstructionKind.New,
+    {},
+  );
 }
 
-export interface ConcreteFunctionReferenceValue extends Value {
+export interface AllocaInstruction extends TypedBlockInstruction {
+  kind: InstructionKind.Alloca;
+  type: ClassType;
+}
+
+// This should only be used as a builtin.
+export function buildAllocaInstruction(
+  ctx: WhackoFunctionContext,
+  currentBlock: BlockContext,
+  classType: ClassType,
+): AllocaInstruction {
+  return buildInstruction(
+    ctx,
+    currentBlock,
+    classType,
+    InstructionKind.Alloca,
+    {},
+  );
+}
+
+export interface ConcreteFunctionReferenceValue extends TypedValue {
   kind: ValueKind.ConcreteFunction;
+  type: FunctionType;
   target: CallableFunctionContext;
 }
 
@@ -610,20 +684,19 @@ export function createFunctionReference(
   );
   return {
     kind: ValueKind.ConcreteFunction,
-    type: null,
+    type: target.type,
     target,
   };
 }
 
-export interface MethodReferenceValue extends Value {
+export interface MethodReferenceValue extends UntypedValue {
   kind: ValueKind.Method;
-  type: null;
-  thisValue: Value;
+  thisValue: RuntimeValue;
   target: MethodClassMember;
 }
 
 export function buildMethodReference(
-  thisValue: Value,
+  thisValue: RuntimeValue,
   target: MethodClassMember,
 ): MethodReferenceValue {
   return {
@@ -634,14 +707,14 @@ export function buildMethodReference(
   };
 }
 
-export interface FieldReferenceValue extends Value {
+export interface FieldReferenceValue extends TypedValue {
   kind: ValueKind.Field;
-  thisValue: Value; // TODO? Formerly thisInstruction
+  thisValue: TypedValue;
   field: ConcreteField;
 }
 
 export function createFieldReference(
-  thisValue: Value,
+  thisValue: TypedValue,
   field: ConcreteField,
 ): FieldReferenceValue {
   return {
@@ -652,13 +725,13 @@ export function createFieldReference(
   };
 }
 
-export interface VariableReferenceValue extends Value {
+export interface VariableReferenceValue extends TypedValue {
   kind: ValueKind.Variable;
-  variable: Variable;
+  variable: StackAllocationSite;
 }
 
 export function createVariableReference(
-  variable: Variable,
+  variable: StackAllocationSite,
 ): VariableReferenceValue {
   return {
     kind: ValueKind.Variable,
@@ -667,18 +740,23 @@ export function createVariableReference(
   };
 }
 
-export interface LogicalNotInstruction extends BlockInstruction {
+export interface LogicalNotInstruction extends TypedBlockInstruction {
   kind: InstructionKind.LogicalNot;
+  type: IntegerType & { integerKind: IntegerKind.Bool };
   operand: RuntimeValue;
 }
 
 export function buildLogicalNotInstruction(
   ctx: WhackoFunctionContext,
+  currentBlock: BlockContext,
   operand: RuntimeValue,
 ): LogicalNotInstruction {
   return buildInstruction(
     ctx,
-    getIntegerType(IntegerKind.Bool),
+    currentBlock,
+    getIntegerType(IntegerKind.Bool) as IntegerType & {
+      integerKind: IntegerKind.Bool;
+    },
     InstructionKind.LogicalNot,
     {
       operand,
@@ -686,31 +764,42 @@ export function buildLogicalNotInstruction(
   );
 }
 
-export interface NegateInstruction extends BlockInstruction {
+export interface NegateInstruction extends TypedBlockInstruction {
   kind: InstructionKind.Negate;
+  type: IntegerType | FloatType;
   operand: RuntimeValue;
 }
 
 export function buildNegateInstruction(
   ctx: WhackoFunctionContext,
+  currentBlock: BlockContext,
   operand: RuntimeValue,
 ): NegateInstruction {
-  return buildInstruction(ctx, assert(operand.type), InstructionKind.Negate, {
-    operand,
-  });
+  assert(isNumeric(operand.type));
+  return buildInstruction(
+    ctx,
+    currentBlock,
+    operand.type as IntegerType | FloatType,
+    InstructionKind.Negate,
+    {
+      operand,
+    },
+  );
 }
 
-export interface BitwiseNotInstruction extends BlockInstruction {
+export interface BitwiseNotInstruction extends TypedBlockInstruction {
   kind: InstructionKind.BitwiseNot;
   operand: RuntimeValue;
 }
 
 export function buildBitwiseNotInstruction(
   ctx: WhackoFunctionContext,
+  currentBlock: BlockContext,
   operand: RuntimeValue,
 ): BitwiseNotInstruction {
   return buildInstruction(
     ctx,
+    currentBlock,
     getIntegerType(IntegerKind.Bool),
     InstructionKind.BitwiseNot,
     {
@@ -724,7 +813,7 @@ export function createRuntimeValue(
   maybeType: ConcreteType | null = null,
 ): RuntimeValue {
   return {
-    type: maybeType ?? type,
+    type: assert(maybeType ?? type),
     instruction: assert(name),
     kind: ValueKind.Runtime,
     valueRef: null,
@@ -733,6 +822,10 @@ export function createRuntimeValue(
 
 export function asComptimeConditional(value: Value): ComptimeConditional {
   switch (value.kind) {
+    case ValueKind.Void:
+      UNREACHABLE(
+        "Void cannot be a comptime conditional. Did you mess up somewhere?",
+      );
     case ValueKind.Invalid:
       return ComptimeConditional.Runtime;
     case ValueKind.Null:
@@ -762,16 +855,15 @@ export function asComptimeConditional(value: Value): ComptimeConditional {
   }
 }
 
-export interface BrInstruction extends BlockInstruction {
+export interface BrInstruction extends UntypedBlockInstruction {
   kind: InstructionKind.Br;
-  type: null;
   target: string;
 }
 
 export function buildBrInstruction(
   ctx: WhackoFunctionContext,
   currentBlock: BlockContext,
-  target: string,
+  target: BlockContext,
 ): BrInstruction {
   assert(
     !currentBlock.terminator,
@@ -779,45 +871,45 @@ export function buildBrInstruction(
   );
   const instruction: BrInstruction = buildInstruction(
     ctx,
+    currentBlock,
     null,
     InstructionKind.Br,
     {
-      target,
+      target: target.name,
     },
   );
   return (currentBlock.terminator = instruction);
 }
 
-export interface BrIfInstruction extends BlockInstruction {
+export interface BrIfInstruction extends UntypedBlockInstruction {
   kind: InstructionKind.BrIf;
   condition: RuntimeValue;
   truthy: string;
-  falsy: string | null;
-  type: null;
+  falsy: string;
 }
 
 export function buildBrIfInstruction(
   ctx: WhackoFunctionContext,
   currentBlock: BlockContext,
   condition: RuntimeValue,
-  truthy: string,
-  falsy: string | null,
+  truthy: BlockContext,
+  falsy: BlockContext,
 ): BrIfInstruction {
   assert(
     !currentBlock.terminator,
     "Block was already terminated! WEE WOO WEE WOO!",
   );
-  const instruction: BrIfInstruction = buildInstruction<BrIfInstruction>(
+  const instruction: BrIfInstruction = buildInstruction(
     ctx,
+    currentBlock,
     null,
     InstructionKind.BrIf,
     {
       condition,
-      truthy,
-      falsy,
+      truthy: truthy.name,
+      falsy: falsy.name,
     },
   );
-  currentBlock.instructions.push(instruction);
   return (currentBlock.terminator = instruction);
 }
 
@@ -834,7 +926,7 @@ export function ensureRuntime(
   currentBlock: BlockContext,
   value: Value,
 ): RuntimeValue {
-  value = ensureDereferenced(ctx, value);
+  value = ensureDereferenced(ctx, currentBlock, value);
   switch (value.kind) {
     case ValueKind.Runtime:
       return value as RuntimeValue;
@@ -889,7 +981,7 @@ export function ensureRuntime(
   UNREACHABLE("TODO: ensureRuntime");
 }
 
-export interface ConstInstruction extends BlockInstruction {
+export interface ConstInstruction extends TypedBlockInstruction {
   kind: InstructionKind.Const;
   child: ComptimeValue;
 }
@@ -901,11 +993,38 @@ export function buildConstInstruction(
 ): ConstInstruction {
   const inst = buildInstruction<ConstInstruction>(
     ctx,
+    currentBlock,
     child.type,
     InstructionKind.Const,
     { child },
   );
-  currentBlock.instructions.push(inst);
+  return inst;
+}
+
+export interface ReturnInstruction extends BlockInstruction {
+  kind: InstructionKind.Return;
+  value: TypedValue;
+}
+
+export function buildReturnInstruction(
+  ctx: WhackoFunctionContext,
+  currentBlock: BlockContext,
+  value: TypedValue,
+): ReturnInstruction {
+  assert(
+    !currentBlock.terminator,
+    "Block was already terminated! WEE WOO WEE WOO!",
+  );
+  const inst = buildInstruction<ReturnInstruction>(
+    ctx,
+    currentBlock,
+    value.type,
+    InstructionKind.Return,
+    {
+      value,
+    },
+  );
+  currentBlock.terminator = inst;
   return inst;
 }
 
@@ -925,12 +1044,12 @@ export function printFunctionContextToString(
 
   if (ctx.isWhackoFunction) {
     const func = ctx as WhackoFunctionContext;
-    for (const [name, block] of func.blocks) {
-      result += printBlockToString(block) + "\n";
+    for (const block of func.blocks.values()) {
+      result += printBlockToString(block);
     }
+  } else {
+    result += "    (extern or declare function)\n";
   }
-
-  result += "\n\n";
   return result;
 }
 
@@ -946,11 +1065,14 @@ export function printBlockToString(block: BlockContext): string {
 
 export function getValueString(value: Value): string {
   switch (value.kind) {
+    case ValueKind.Void:
+      // void has no value, but really this is okay
+      return "(void value)";
     case ValueKind.Invalid:
       return "(invalid value)";
     case ValueKind.Null:
       return "(null value)";
-    // https://www.npmjs.com/package/js-string-escape
+    // TODO: https://www.npmjs.com/package/js-string-escape
     case ValueKind.Integer: {
       const integerValue = value as ConstIntegerValue;
       const integerKind = integerValue.type.integerKind;
@@ -1029,7 +1151,7 @@ export function printInstructionToString(inst: BlockInstruction): string {
         callee.node,
         callee.type,
       )} with ${call.args.map(getValueString).join(", ")}`;
-    case InstructionKind.IntCast:
+    case InstructionKind.IntegerCast:
     case InstructionKind.FloatCast: {
       const cast = inst as FloatCastInstruction;
       return `      ${cast.name} = cast: <${getFullyQualifiedTypeName(
@@ -1037,7 +1159,7 @@ export function printInstructionToString(inst: BlockInstruction): string {
       )}> ${cast.value}`;
     }
     case InstructionKind.Invalid: {
-      return `      invalid`;
+      return `      ${inst.name} = invalid`;
     }
     case InstructionKind.New: {
       return `      ${inst.name} = new: ${getFullyQualifiedTypeName(
@@ -1046,18 +1168,45 @@ export function printInstructionToString(inst: BlockInstruction): string {
     }
     case InstructionKind.Store: {
       const cast = inst as StoreInstruction;
-      return `      store: ${getValueString(cast.target)}} = ${getValueString(
-        cast.value,
-      )}`;
+      return `      ${inst.name} = store: ${getValueString(
+        cast.target,
+      )}} = ${getValueString(cast.value)}`;
     }
     case InstructionKind.Unreachable: {
-      return `      unreachable`;
+      return `      ${inst.name} = unreachable`;
     }
     case InstructionKind.Unset: {
       UNREACHABLE("UNSET INSTRUCTION TYPE.");
     }
-    default: {
-      UNREACHABLE("Unknown instruction type, what the heck did you do?");
+    case InstructionKind.Return: {
+      const cast = inst as ReturnInstruction;
+      return `      return ${getValueString(cast.value)}`;
+    }
+    case InstructionKind.Br: {
+      const casted = inst as BrInstruction;
+      return `      br to ${casted.target}`;
+    }
+    case InstructionKind.BrIf: {
+      const casted = inst as BrIfInstruction;
+      return `      br to ${casted.truthy} if ${getValueString(
+        casted.condition,
+      )}; else to ${casted.falsy}`;
+    }
+    case InstructionKind.Load: {
+      const casted = inst as LoadInstruction;
+      return `      ${inst.name} = load ${getValueString(casted.source)}`;
+    }
+    case InstructionKind.LogicalNot: {
+      const cast = inst as LogicalNotInstruction;
+      return `      ${inst.name} = not ${getValueString(cast.operand)}`;
+    }
+    case InstructionKind.BitwiseNot: {
+      const cast = inst as BitwiseNotInstruction;
+      return `      ${inst.name} = bitwisenot ${getValueString(cast.operand)}`;
+    }
+    case InstructionKind.Negate: {
+      const cast = inst as NegateInstruction;
+      return `      ${inst.name} = negate ${getValueString(cast.operand)}`;
     }
   }
 }
@@ -1068,17 +1217,22 @@ export function getInstructionName(inst: BlockInstruction): string {
 
 export function ensureDereferenced(
   ctx: WhackoFunctionContext,
+  currentBlock: BlockContext,
   value: Value,
 ): Value {
   switch (value.kind) {
     case ValueKind.Field: {
       return createRuntimeValue(
-        buildLoadInstruction(ctx, value as FieldReferenceValue),
+        buildLoadInstruction(ctx, currentBlock, value as FieldReferenceValue),
       );
     }
     case ValueKind.Variable: {
       return createRuntimeValue(
-        buildLoadInstruction(ctx, value as VariableReferenceValue),
+        buildLoadInstruction(
+          ctx,
+          currentBlock,
+          value as VariableReferenceValue,
+        ),
       );
     }
     default: {

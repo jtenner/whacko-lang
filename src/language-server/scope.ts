@@ -105,8 +105,6 @@ export function createNewScopeElement(
 }
 
 export function createNewScope(module: WhackoModule | null): Scope {
-  // it was the global scope :(
-  if (!module) console.error(new Error("why").stack);
   return {
     id: scopeIDs++,
     elements: new Map(),

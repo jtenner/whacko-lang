@@ -85,7 +85,7 @@ export function getNodeName(node: Nameable | ConstructorClassMember): string {
     }
   }
 
-  return `[${module.absolutePath}]${accumulatedName}`;
+  return `[${module.relativePath}]${accumulatedName}`;
 }
 
 export type ConstructorSentinel = symbol & { __constructorSentinel: never };
@@ -146,7 +146,7 @@ export function getFullyQualifiedTypeName(type: ConcreteType): string {
     case ConcreteTypeKind.Float: {
       const floatKind =
         (type as FloatType).floatKind === FloatKind.F64 ? "f64" : "f32";
-      return `floatType:${floatKind}`;
+      return `${floatKind}Type`;
     }
     case ConcreteTypeKind.Integer: {
       const integerKind = (type as IntegerType).integerKind;
@@ -188,7 +188,7 @@ export function getFullyQualifiedTypeName(type: ConcreteType): string {
           break;
       }
 
-      return `integerType:${integerKindName}`;
+      return `${integerKindName}Type`;
     }
     case ConcreteTypeKind.V128: {
       const v128Type = type as V128Type;
@@ -226,7 +226,7 @@ export function getFullyQualifiedTypeName(type: ConcreteType): string {
           v128Kind = "f64x2";
           break;
       }
-      return `v128Type:${v128Kind}`;
+      return `${v128Kind}Type`;
     }
     case ConcreteTypeKind.Never: {
       return `neverType`;
@@ -325,6 +325,33 @@ export function assertIsBinaryOpString(op: string): BinaryOpString {
   }
 }
 
+export function getBinaryOperatorString(op: BinaryOperator): string {
+  switch (op) {
+    case BinaryOperator.Add:
+      return "Add";
+    case BinaryOperator.Sub:
+      return "Sub";
+    case BinaryOperator.Mul:
+      return "Mul";
+    case BinaryOperator.Div:
+      return "Div";
+    case BinaryOperator.BitwiseAnd:
+      return "BitwiseAnd";
+    case BinaryOperator.BitwiseOr:
+      return "BitwiseOr";
+    case BinaryOperator.BitwiseXor:
+      return "BitwiseXor";
+    case BinaryOperator.Shl:
+      return "Shl";
+    case BinaryOperator.Eq:
+      return "Eq";
+    case BinaryOperator.Shr:
+      return "Shr";
+    case BinaryOperator.Neq:
+      return "Neq";
+  }
+}
+
 export function stringOpToEnum(op: BinaryOpString): BinaryOperator {
   switch (op) {
     case "+":
@@ -345,23 +372,25 @@ export function stringOpToEnum(op: BinaryOpString): BinaryOperator {
     }
     case "**":
     case "**=": {
-      return BinaryOperator.Exp;
-    } // hm, the caller should ensure that
+      UNREACHABLE(
+        "Exponentiation must be handled separately as a function call",
+      );
+    }
     case "&":
     case "&=": {
       return BinaryOperator.BitwiseAnd;
     }
     case "&&":
-    case "&&=": {
-      return BinaryOperator.LogicalAnd;
+    case "&&=":
+    case "||":
+    case "||=": {
+      UNREACHABLE(
+        "Logical AND/OR must be handled separately as a set of instructions",
+      );
     }
     case "|":
     case "|=": {
       return BinaryOperator.BitwiseOr;
-    }
-    case "||":
-    case "||=": {
-      return BinaryOperator.LogicalOr;
     }
     case "^":
     case "^=": {

@@ -1,5 +1,12 @@
+class Foo {
+  someField: i32;
+  constructor() {
+    this.someField = 0;
+  }
+}
+
 export fn _start(): void {
+  let foo = new Foo(); // I think we just forgot to set stuff to the map again
   math.asinf(f32(1.0));
-  // we didn't need the f32 lol
   math.asin(1.0);
 }
