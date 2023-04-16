@@ -52,12 +52,13 @@ export function setScope(node: AstNode, scope: Scope) {
 }
 
 export function createChildScope(scope: Scope): Scope {
-  return {
+  const result = {
     elements: new Map(),
     id: scopeIDs++,
     parent: scope,
     module: scope.module,
   };
+  return result;
 }
 
 export const enum ScopeElementType {
@@ -80,6 +81,9 @@ export const enum ScopeElementType {
   ClassSetter,
   ClassGetter,
   GrabbedVariable,
+  Interface,
+  InterfaceMethod,
+  Label,
 }
 
 export interface ScopeElement {

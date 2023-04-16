@@ -12,6 +12,7 @@ entry Program:
     | declarations+=EnumDeclaration
     | declarations+=ExternDeclaration
     | declarations+=ExportStarDeclaration
+    | declarations+=InterfaceDeclaration
 )*;
 
 NamespaceDeclaration:
@@ -26,7 +27,20 @@ NamespaceDeclaration:
     | declarations+=EnumDeclaration
     | declarations+=ExternDeclaration
     | declarations+=ExportStarDeclaration
-    )* "}";
+    | declarations+=InterfaceDeclaration
+)* "}";
+
+InterfaceDeclaration:
+    Decorators (export?="export")? "interface" NamedTypeParameters Name "{" members+=InterfaceMember* "}";
+
+InterfaceMember:
+    InterfaceFieldDeclaration | InterfaceMethodDeclaration;
+
+InterfaceFieldDeclaration:
+    Decorators Name ":" Type ";";
+
+InterfaceMethodDeclaration:
+    Decorators Name NamedTypeParameters Parameters ":" ReturnType ";";
 
 ExportStarDeclaration:
     Decorators "export" "*" "as" Name "from" path=StringLiteral ";";
@@ -62,13 +76,13 @@ FunctionDeclaration:
     Decorators (export?="export")? (async="async")? "fn" Name NamedTypeParameters Parameters ":" ReturnType block=BlockStatement;
 
 Parameter:
-    Name ":" type=TypeExpression;
+    Name ":" Type;
 
 TypeDeclaration:
-    Decorators (export?="export")? "type" Name NamedTypeParameters "=" type=TypeExpression ";";
+    Decorators (export?="export")? "type" Name NamedTypeParameters "=" Type ";";
 
 ClassDeclaration:
-    Decorators (export?="export")? (final?="final")? "class" Name NamedTypeParameters "{" members+=ClassMember* "}";
+    Decorators (export?="export")? "class" Name NamedTypeParameters ("implements" implements+=(NamedTypeExpression | TypeID) ("," implements+=(NamedTypeExpression | TypeID))*)? "{" members+=ClassMember* "}";
 
 TypeExpression:
     FunctionTypeExpression | NamedTypeExpression | TupleTypeExpression | TypeID;
@@ -89,7 +103,7 @@ ClassMember:
     ConstructorClassMember | FieldClassMember | MethodClassMember | GetterClassMember | SetterClassMember;
 
 FieldClassMember:
-    Decorators (private?="private")? Name ":" type=TypeExpression ";";
+    Decorators (private?="private")? Name ":" Type ";";
 
 MethodClassMember:
     Decorators (private?="private")? Name NamedTypeParameters Parameters ":" ReturnType block=BlockStatement;
@@ -110,19 +124,19 @@ BlockStatement:
     "{" (statements+=Statement)* "}";
 
 TypeDeclarationStatement:
-    "type" Name NamedTypeParameters "=" type=TypeExpression ";";
+    "type" Name NamedTypeParameters "=" Type ";";
 
 GrabStatement:
     "grab" "(" heldExpression=Expression "as" name=ID ")" statement=Statement;
 
 WhileStatement:
-    "while" "(" expression=Expression ")" statement=Statement;
+    (":" label=ID)? "while" "(" expression=Expression ")" statement=Statement;
 
 ContinueStatement:
-    cont?="continue" ";";
+    "continue" label=ID? ";";
 
 BreakStatement:
-    brk?="break" ";";
+    "break" label=ID? ";";
 
 IfElseStatement:
     "if" "(" condition=Expression ")" truthy=Statement ("else" falsy=Statement)?;
@@ -134,7 +148,7 @@ VariableDeclarationStatement:
     (immutable?="const" | "let") declarators+=VariableDeclarator ("," declarators+=VariableDeclarator)* ";";
 
 VariableDeclarator:
-    Name (":" type=TypeExpression)? "=" expression=Expression;
+    Name (":" Type)? "=" expression=Expression;
 
 ExpressionStatement:
     expression=Expression ";";
@@ -230,6 +244,9 @@ RootIdentifier:
 FunctionLiteral:
     TypeParameters Parameters ":" ReturnType "=>" block=BlockStatement;
 
+fragment Type:
+    type=TypeExpression;
+
 fragment CallParameters:
     "(" (parameters+=Expression ("," parameters+=Expression)*)? ")";
 
@@ -288,7 +305,7 @@ SuperLiteral:
     super?="super";
 
 AsyncBlockLiteral:
-    "async" (Generics_Open type=TypeExpression ">")? block=BlockStatement;
+    "async" (Generics_Open Type ">")? block=BlockStatement;
 
 ID:
     name=Identifier;
@@ -300,6 +317,7 @@ terminal Identifier: /[a-zA-Z$_][a-zA-Z$_0-9]*/;
 
 terminal Generics_Open: '<' (?= (/\s+/ | Identifier | "." | "," | "<" )+ '>');
 terminal Less_Than: /</;
+
 
 terminal Binary: /0b[10]+/;
 terminal Hex: /0x[0-9a-fA-F]+/;

@@ -14,12 +14,12 @@
 @name("f64") export builtin f64<T>(val: T): f64;
 
 export namespace heap {
-  @name("malloc") export builtin malloc(size: usize): usize;
-  @name("free") export builtin free<T>(ptr: T): void;
+  @name("heap.malloc") export builtin malloc(size: usize): usize;
+  @name("heap.free") export builtin free<T>(ptr: T): void;
 }
 
 export namespace stack {
-  @name("alloca") export builtin alloca(size: usize): usize;
+  @name("stack.alloca") export builtin alloca(size: usize): usize;
 }
 
 export namespace memory {
@@ -38,6 +38,7 @@ export namespace types {
   @name("types.ref") export builtin ref<T>(ptr: usize): T;
   @name("types.isReference") export builtin isReference<T>(): bool;
   @name("types.isInteger") export builtin isInteger<T>(): bool;
+  @name("types.forFieldsIn") export builtin forFieldsIn<T, U>(value: T, context: U, func: UnresolvedFunction): void;
 }
 
 export namespace math {
@@ -97,6 +98,7 @@ export namespace math {
   @name("ldexpf") export extern ldexpf(f: f32, n: i32): f32;
 }
 
+@name("UnresolvedFunction") export builtintype UnresolvedFunction;
 @name("NonNullable") export builtintype NonNullable<T>;
 @name("assert") export builtin assert<T>(value: T): NonNullable<T>;
 

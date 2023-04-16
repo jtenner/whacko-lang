@@ -69,6 +69,9 @@ import {
   ExternDeclaration,
   ExportStarDeclaration,
   RightUnaryExpression,
+  InterfaceDeclaration,
+  InterfaceFieldDeclaration,
+  InterfaceMethodDeclaration,
 } from "./generated/ast";
 import { createWhackoServices, WhackoServices } from "./whacko-module";
 import { TypeID } from "./generated/ast";
@@ -224,6 +227,12 @@ export class WhackoVisitor {
         return this.visitExternDeclaration(node);
       case "TypeID":
         return this.visitTypeID(node);
+      case "InterfaceDeclaration":
+        return this.visitInterfaceDeclaration(node);
+      case "InterfaceFieldDeclaration":
+        return this.visitInterfaceFieldDeclaration(node);
+      case "InterfaceMethodDeclaration":
+        return this.visitInterfaceMethodDeclaration(node);
       // case "TypeCastExpression":
       //   return this.visitTypeCastExpression(node);
       default:
@@ -314,6 +323,8 @@ export class WhackoVisitor {
   visitClassDeclaration(node: ClassDeclaration) {
     this.visitAll(node.decorators);
     this.visit(node.name);
+    this.visitAll(node.typeParameters);
+    this.visitAll(node.implements);
     this.visitAll(node.members);
   }
 
@@ -533,6 +544,26 @@ export class WhackoVisitor {
 
   visitRightUnaryExpression(node: RightUnaryExpression): void {
     this.visit(node.operand);
+  }
+
+  visitInterfaceDeclaration(node: InterfaceDeclaration): void {
+    this.visitAll(node.decorators);
+    this.visit(node.name);
+    this.visitAll(node.members);
+  }
+
+  visitInterfaceFieldDeclaration(node: InterfaceFieldDeclaration) {
+    this.visitAll(node.decorators);
+    this.visit(node.name);
+    this.visit(node.type);
+  }
+
+  visitInterfaceMethodDeclaration(node: InterfaceMethodDeclaration): void {
+    this.visitAll(node.decorators);
+    this.visit(node.name);
+    this.visitAll(node.typeParameters);
+    this.visitAll(node.parameters);
+    this.visit(node.returnType);
   }
 
   // visitTypeCastExpression(expression: TypeCastExpression) {

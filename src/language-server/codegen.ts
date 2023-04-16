@@ -28,9 +28,27 @@ import {
   FieldReferenceValue,
   ConstFloatValue,
   RuntimeValue,
+  UndefinedInstruction,
+  InsertElementInstruction,
+  FreeInstruction,
+  IntToPtrInstruction,
+  CallableKind,
+  isWhackoMethod,
+  isWhackoFunction,
+  printInstructionToString,
+  MallocInstruction,
+  PtrToIntInstruction,
+  TrampolineFunctionContext,
+  IntegerCastInstruction,
 } from "./ir";
-import { assert, idCounter, UNREACHABLE } from "./util";
-import { WhackoProgram } from "./program";
+import {
+  assert,
+  getFullyQualifiedInterfaceName,
+  getFullyQualifiedTypeName,
+  idCounter,
+  UNREACHABLE,
+} from "./util";
+import { LLVMFieldTrampolineDefinition, WhackoProgram } from "./program";
 import {
   LLVMValueRef,
   LLVMTypeRef,
@@ -38,7 +56,12 @@ import {
   LLVMBool,
   LLVMCodeGenFileType,
   LLVMBuilderRef,
-  lower,
+  LLVMStringRef,
+  LLVMVerifierFailureAction,
+  Pointer,
+  LLVMTargetRef,
+  LLVMErrorRef,
+  LLVMBasicBlockRef,
 } from "llvm-js";
 import {
   ConcreteType,
@@ -58,12 +81,17 @@ import {
   isSignedIntegerKind,
   isSignedV128Kind,
   isFloatV128Kind,
+  theVoidType,
+  InterfaceType,
+  getIntegerType,
+  ConcreteField,
 } from "./types";
 import {
   isClassDeclaration,
   isParameter,
   isVariableDeclarator,
 } from "./generated/ast";
+import { reportErrorDiagnostic } from "./diagnostic";
 
 type LLVMUtil = typeof import("llvm-js");
 
@@ -110,7 +138,11 @@ export function getLLVMStructType(
   const fields = Array.from(type.fields.values()).map((e) =>
     getLLVMType(LLVM, LLVMUtil, e.type),
   );
+
+  fields.unshift(LLVM._LLVMInt32Type(), LLVM._LLVMInt32Type());
+
   const fieldArray = LLVMUtil.lowerPointerArray(fields);
+
   const result = LLVM._LLVMStructType(
     fieldArray,
     fields.length,
@@ -121,6 +153,21 @@ export function getLLVMStructType(
   return result;
 }
 
+export function getLLVMCommonObjectType(
+  LLVM: LLVM,
+  LLVMUtil: LLVMUtil,
+): LLVMTypeRef {
+  const commonObjectElementTypes = LLVMUtil.lowerPointerArray([
+    LLVM._LLVMInt32Type(),
+    LLVM._LLVMInt32Type(),
+  ]);
+
+  const commonObjectType = LLVM._LLVMStructType(commonObjectElementTypes, 2, 0);
+
+  LLVM._free(commonObjectElementTypes);
+  return commonObjectType;
+}
+
 export function getLLVMType(
   LLVM: LLVM,
   LLVMUtil: LLVMUtil,
@@ -129,10 +176,13 @@ export function getLLVMType(
   if (ty.llvmType) return ty.llvmType;
 
   switch (ty.kind) {
+    case ConcreteTypeKind.UnresolvedFunction:
+      UNREACHABLE("We should always have resolved functions at this point.");
+    case ConcreteTypeKind.Pointer:
     case ConcreteTypeKind.Nullable:
     case ConcreteTypeKind.Class:
+    case ConcreteTypeKind.Interface:
     case ConcreteTypeKind.Array:
-    case ConcreteTypeKind.Str:
       return (ty.llvmType = getLLVMPointerType(LLVM));
     case ConcreteTypeKind.Function:
       return (ty.llvmType = getLLVMFunctionType(
@@ -256,8 +306,9 @@ export function codegen(program: WhackoProgram): CodegenResult {
     addAttributesToFunction(LLVM, LLVMUtil, funcRef, func.attributes);
 
     // if we need to generate instructions, then we should generate each block
-    if (func.isWhackoFunction) {
+    if (isWhackoFunction(func)) {
       const whackoFunc = func as WhackoFunctionContext;
+      if (!whackoFunc.entry) console.log(whackoFunc.name);
       const entryBlock = assert(
         whackoFunc.entry,
         "Whacko functions should have entries",
@@ -282,15 +333,25 @@ export function codegen(program: WhackoProgram): CodegenResult {
 
   // then we can generate instructions because all the function llvm references now exist
   for (const func of program.functions.values()) {
-    if (func.isWhackoFunction)
+    if (isWhackoFunction(func))
       codegenFunction(program, LLVM, LLVMUtil, func as WhackoFunctionContext);
+  }
+
+  // finally we generate all the trampolines
+  for (const trampoline of program.fieldTrampolines.values()) {
+    codegenFieldTrampoline(program, LLVM, LLVMUtil, trampoline);
+  }
+
+  for (const [trampoline, membersList] of program.methodTrampolines) {
+    codegenMethodTrampoline(program, LLVM, LLVMUtil, trampoline, membersList);
   }
 
   const targetTriplePtr = LLVMUtil.lower("wasm32-wasi");
 
   LLVM._LLVMSetTarget(program.llvmModule, targetTriplePtr);
 
-  const mallocName = LLVMUtil.lower("_malloc");
+  // attributes for malloc()
+  const mallocName = LLVMUtil.lower("malloc");
   const mallocRef = LLVM._LLVMGetNamedFunction(program.llvmModule, mallocName);
   LLVM._free(mallocName);
 
@@ -302,7 +363,8 @@ export function codegen(program: WhackoProgram): CodegenResult {
     ]);
   }
 
-  const freeName = LLVMUtil.lower("_free");
+  // attributes for free()
+  const freeName = LLVMUtil.lower("free");
   const freeRef = LLVM._LLVMGetNamedFunction(program.llvmModule, freeName);
   LLVM._free(freeName);
 
@@ -312,6 +374,63 @@ export function codegen(program: WhackoProgram): CodegenResult {
       { name: "allockind", value: "free" },
     ]);
   }
+
+  LLVM._LLVMInitializeWebAssemblyTarget();
+  LLVM._LLVMInitializeWebAssemblyTargetInfo();
+  LLVM._LLVMInitializeWebAssemblyTargetMC();
+
+  const triple = LLVMUtil.lower("wasm32-wasi");
+  const targetPtr = LLVM._malloc<LLVMTargetRef[]>(4);
+  const errorPtr = LLVM._malloc<LLVMStringRef[]>(4);
+
+  if (LLVM._LLVMGetTargetFromTriple(triple, targetPtr, errorPtr)) {
+    const errorString = LLVM.HEAPU32[errorPtr >>> 2] as LLVMStringRef;
+    const error = LLVMUtil.lift(errorString);
+    LLVM._LLVMDisposeErrorMessage(errorString);
+    UNREACHABLE("LLVMGetTargetFromTriple failed: " + error);
+  }
+
+  // This should be a helper
+  const targetRef = LLVM.HEAPU32[targetPtr >>> 2] as LLVMTargetRef;
+
+  LLVM._free(targetPtr);
+  LLVM._free(errorPtr);
+  LLVM._LLVMSetTarget(program.llvmModule, triple);
+
+  const cpu = LLVMUtil.lower("generic");
+  const features = LLVMUtil.lower("");
+  const targetMachineRef = LLVM._LLVMCreateTargetMachine(
+    targetRef,
+    triple,
+    cpu,
+    features,
+    LLVMUtil.LLVMCodeGenOptLevel.LLVMCodeGenLevelNone,
+    LLVMUtil.LLVMRelocMode.LLVMRelocDefault,
+    LLVMUtil.LLVMCodeModel.LLVMCodeModelDefault,
+  );
+  LLVM._free(triple);
+  LLVM._free(cpu);
+  LLVM._free(features);
+
+  // TODO: Figure out passes
+  const passes = LLVMUtil.lower("module-inline");
+  const passOptions = LLVM._LLVMCreatePassBuilderOptions();
+  const error = LLVM._LLVMRunPasses(
+    program.llvmModule,
+    passes,
+    targetMachineRef,
+    passOptions,
+  );
+
+  if (error) {
+    const errorMessageRef = LLVM._LLVMGetErrorMessage(error);
+    const errorMessage = LLVMUtil.lift(errorMessageRef);
+    LLVM._LLVMDisposeErrorMessage(errorMessageRef);
+    assert(`LLVMRunPasses failed: ${errorMessage}`);
+  }
+
+  LLVM._LLVMDisposePassBuilderOptions(passOptions);
+  LLVM._LLVMDisposeTargetMachine(targetMachineRef);
 
   const bitcodeRef = LLVM._LLVMWriteBitcodeToMemoryBuffer(program.llvmModule);
   const bitcodeSize = LLVM._LLVMGetBufferSize(bitcodeRef);
@@ -326,7 +445,262 @@ export function codegen(program: WhackoProgram): CodegenResult {
   const textIR = Buffer.from(LLVMUtil.lift(textIRRef));
   LLVM._free(textIRRef);
 
+  const errorPointer = LLVM._malloc<LLVMStringRef[]>(4);
+  LLVM._LLVMVerifyModule(
+    program.llvmModule,
+    1 as LLVMVerifierFailureAction,
+    errorPointer,
+  );
+
+  const stringPtr = LLVM.HEAPU32[errorPointer >>> 2] as LLVMStringRef;
+  const errorString = stringPtr === 0 ? null : LLVMUtil.lift(stringPtr);
+
+  if (errorString) {
+    reportErrorDiagnostic(
+      program,
+      null,
+      "codegen",
+      null,
+      `LLVM IR validation failed: ${errorString}`,
+    );
+  }
+
+  LLVM._free(errorPointer);
+
+  if (stringPtr) LLVM._LLVMDisposeErrorMessage(stringPtr);
+
   return { bitcode, textIR };
+}
+
+export function codegenFieldTrampoline(
+  program: WhackoProgram,
+  LLVM: LLVM,
+  LLVMUtil: LLVMUtil,
+  trampoline: LLVMFieldTrampolineDefinition,
+) {
+  // create the entry block
+  const entryName = LLVMUtil.lower(`entry~${idCounter.value++}`);
+  const entryBlock = LLVM._LLVMAppendBasicBlock(trampoline.funcRef, entryName);
+  LLVM._free(entryName);
+  LLVM._LLVMPositionBuilderAtEnd(program.llvmBuilder, entryBlock);
+
+  const commonObjectType = getLLVMCommonObjectType(LLVM, LLVMUtil);
+
+  // get the pointer to the type
+  const gepTypeName = LLVMUtil.lower(`typeGEP~${idCounter.value++}`);
+  const gepTypeIndices = LLVMUtil.lowerPointerArray([
+    // index 0
+    LLVM._LLVMConstInt(LLVM._LLVMInt32Type(), 0n, Number(false) as LLVMBool),
+  ]);
+  const pointerValue = LLVM._LLVMGetParam(trampoline.funcRef, 0);
+  const typeGEP = LLVM._LLVMBuildGEP2(
+    program.llvmBuilder,
+    commonObjectType,
+    pointerValue,
+    gepTypeIndices,
+    1,
+    gepTypeName,
+  );
+  LLVM._free(gepTypeIndices);
+  LLVM._free(gepTypeName);
+
+  const loadTypeName = LLVMUtil.lower(`loadType~${idCounter.value++}`);
+  const loadType = LLVM._LLVMBuildLoad2(
+    program.llvmBuilder,
+    LLVM._LLVMInt32Type(),
+    typeGEP,
+    loadTypeName,
+  );
+  LLVM._free(loadTypeName);
+
+  const defaultBlockName = LLVMUtil.lower(`default~${idCounter.value++}`);
+  const defaultBlock = LLVM._LLVMAppendBasicBlock(
+    trampoline.funcRef,
+    defaultBlockName,
+  );
+  LLVM._free(defaultBlockName);
+
+  // now that the type is loaded we can switch on it
+  const implementers = Array.from(trampoline.type.implementers);
+  const trampolineSwitch = LLVM._LLVMBuildSwitch(
+    program.llvmBuilder,
+    loadType,
+    defaultBlock,
+    implementers.length,
+  );
+
+  const blocks = [] as LLVMBasicBlockRef[];
+
+  // for each implementer
+  for (let i = 0; i < implementers.length; i++) {
+    // create a block and add it to the switch
+    const implementer = implementers[i];
+    const blockName = LLVMUtil.lower(getFullyQualifiedTypeName(implementer));
+    const block = LLVM._LLVMAppendBasicBlock(trampoline.funcRef, blockName);
+    LLVM._free(blockName);
+
+    LLVM._LLVMAddCase(
+      trampolineSwitch,
+      LLVM._LLVMConstInt(
+        LLVM._LLVMInt32Type(),
+        BigInt(implementer.id),
+        Number(false) as LLVMBool,
+      ),
+      block,
+    );
+
+    blocks.push(block);
+  }
+
+  // then codegen each implementer branch
+  const fieldName = trampoline.field.name;
+
+  for (let i = 0; i < implementers.length; i++) {
+    // set the start of the block
+    const block = blocks[i];
+    const implementer = implementers[i];
+    LLVM._LLVMPositionBuilderAtEnd(program.llvmBuilder, block);
+
+    const fieldIndex = Array.from(implementer.fields.values()).findIndex(
+      (e) => e.name === fieldName,
+    );
+    assert(fieldIndex !== -1);
+
+    const fieldIndexArray = LLVMUtil.lowerPointerArray([
+      LLVM._LLVMConstInt(
+        LLVM._LLVMInt32Type(),
+        BigInt(fieldIndex + 2),
+        Number(false) as LLVMBool,
+      ),
+    ]);
+    const resultGEPName = LLVMUtil.lower(`resultGEP~${idCounter.value++}`);
+    const result = LLVM._LLVMBuildGEP2(
+      program.llvmBuilder,
+      assert(implementer.llvmType),
+      pointerValue,
+      fieldIndexArray,
+      1,
+      resultGEPName,
+    );
+
+    LLVM._LLVMBuildRet(program.llvmBuilder, result);
+  }
+
+  LLVM._LLVMPositionBuilderAtEnd(program.llvmBuilder, defaultBlock);
+  LLVM._LLVMBuildUnreachable(program.llvmBuilder);
+}
+
+export function codegenMethodTrampoline(
+  program: WhackoProgram,
+  LLVM: LLVM,
+  LLVMUtil: LLVMUtil,
+  trampoline: TrampolineFunctionContext,
+  membersList: Set<WhackoMethodContext>,
+) {
+  const funcRef = assert(
+    trampoline.funcRef,
+    "The trampoline funcRef must exist at this point.",
+  );
+
+  // create the entry block
+  const entryName = LLVMUtil.lower(`entry~${idCounter.value++}`);
+  const entryBlock = LLVM._LLVMAppendBasicBlock(funcRef, entryName);
+  LLVM._free(entryName);
+  LLVM._LLVMPositionBuilderAtEnd(program.llvmBuilder, entryBlock);
+
+  const commonObjectType = getLLVMCommonObjectType(LLVM, LLVMUtil);
+
+  // get the pointer to the type
+  const gepTypeName = LLVMUtil.lower(`typeGEP~${idCounter.value++}`);
+  const gepTypeIndices = LLVMUtil.lowerPointerArray([
+    // index 0
+    LLVM._LLVMConstInt(LLVM._LLVMInt32Type(), 0n, Number(false) as LLVMBool),
+  ]);
+  const pointerValue = LLVM._LLVMGetParam(funcRef, 0);
+  const typeGEP = LLVM._LLVMBuildGEP2(
+    program.llvmBuilder,
+    commonObjectType,
+    pointerValue,
+    gepTypeIndices,
+    1,
+    gepTypeName,
+  );
+  LLVM._free(gepTypeIndices);
+  LLVM._free(gepTypeName);
+
+  const loadTypeName = LLVMUtil.lower(`loadType~${idCounter.value++}`);
+  const loadType = LLVM._LLVMBuildLoad2(
+    program.llvmBuilder,
+    LLVM._LLVMInt32Type(),
+    typeGEP,
+    loadTypeName,
+  );
+  LLVM._free(loadTypeName);
+
+  const defaultBlockName = LLVMUtil.lower(`default~${idCounter.value++}`);
+  const defaultBlock = LLVM._LLVMAppendBasicBlock(funcRef, defaultBlockName);
+  LLVM._free(defaultBlockName);
+
+  // now that the type is loaded we can switch on it
+  const membersListArray = Array.from(membersList);
+  const trampolineSwitch = LLVM._LLVMBuildSwitch(
+    program.llvmBuilder,
+    loadType,
+    defaultBlock,
+    membersListArray.length,
+  );
+
+  const blocks = [] as LLVMBasicBlockRef[];
+
+  // for each implementer
+  for (let i = 0; i < membersListArray.length; i++) {
+    // create a block and add it to the switch
+    const member = membersListArray[i];
+    const blockName = LLVMUtil.lower(member.name);
+    const block = LLVM._LLVMAppendBasicBlock(funcRef, blockName);
+    LLVM._free(blockName);
+
+    LLVM._LLVMAddCase(
+      trampolineSwitch,
+      LLVM._LLVMConstInt(
+        LLVM._LLVMInt32Type(),
+        BigInt(member.thisType.id),
+        Number(false) as LLVMBool,
+      ),
+      block,
+    );
+
+    blocks.push(block);
+  }
+
+  for (let i = 0; i < membersListArray.length; i++) {
+    const block = blocks[i];
+    const method = membersListArray[i];
+    LLVM._LLVMPositionBuilderAtEnd(program.llvmBuilder, block);
+
+    const params = [];
+    for (let i = 0; i < 1 + trampoline.type.parameterTypes.length; i++) {
+      params.push(LLVM._LLVMGetParam(funcRef, i));
+    }
+
+    const paramsArray = LLVMUtil.lowerPointerArray(params);
+
+    const result = LLVM._LLVMBuildCall2(
+      program.llvmBuilder,
+      getLLVMFunctionType(LLVM, LLVMUtil, trampoline.type),
+      assert(method.funcRef, "All methods should have been compiled by now."),
+      paramsArray,
+      params.length,
+      0 as LLVMStringRef,
+    );
+    // there is one last thing
+    // removing trampolineInfo, because callables already have a funcRef property
+    LLVM._free(paramsArray);
+    LLVM._LLVMBuildRet(program.llvmBuilder, result);
+  }
+
+  LLVM._LLVMPositionBuilderAtEnd(program.llvmBuilder, defaultBlock);
+  LLVM._LLVMBuildUnreachable(program.llvmBuilder);
 }
 
 export function getLLVMIntType(LLVM: LLVM, type: IntegerType): LLVMTypeRef {
@@ -351,6 +725,7 @@ export function getLLVMIntType(LLVM: LLVM, type: IntegerType): LLVMTypeRef {
 }
 
 export function getLLVMValue(
+  program: WhackoProgram,
   func: WhackoFunctionContext,
   builder: LLVMBuilderRef,
   LLVM: LLVM,
@@ -404,36 +779,75 @@ export function getLLVMValue(
       // Keep this comment here: :^)
       const casted = value as FieldReferenceValue;
       const thisValue = casted.thisValue;
-      assert(
-        thisValue.type?.kind === ConcreteTypeKind.Class,
-        "thisValue should be a class...you screwed up!",
-      );
-      const thisType = thisValue.type as ClassType;
-      const structType = getLLVMStructType(LLVM, LLVMUtil, thisType);
 
-      const index = Array.from(thisType.fields.values()).indexOf(casted.field);
-      assert(
-        index !== -1,
-        "The field reference value must use a field that exists on the thisValue's type. Royal screw up!",
-      );
+      if (thisValue.type.kind === ConcreteTypeKind.Class) {
+        const thisType = thisValue.type as ClassType;
 
-      const name = LLVMUtil.lower(`GEP~${idCounter.value++}`);
-      const lowered = LLVMUtil.lowerPointerArray([
-        LLVM._LLVMConstInt(LLVM._LLVMInt32Type(), BigInt(index), 0),
-      ]);
+        const structType = getLLVMStructType(LLVM, LLVMUtil, thisType);
 
-      const result = LLVM._LLVMBuildGEP2(
-        builder,
-        structType,
-        getLLVMValue(func, builder, LLVM, LLVMUtil, thisValue),
-        lowered,
-        1,
-        name,
-      );
+        const index = Array.from(thisType.fields.values()).indexOf(
+          casted.field,
+        );
+        assert(
+          index !== -1,
+          "The field reference value must use a field that exists on the thisValue's type. Royal screw up!",
+        );
 
-      LLVM._free(name);
-      LLVM._free(lowered);
-      return result;
+        const name = LLVMUtil.lower(`gep~${idCounter.value++}`);
+        const lowered = LLVMUtil.lowerPointerArray([
+          LLVM._LLVMConstInt(LLVM._LLVMInt32Type(), BigInt(index + 2), 0),
+        ]);
+
+        const result = LLVM._LLVMBuildGEP2(
+          builder,
+          structType,
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, thisValue),
+          lowered,
+          1,
+          name,
+        );
+
+        LLVM._free(name);
+        LLVM._free(lowered);
+        return result;
+      } else if (thisValue.type.kind === ConcreteTypeKind.Interface) {
+        const thisType = thisValue.type as InterfaceType;
+
+        const { funcRef: ref, typeRef: refType } =
+          ensureFieldTrampolineCompiled(
+            program,
+            LLVM,
+            LLVMUtil,
+            casted.field,
+            thisType,
+          );
+        const trampolineCallName = LLVMUtil.lower(
+          `trampolineCall~${idCounter.value++}`,
+        );
+        const parameters = LLVMUtil.lowerPointerArray([
+          getLLVMValue(
+            program,
+            func,
+            builder,
+            LLVM,
+            LLVMUtil,
+            casted.thisValue,
+          ),
+        ]);
+        const result = LLVM._LLVMBuildCall2(
+          builder,
+          refType,
+          ref,
+          parameters,
+          1,
+          trampolineCallName,
+        );
+        LLVM._free(trampolineCallName);
+        LLVM._free(parameters);
+        return result;
+      } else {
+        UNREACHABLE("What happened here?");
+      }
     }
     case ValueKind.ConcreteFunction: {
       return assert(func.funcRef);
@@ -444,8 +858,6 @@ export function getLLVMValue(
     }
     case ValueKind.Runtime: {
       const casted = value as RuntimeValue;
-      // Oh, I'm stupid, I'm sorry
-      // I remember
       const instruction = assert(func.instructions.get(casted.instruction));
       return assert(
         instruction.ref,
@@ -464,21 +876,121 @@ function appendLLVMBinaryInstruction(
 ): LLVMValueRef {
   const { llvmBuilder: builder } = program;
   switch (instruction.op) {
+    case BinaryOperator.Lt: {
+      const name = LLVMUtil.lower(instruction.name);
+      let result: LLVMValueRef;
+      if (instruction.type.kind === ConcreteTypeKind.Float) {
+        result = LLVM._LLVMBuildFCmp(
+          program.llvmBuilder,
+          LLVMUtil.LLVMRealPredicate.Olt,
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.lhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.rhs),
+          name,
+        );
+      } else {
+        result = LLVM._LLVMBuildICmp(
+          program.llvmBuilder,
+          isSignedIntegerKind((instruction.type as IntegerType).integerKind)
+            ? LLVMUtil.LLVMIntPredicate.Slt
+            : LLVMUtil.LLVMIntPredicate.Ult,
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.lhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.rhs),
+          name,
+        );
+      }
+      LLVM._free(name);
+      return result;
+    }
+    case BinaryOperator.Lte: {
+      const name = LLVMUtil.lower(instruction.name);
+      let result: LLVMValueRef;
+      if (instruction.type.kind === ConcreteTypeKind.Float) {
+        result = LLVM._LLVMBuildFCmp(
+          program.llvmBuilder,
+          LLVMUtil.LLVMRealPredicate.Ole,
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.lhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.rhs),
+          name,
+        );
+      } else {
+        result = LLVM._LLVMBuildICmp(
+          program.llvmBuilder,
+          isSignedIntegerKind((instruction.type as IntegerType).integerKind)
+            ? LLVMUtil.LLVMIntPredicate.Sle
+            : LLVMUtil.LLVMIntPredicate.Ule,
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.lhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.rhs),
+          name,
+        );
+      }
+      LLVM._free(name);
+      return result;
+    }
+    case BinaryOperator.Gte: {
+      const name = LLVMUtil.lower(instruction.name);
+      let result: LLVMValueRef;
+      if (instruction.type.kind === ConcreteTypeKind.Float) {
+        result = LLVM._LLVMBuildFCmp(
+          program.llvmBuilder,
+          LLVMUtil.LLVMRealPredicate.Oge,
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.lhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.rhs),
+          name,
+        );
+      } else {
+        result = LLVM._LLVMBuildICmp(
+          program.llvmBuilder,
+          isSignedIntegerKind((instruction.type as IntegerType).integerKind)
+            ? LLVMUtil.LLVMIntPredicate.Sge
+            : LLVMUtil.LLVMIntPredicate.Uge,
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.lhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.rhs),
+          name,
+        );
+      }
+      LLVM._free(name);
+      return result;
+    }
+    case BinaryOperator.Gt: {
+      const name = LLVMUtil.lower(instruction.name);
+      let result: LLVMValueRef;
+      if (instruction.type.kind === ConcreteTypeKind.Float) {
+        result = LLVM._LLVMBuildFCmp(
+          program.llvmBuilder,
+          LLVMUtil.LLVMRealPredicate.Ogt,
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.lhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.rhs),
+          name,
+        );
+      } else {
+        result = LLVM._LLVMBuildICmp(
+          program.llvmBuilder,
+          isSignedIntegerKind((instruction.type as IntegerType).integerKind)
+            ? LLVMUtil.LLVMIntPredicate.Sgt
+            : LLVMUtil.LLVMIntPredicate.Ugt,
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.lhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.rhs),
+          name,
+        );
+      }
+      LLVM._free(name);
+      return result;
+    }
     case BinaryOperator.Add: {
       const name = LLVMUtil.lower(instruction.name);
       let result: LLVMValueRef;
       if (instruction.type.kind === ConcreteTypeKind.Float) {
         result = LLVM._LLVMBuildFAdd(
           program.llvmBuilder,
-          getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.lhs),
-          getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.rhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.lhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.rhs),
           name,
         );
       } else {
         result = LLVM._LLVMBuildAdd(
           program.llvmBuilder,
-          getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.lhs),
-          getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.rhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.lhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.rhs),
           name,
         );
       }
@@ -491,16 +1003,16 @@ function appendLLVMBinaryInstruction(
       if (instruction.type.kind === ConcreteTypeKind.Float) {
         result = LLVM._LLVMBuildFSub(
           program.llvmBuilder,
-          getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.lhs),
-          getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.rhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.lhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.rhs),
           name,
         );
       } else {
         // this works for vectors
         result = LLVM._LLVMBuildSub(
           program.llvmBuilder,
-          getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.lhs),
-          getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.rhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.lhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.rhs),
           name,
         );
       }
@@ -513,16 +1025,16 @@ function appendLLVMBinaryInstruction(
       if (instruction.type.kind === ConcreteTypeKind.Float) {
         result = LLVM._LLVMBuildFMul(
           program.llvmBuilder,
-          getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.lhs),
-          getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.rhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.lhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.rhs),
           name,
         );
       } else {
         // this works for vectors
         result = LLVM._LLVMBuildMul(
           program.llvmBuilder,
-          getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.lhs),
-          getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.rhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.lhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.rhs),
           name,
         );
       }
@@ -549,23 +1061,51 @@ function appendLLVMBinaryInstruction(
       if (isFloat) {
         result = LLVM._LLVMBuildFDiv(
           program.llvmBuilder,
-          getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.lhs),
-          getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.rhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.lhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.rhs),
           name,
         );
       } else {
         if (isSigned) {
           result = LLVM._LLVMBuildSDiv(
             program.llvmBuilder,
-            getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.lhs),
-            getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.rhs),
+            getLLVMValue(
+              program,
+              func,
+              builder,
+              LLVM,
+              LLVMUtil,
+              instruction.lhs,
+            ),
+            getLLVMValue(
+              program,
+              func,
+              builder,
+              LLVM,
+              LLVMUtil,
+              instruction.rhs,
+            ),
             name,
           );
         } else {
           result = LLVM._LLVMBuildUDiv(
             program.llvmBuilder,
-            getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.lhs),
-            getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.rhs),
+            getLLVMValue(
+              program,
+              func,
+              builder,
+              LLVM,
+              LLVMUtil,
+              instruction.lhs,
+            ),
+            getLLVMValue(
+              program,
+              func,
+              builder,
+              LLVM,
+              LLVMUtil,
+              instruction.rhs,
+            ),
             name,
           );
         }
@@ -577,8 +1117,8 @@ function appendLLVMBinaryInstruction(
       const name = LLVMUtil.lower(instruction.name);
       const result = LLVM._LLVMBuildAnd(
         program.llvmBuilder,
-        getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.lhs),
-        getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.rhs),
+        getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.lhs),
+        getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.rhs),
         name,
       );
       LLVM._free(name);
@@ -588,8 +1128,8 @@ function appendLLVMBinaryInstruction(
       const name = LLVMUtil.lower(instruction.name);
       const result = LLVM._LLVMBuildOr(
         program.llvmBuilder,
-        getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.lhs),
-        getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.rhs),
+        getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.lhs),
+        getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.rhs),
         name,
       );
       LLVM._free(name);
@@ -599,8 +1139,8 @@ function appendLLVMBinaryInstruction(
       const name = LLVMUtil.lower(instruction.name);
       const result = LLVM._LLVMBuildXor(
         program.llvmBuilder,
-        getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.lhs),
-        getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.rhs),
+        getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.lhs),
+        getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.rhs),
         name,
       );
       LLVM._free(name);
@@ -611,8 +1151,8 @@ function appendLLVMBinaryInstruction(
       const name = LLVMUtil.lower(instruction.name);
       const result = LLVM._LLVMBuildShl(
         program.llvmBuilder,
-        getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.lhs),
-        getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.rhs),
+        getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.lhs),
+        getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.rhs),
         name,
       );
       LLVM._free(name);
@@ -627,8 +1167,8 @@ function appendLLVMBinaryInstruction(
         result = LLVM._LLVMBuildFCmp(
           program.llvmBuilder,
           LLVMUtil.LLVMRealPredicate.Oeq,
-          getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.lhs),
-          getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.rhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.lhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.rhs),
           name,
         );
       } else {
@@ -636,8 +1176,8 @@ function appendLLVMBinaryInstruction(
         result = LLVM._LLVMBuildICmp(
           program.llvmBuilder,
           LLVMUtil.LLVMIntPredicate.Eq,
-          getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.lhs),
-          getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.rhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.lhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.rhs),
           name,
         );
       }
@@ -654,15 +1194,15 @@ function appendLLVMBinaryInstruction(
       if (isSignedIntegerKind((type as IntegerType).integerKind)) {
         result = LLVM._LLVMBuildAShr(
           program.llvmBuilder,
-          getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.lhs),
-          getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.rhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.lhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.rhs),
           name,
         );
       } else {
         result = LLVM._LLVMBuildLShr(
           program.llvmBuilder,
-          getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.lhs),
-          getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.rhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.lhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.rhs),
           name,
         );
       }
@@ -678,8 +1218,8 @@ function appendLLVMBinaryInstruction(
         result = LLVM._LLVMBuildFCmp(
           program.llvmBuilder,
           LLVMUtil.LLVMRealPredicate.Une,
-          getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.lhs),
-          getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.rhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.lhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.rhs),
           name,
         );
       } else {
@@ -687,8 +1227,8 @@ function appendLLVMBinaryInstruction(
         result = LLVM._LLVMBuildICmp(
           program.llvmBuilder,
           LLVMUtil.LLVMIntPredicate.Ne,
-          getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.lhs),
-          getLLVMValue(func, builder, LLVM, LLVMUtil, instruction.rhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.lhs),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, instruction.rhs),
           name,
         );
       }
@@ -708,13 +1248,69 @@ function appendLLVMInstruction(
   // This will be nullable soon honestly
   const { llvmBuilder: builder } = program;
   switch (instruction.kind) {
+    case InstructionKind.PtrToInt: {
+      const cast = instruction as PtrToIntInstruction;
+      const name = LLVMUtil.lower(cast.name);
+      const result = LLVM._LLVMBuildPtrToInt(
+        builder,
+        getLLVMValue(program, func, builder, LLVM, LLVMUtil, cast.value),
+        getLLVMIntType(LLVM, cast.type),
+        name,
+      );
+      LLVM._free(name);
+      return result;
+    }
+    case InstructionKind.Malloc: {
+      const cast = instruction as MallocInstruction;
+      const name = LLVMUtil.lower(cast.name);
+      const result = LLVM._LLVMBuildArrayMalloc(
+        builder,
+        getLLVMIntType(LLVM, getIntegerType(IntegerKind.I8)),
+        getLLVMValue(program, func, builder, LLVM, LLVMUtil, cast.size),
+        name,
+      );
+      LLVM._free(name);
+      return result;
+    }
+    case InstructionKind.IntToPtr: {
+      const cast = instruction as IntToPtrInstruction;
+      const name = LLVMUtil.lower(cast.name);
+      const value = getLLVMValue(
+        program,
+        func,
+        builder,
+        LLVM,
+        LLVMUtil,
+        cast.value,
+      );
+      const result = LLVM._LLVMBuildIntToPtr(
+        builder,
+        value,
+        getLLVMType(LLVM, LLVMUtil, cast.type),
+        name,
+      );
+      LLVM._free(name);
+      return result;
+    }
+    case InstructionKind.Free: {
+      const cast = instruction as FreeInstruction;
+      const value = getLLVMValue(
+        program,
+        func,
+        builder,
+        LLVM,
+        LLVMUtil,
+        cast.value,
+      );
+      return LLVM._LLVMBuildFree(builder, value);
+    }
     case InstructionKind.Unset:
       UNREACHABLE(
         "Unset should never be reached in codegen (or anywhere for that matter)",
       );
     case InstructionKind.Const: {
       const cast = instruction as ConstInstruction;
-      return getLLVMValue(func, builder, LLVM, LLVMUtil, cast.child);
+      return getLLVMValue(program, func, builder, LLVM, LLVMUtil, cast.child);
     }
     case InstructionKind.Br: {
       const cast = instruction as BrInstruction;
@@ -724,6 +1320,7 @@ function appendLLVMInstruction(
     case InstructionKind.BrIf: {
       const cast = instruction as BrIfInstruction;
       const condition = getLLVMValue(
+        program,
         func,
         builder,
         LLVM,
@@ -773,44 +1370,116 @@ function appendLLVMInstruction(
     case InstructionKind.New: {
       const casted = instruction as NewInstruction;
       const name = LLVMUtil.lower(casted.name);
-      const result = LLVM._LLVMBuildMalloc(
-        builder,
-        getLLVMType(LLVM, LLVMUtil, casted.type),
-        name,
-      );
+      const llvmType = getLLVMType(LLVM, LLVMUtil, casted.type);
+      const result = LLVM._LLVMBuildMalloc(builder, llvmType, name);
       LLVM._free(name);
+
+      // We need to store the type of the reference on the allocation
+      LLVM._LLVMBuildStore(
+        builder,
+        LLVM._LLVMConstInt(
+          LLVM._LLVMInt32Type(),
+          BigInt(casted.type.id),
+          Number(false) as LLVMBool,
+        ),
+        result,
+      );
+
+      // we need to store at offset 4 the following value
+      const rawSizeOf = LLVM._LLVMSizeOf(llvmType);
+
+      const sizeOfCastName = LLVMUtil.lower(`sizeOfCast~${idCounter.value++}`);
+      const sizeOf = LLVM._LLVMBuildIntCast2(
+        builder,
+        rawSizeOf,
+        LLVM._LLVMInt32Type(),
+        Number(false) as LLVMBool,
+        sizeOfCastName,
+      );
+      LLVM._free(sizeOfCastName);
+
+      const sizeOfGEPName = LLVMUtil.lower(`sizeOfGEP~${idCounter.value++}`);
+      const sizeOfIndices = LLVMUtil.lowerPointerArray([
+        LLVM._LLVMConstInt(
+          LLVM._LLVMInt32Type(),
+          1n,
+          Number(false) as LLVMBool,
+        ),
+      ]);
+      const sizeOfGEP = LLVM._LLVMBuildGEP2(
+        builder,
+        llvmType,
+        result,
+        sizeOfIndices,
+        1,
+        sizeOfGEPName,
+      );
+      LLVM._free(sizeOfGEPName);
+      LLVM._free(sizeOfIndices);
+
+      // perform the store
+      LLVM._LLVMBuildStore(builder, sizeOf, sizeOfGEP);
+
       return result;
     }
     case InstructionKind.Call: {
       const casted = instruction as CallInstruction;
-      const name = LLVMUtil.lower(casted.name);
+      const name =
+        casted.type === theVoidType
+          ? (0 as LLVMStringRef)
+          : LLVMUtil.lower(casted.name);
 
       const args = LLVMUtil.lowerPointerArray(
         casted.args.map((value) =>
-          getLLVMValue(func, builder, LLVM, LLVMUtil, value),
+          getLLVMValue(program, func, builder, LLVM, LLVMUtil, value),
         ),
       );
+
+      const funcRef =
+        casted.callee.kind === CallableKind.InterfaceMethod
+          ? ensureMethodTrampolineCompiled(
+              program,
+              LLVM,
+              LLVMUtil,
+              casted.callee as TrampolineFunctionContext,
+            )
+          : assert(
+              casted.callee.funcRef,
+              `The funcref wasn't set on the callee '${casted.callee.name}'. Uhoh.`,
+            );
 
       const result = LLVM._LLVMBuildCall2(
         builder,
         getLLVMType(LLVM, LLVMUtil, casted.callee.type),
-        assert(casted.callee.funcRef),
+        funcRef,
         args,
         casted.args.length,
         name,
       );
 
       LLVM._free(args);
+      if (name) LLVM._free(name);
+      return result;
+    }
+    case InstructionKind.IntegerCast: {
+      const casted = instruction as IntegerCastInstruction;
+      const name = LLVMUtil.lower(casted.name);
+      const result = LLVM._LLVMBuildIntCast2(
+        builder,
+        getLLVMValue(program, func, builder, LLVM, LLVMUtil, casted.value),
+        getLLVMType(LLVM, LLVMUtil, casted.type),
+        Number(isSignedIntegerKind(casted.type.integerKind)) as LLVMBool,
+        name,
+      );
       LLVM._free(name);
       return result;
     }
-    case InstructionKind.IntegerCast:
     case InstructionKind.FloatCast: {
       const casted = instruction as FloatCastInstruction;
       const name = LLVMUtil.lower(casted.name);
       const result = LLVM._LLVMBuildFPCast(
         builder,
-        getLLVMValue(func, builder, LLVM, LLVMUtil, casted.value),
+        getLLVMValue(program, func, builder, LLVM, LLVMUtil, casted.value),
         getLLVMType(LLVM, LLVMUtil, casted.type),
         name,
       );
@@ -819,11 +1488,21 @@ function appendLLVMInstruction(
     }
     case InstructionKind.Load: {
       const casted = instruction as LoadInstruction;
+
+      const pointer: LLVMValueRef = getLLVMValue(
+        program,
+        func,
+        builder,
+        LLVM,
+        LLVMUtil,
+        casted.source,
+      );
+
       const name = LLVMUtil.lower(casted.name);
       const result = LLVM._LLVMBuildLoad2(
         builder,
         getLLVMType(LLVM, LLVMUtil, casted.type),
-        getLLVMValue(func, builder, LLVM, LLVMUtil, casted.source), // GEP for fields
+        pointer, // GEP for fields
         name,
       );
       LLVM._free(name);
@@ -833,8 +1512,8 @@ function appendLLVMInstruction(
       const casted = instruction as StoreInstruction;
       return LLVM._LLVMBuildStore(
         program.llvmBuilder,
-        getLLVMValue(func, builder, LLVM, LLVMUtil, casted.value),
-        getLLVMValue(func, builder, LLVM, LLVMUtil, casted.target),
+        getLLVMValue(program, func, builder, LLVM, LLVMUtil, casted.value),
+        getLLVMValue(program, func, builder, LLVM, LLVMUtil, casted.target),
       );
     }
     case InstructionKind.LogicalNot:
@@ -843,7 +1522,7 @@ function appendLLVMInstruction(
       const name = LLVMUtil.lower(casted.name);
       const result = LLVM._LLVMBuildNot(
         program.llvmBuilder,
-        getLLVMValue(func, builder, LLVM, LLVMUtil, casted.operand),
+        getLLVMValue(program, func, builder, LLVM, LLVMUtil, casted.operand),
         name,
       );
       LLVM._free(result);
@@ -858,12 +1537,26 @@ function appendLLVMInstruction(
         casted.type.kind === ConcreteTypeKind.Integer
           ? LLVM._LLVMBuildNeg(
               builder,
-              getLLVMValue(func, builder, LLVM, LLVMUtil, casted.operand),
+              getLLVMValue(
+                program,
+                func,
+                builder,
+                LLVM,
+                LLVMUtil,
+                casted.operand,
+              ),
               name,
             )
           : LLVM._LLVMBuildFNeg(
               builder,
-              getLLVMValue(func, builder, LLVM, LLVMUtil, casted.operand),
+              getLLVMValue(
+                program,
+                func,
+                builder,
+                LLVM,
+                LLVMUtil,
+                casted.operand,
+              ),
               name,
             );
 
@@ -877,8 +1570,25 @@ function appendLLVMInstruction(
         ? LLVM._LLVMBuildRetVoid(builder)
         : LLVM._LLVMBuildRet(
             builder,
-            getLLVMValue(func, builder, LLVM, LLVMUtil, value),
+            getLLVMValue(program, func, builder, LLVM, LLVMUtil, value),
           );
+    }
+    case InstructionKind.Undefined: {
+      const casted = instruction as UndefinedInstruction;
+      return LLVM._LLVMGetUndef(getLLVMType(LLVM, LLVMUtil, casted.type));
+    }
+    case InstructionKind.InsertElement: {
+      const casted = instruction as InsertElementInstruction;
+      const name = LLVMUtil.lower(casted.name);
+      const result = LLVM._LLVMBuildInsertElement(
+        builder,
+        getLLVMValue(program, func, builder, LLVM, LLVMUtil, casted.target),
+        getLLVMValue(program, func, builder, LLVM, LLVMUtil, casted.value),
+        LLVM._LLVMConstInt(LLVM._LLVMInt32Type(), BigInt(casted.index), 0),
+        name,
+      );
+      LLVM._free(name);
+      return result;
     }
   }
 }
@@ -896,6 +1606,8 @@ export function codegenFunction(
   // For variables, it's the declarator
 
   const { llvmBuilder: builder } = program;
+
+  LLVM._LLVMPositionBuilderAtEnd(builder, assert(func.entry?.llvmBlock));
 
   let allocaId = 0;
   for (const [node, site] of func.stackAllocationSites) {
@@ -919,7 +1631,7 @@ export function codegenFunction(
         site.ref,
       );
     } else if (isParameter(node)) {
-      const index = node.$containerIndex! + Number(func.isWhackoMethod);
+      const index = node.$containerIndex! + Number(isWhackoMethod(func));
       LLVM._LLVMBuildStore(
         builder,
         LLVM._LLVMGetParam(assert(func.funcRef), index),
@@ -948,4 +1660,65 @@ export function codegenFunction(
       );
     }
   }
+}
+
+export function ensureFieldTrampolineCompiled(
+  program: WhackoProgram,
+  LLVM: LLVM,
+  LLVMUtil: LLVMUtil,
+  field: ConcreteField,
+  type: InterfaceType,
+): LLVMFieldTrampolineDefinition {
+  const interfaceTypeName = getFullyQualifiedTypeName(type);
+  const fullyQualifiedFieldName = `${interfaceTypeName}#${field.name}`;
+
+  if (program.fieldTrampolines.has(fullyQualifiedFieldName)) {
+    const trampoline = program.fieldTrampolines.get(fullyQualifiedFieldName)!;
+    return trampoline;
+  }
+
+  const loweredParameterTypeArray = LLVMUtil.lowerPointerArray([
+    getLLVMPointerType(LLVM),
+  ]);
+  const typeRef = LLVM._LLVMFunctionType(
+    getLLVMPointerType(LLVM),
+    loweredParameterTypeArray,
+    1,
+    Number(false) as LLVMBool,
+  );
+  LLVM._free(loweredParameterTypeArray);
+
+  const loweredTrampolineName = LLVMUtil.lower(fullyQualifiedFieldName);
+  const funcRef = LLVM._LLVMAddFunction(
+    program.llvmModule,
+    loweredTrampolineName,
+    typeRef,
+  );
+  LLVM._free(loweredTrampolineName);
+  const result: LLVMFieldTrampolineDefinition = {
+    field,
+    name: fullyQualifiedFieldName,
+    funcRef,
+    typeRef,
+    type,
+  };
+  program.fieldTrampolines.set(fullyQualifiedFieldName, result);
+  return result;
+}
+
+export function ensureMethodTrampolineCompiled(
+  program: WhackoProgram,
+  LLVM: LLVM,
+  LLVMUtil: LLVMUtil,
+  trampoline: TrampolineFunctionContext,
+): LLVMValueRef {
+  if (trampoline.funcRef) return trampoline.funcRef;
+
+  const typeRef = getLLVMFunctionType(LLVM, LLVMUtil, trampoline.type);
+  const name = LLVMUtil.lower(trampoline.name);
+  const funcRef = LLVM._LLVMAddFunction(program.llvmModule, name, typeRef);
+
+  LLVM._free(name);
+  trampoline.funcRef = funcRef;
+  return funcRef;
 }

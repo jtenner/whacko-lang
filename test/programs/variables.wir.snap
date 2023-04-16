@@ -1,0 +1,8 @@
+program:
+  callable:[test/programs/variables.wo]_start;functionType:()=>voidType
+    block: entry~29
+      30~inst = load: (variable a)
+      31~inst = (i64 10)
+      32~inst = store: (variable a) = (runtime i64Type 31~inst)
+      return (void)
+

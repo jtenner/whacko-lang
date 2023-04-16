@@ -1,3 +1,4 @@
+import { AstNode } from "langium";
 import { WhackoVisitor } from "../WhackoVisitor";
 import { reportErrorDiagnostic } from "../diagnostic";
 import {
@@ -8,6 +9,7 @@ import {
   ContinueStatement,
   IfElseStatement,
   ReturnStatement,
+  WhileStatement,
   isConstructorClassMember,
   isFieldClassMember,
   isMemberAccessExpression,
@@ -15,13 +17,14 @@ import {
 } from "../generated/ast";
 import { WhackoModule, WhackoProgram } from "../program";
 import { assert, cleanNode, isAssignmentOperator } from "../util";
+import { ScopeElementType, getElementInScope, getScope } from "../scope";
 
 export interface ClassRulesStackItem {
   fields: Map<string, boolean>;
   shouldAdd: boolean;
 }
 
-export class ClassRulesPass extends WhackoVisitor {
+export class ValidatorPass extends WhackoVisitor {
   constructor(public program: WhackoProgram) {
     super();
   }
@@ -29,6 +32,7 @@ export class ClassRulesPass extends WhackoVisitor {
   inConstructor: boolean = false;
   setStack: ClassRulesStackItem[] = [];
   mod!: WhackoModule;
+  loopStack: AstNode[] = [];
 
   visitModule(module: WhackoModule) {
     this.mod = module;
@@ -138,15 +142,6 @@ export class ClassRulesPass extends WhackoVisitor {
     this.visit(node.truthy);
     this.setStack.pop();
 
-    /*
-      if (foo) {
-        this.y = 123;
-        return;
-      } else {
-        // We must modify currentItem.shouldAdd
-      }
-    */
-
     if (node.falsy) {
       this.setStack.push(elseSet);
       this.visit(node.falsy);
@@ -186,14 +181,94 @@ export class ClassRulesPass extends WhackoVisitor {
   }
 
   override visitBreakStatement(node: BreakStatement): void {
+    if (!this.loopStack.length) {
+      reportErrorDiagnostic(
+        this.program,
+        this.mod,
+        "type",
+        node,
+        `Cannot break outside of a loop.`,
+      );
+      return;
+    }
+
+    if (node.label) {
+      const scope = assert(
+        getScope(node),
+        "The scope for this element must exist.",
+      );
+      const scopeElement = getElementInScope(scope, node.label.name);
+      if (!scopeElement) {
+        reportErrorDiagnostic(
+          this.program,
+          this.mod,
+          "type",
+          node,
+          `Label '${node.label.name}' does not exist.`,
+        );
+      }
+      if (scopeElement && scopeElement.type !== ScopeElementType.Label) {
+        reportErrorDiagnostic(
+          this.program,
+          this.mod,
+          "type",
+          node,
+          `'${node.label.name}' is not a label.`,
+        );
+      }
+    }
+
     if (!this.inConstructor) return;
     const lastItem = assert(this.setStack.at(-1));
     lastItem.shouldAdd = false;
   }
 
   override visitContinueStatement(node: ContinueStatement): void {
+    if (!this.loopStack.length) {
+      reportErrorDiagnostic(
+        this.program,
+        this.mod,
+        "type",
+        node,
+        `Cannot continue outside of a loop.`,
+      );
+      return;
+    }
+
+    if (node.label) {
+      const scope = assert(
+        getScope(node),
+        "The scope for this element must exist.",
+      );
+      const scopeElement = getElementInScope(scope, node.label.name);
+      if (!scopeElement) {
+        reportErrorDiagnostic(
+          this.program,
+          this.mod,
+          "type",
+          node,
+          `Label '${node.label.name}' does not exist.`,
+        );
+      }
+      if (scopeElement && scopeElement.type !== ScopeElementType.Label) {
+        reportErrorDiagnostic(
+          this.program,
+          this.mod,
+          "type",
+          node,
+          `'${node.label.name}' is not a label.`,
+        );
+      }
+    }
+
     if (!this.inConstructor) return;
     const lastItem = assert(this.setStack.at(-1));
     lastItem.shouldAdd = false;
+  }
+
+  override visitWhileStatement(node: WhileStatement): void {
+    this.loopStack.push(node);
+    super.visitWhileStatement(node);
+    this.loopStack.pop();
   }
 }

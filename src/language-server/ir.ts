@@ -8,13 +8,20 @@ import {
   ExternDeclaration,
   FunctionDeclaration,
   ID,
+  InterfaceMethodDeclaration,
   MethodClassMember,
+  isFunctionDeclaration,
   isParameter,
   isThisLiteral,
   isVariableDeclarator,
 } from "./generated/ast";
 import { WhackoModule, WhackoProgram } from "./program";
-import { getElementInScope, getScope, ScopeElement } from "./scope";
+import {
+  getElementInScope,
+  getScope,
+  ScopeElement,
+  ScopeElementType,
+} from "./scope";
 import {
   ClassType,
   ConcreteType,
@@ -25,7 +32,6 @@ import {
   FunctionType,
   getFloatType,
   getIntegerType,
-  theStrType,
   IntegerKind,
   IntegerType,
   isSignedIntegerKind,
@@ -39,6 +45,13 @@ import {
   isNumeric,
   VoidType,
   theVoidType,
+  V128Type,
+  RawPointerType,
+  theRawPointerType,
+  theUnresolvedFunctionType,
+  UnresolvedFunctionType,
+  getStrType,
+  InterfaceType,
 } from "./types";
 import {
   assert,
@@ -48,7 +61,6 @@ import {
   idCounter,
   logNode,
   UNREACHABLE,
-  ConstructorSentinel,
   getElementName,
   getBinaryOperatorString,
 } from "./util";
@@ -71,10 +83,15 @@ export const enum BinaryOperator {
   Eq,
   Shr,
   Neq,
+  Lt,
+  Lte,
+  Gt,
+  Gte,
 }
 
 export const enum InstructionKind {
   Unset,
+  Undefined,
   Const,
   Br,
   BrIf,
@@ -92,6 +109,11 @@ export const enum InstructionKind {
   BitwiseNot,
   Negate,
   Return,
+  InsertElement,
+  Free,
+  IntToPtr,
+  Malloc,
+  PtrToInt,
 }
 
 export const enum ValueKind {
@@ -122,6 +144,10 @@ export interface TypedValue extends Value {
   type: ConcreteType;
 }
 
+export interface MaybeTypedValue extends Value {
+  type: null | ConcreteType;
+}
+
 export interface RuntimeValue extends TypedValue {
   kind: ValueKind.Runtime;
   instruction: string; // Corresponds to a BlockInstruction
@@ -130,9 +156,19 @@ export interface RuntimeValue extends TypedValue {
 
 export interface StackAllocationSite {
   immutable: boolean;
-  type: ConcreteType;
-  ref: LLVMValueRef | null;
   node: AstNode;
+  ref: LLVMValueRef | null;
+  type: ConcreteType;
+  value: ComptimeValue | null;
+}
+
+export const enum CallableKind {
+  Constructor,
+  Function,
+  Method,
+  Declare,
+  Extern,
+  InterfaceMethod,
 }
 
 export interface CallableFunctionContext {
@@ -160,13 +196,10 @@ export interface CallableFunctionContext {
     | FunctionDeclaration
     | MethodClassMember
     | DeclareFunction
-    | ExternDeclaration;
+    | ExternDeclaration
+    | InterfaceMethodDeclaration;
 
-  /** Whether this function contains Whacko code */
-  isWhackoFunction: boolean;
-
-  /** Whether this function is a class method, or a constructor. */
-  isWhackoMethod: boolean;
+  kind: CallableKind;
 }
 
 export interface WhackoFunctionContext extends CallableFunctionContext {
@@ -187,9 +220,6 @@ export interface WhackoFunctionContext extends CallableFunctionContext {
 
   /** The already resolved types for this function. */
   typeMap: TypeMap;
-
-  /** If this is a whacko function. */
-  isWhackoFunction: true;
 }
 
 export interface WhackoMethodContext extends WhackoFunctionContext {
@@ -198,6 +228,26 @@ export interface WhackoMethodContext extends WhackoFunctionContext {
 
   /** The `this` type of this method. */
   thisType: ClassType;
+}
+
+export interface TrampolineFunctionContext extends CallableFunctionContext {
+  /** The method type for this trampoline method. */
+  type: MethodType;
+
+  /** The type parameters for this trampoline method (for compiling the implementer methods). */
+  typeParameters: ConcreteType[];
+
+  /** The interface type for this trampoline method. */
+  thisType: InterfaceType;
+
+  /** The node that generated this trampoline. */
+  node: InterfaceMethodDeclaration;
+
+  /** The fully qualified name. */
+  name: string;
+
+  /** The callable kind. */
+  kind: CallableKind.InterfaceMethod;
 }
 
 export interface BlockContext {
@@ -394,10 +444,14 @@ export interface ConstStrValue extends TypedValue {
   value: string;
 }
 
-export function createStrValue(value: string, type: FloatType): ConstStrValue {
+export function createStrValue(
+  program: WhackoProgram,
+  module: WhackoModule,
+  value: string,
+): ConstStrValue {
   return {
     kind: ValueKind.Str,
-    type,
+    type: getStrType(program, module),
     value,
   };
 }
@@ -432,20 +486,28 @@ export const theVoidValue: VoidValue = {
   type: theVoidType,
 };
 
-export interface ScopeElementValue extends UntypedValue {
+export interface ScopeElementValue extends MaybeTypedValue {
   kind: ValueKind.ScopeElement;
   element: ScopeElement;
+  type: null | UnresolvedFunctionType;
 }
 
-export function createScopeElement(element: ScopeElement): ScopeElementValue {
+export function createScopeElementValue(
+  element: ScopeElement,
+): ScopeElementValue {
   return {
     element,
     kind: ValueKind.ScopeElement,
-    type: null,
+    type: isFunctionDeclaration(element.node)
+      ? theUnresolvedFunctionType
+      : null,
   };
 }
 
-export function isCompileTimeValue(value: Value): boolean {
+export function isCompileTimeValue(value: Value): value is ComptimeValue {
+  if (value.kind === ValueKind.Variable) {
+    return (value as VariableReferenceValue).variable.immutable;
+  }
   return value.kind !== ValueKind.Runtime;
 }
 
@@ -516,8 +578,7 @@ export function buildDeclareFunction(
     ],
     funcRef: null,
     id: idCounter.value++,
-    isWhackoFunction: false,
-    isWhackoMethod: false,
+    kind: CallableKind.Declare,
     module,
     name,
     node: declaration,
@@ -540,8 +601,7 @@ export function buildExternFunction(
     attributes: [],
     funcRef: null,
     id: idCounter.value++,
-    isWhackoFunction: false,
-    isWhackoMethod: false,
+    kind: CallableKind.Extern,
     module,
     node: declaration,
     name,
@@ -557,7 +617,7 @@ export interface IntegerCastInstruction extends TypedBlockInstruction {
   value: RuntimeValue;
 }
 
-export function buildIntCastInstruction(
+export function buildIntegerCastInstruction(
   ctx: WhackoFunctionContext,
   currentBlock: BlockContext,
   value: RuntimeValue,
@@ -649,6 +709,26 @@ export function buildNewInstruction(
   );
 }
 
+export interface MallocInstruction extends TypedBlockInstruction {
+  kind: InstructionKind.Malloc;
+  type: RawPointerType;
+  size: TypedValue;
+}
+
+export function buildMallocInstruction(
+  ctx: WhackoFunctionContext,
+  currentBlock: BlockContext,
+  size: TypedValue,
+): MallocInstruction {
+  return buildInstruction(
+    ctx,
+    currentBlock,
+    theRawPointerType,
+    InstructionKind.Malloc,
+    { size },
+  );
+}
+
 export interface AllocaInstruction extends TypedBlockInstruction {
   kind: InstructionKind.Alloca;
   type: ClassType;
@@ -675,11 +755,11 @@ export interface ConcreteFunctionReferenceValue extends TypedValue {
   target: CallableFunctionContext;
 }
 
-export function createFunctionReference(
+export function createConcreteFunctionReference(
   target: CallableFunctionContext,
 ): ConcreteFunctionReferenceValue {
   assert(
-    !target.isWhackoMethod,
+    target.kind !== CallableKind.Method,
     "Function reference instructions must not contain method contexts",
   );
   return {
@@ -692,12 +772,12 @@ export function createFunctionReference(
 export interface MethodReferenceValue extends UntypedValue {
   kind: ValueKind.Method;
   thisValue: RuntimeValue;
-  target: MethodClassMember;
+  target: MethodClassMember | InterfaceMethodDeclaration;
 }
 
-export function buildMethodReference(
+export function createMethodReference(
   thisValue: RuntimeValue,
-  target: MethodClassMember,
+  target: MethodClassMember | InterfaceMethodDeclaration,
 ): MethodReferenceValue {
   return {
     kind: ValueKind.Method,
@@ -711,15 +791,18 @@ export interface FieldReferenceValue extends TypedValue {
   kind: ValueKind.Field;
   thisValue: TypedValue;
   field: ConcreteField;
+  node: AstNode;
 }
 
 export function createFieldReference(
   thisValue: TypedValue,
   field: ConcreteField,
+  node: AstNode,
 ): FieldReferenceValue {
   return {
     field,
     kind: ValueKind.Field,
+    node,
     thisValue,
     type: field.type,
   };
@@ -959,11 +1042,6 @@ export function ensureRuntime(
     case ValueKind.Field:
       UNREACHABLE("ensureRuntime: fields should have been dereferenced");
     case ValueKind.ConcreteFunction: {
-      // Let codegen deal with it
-      // We literally pass the Value to codegen
-      // Hm, we need that ConcreteFunctionReferenceValue thingy
-      // Yeah, the name
-      // In the end, this is what we want, but we need to rename this to ConcreteFunctionReferenceValu
       return createRuntimeValue(
         buildConstInstruction(
           ctx,
@@ -972,8 +1050,9 @@ export function ensureRuntime(
         ),
       );
     }
-    case ValueKind.Variable:
-      UNREACHABLE("ensureRuntime: variables should have been dereferenced");
+    case ValueKind.Variable: {
+      UNREACHABLE("Variables should already be dereferenced.");
+    }
     default:
   }
   const type = value.type;
@@ -1001,7 +1080,7 @@ export function buildConstInstruction(
   return inst;
 }
 
-export interface ReturnInstruction extends BlockInstruction {
+export interface ReturnInstruction extends TypedBlockInstruction {
   kind: InstructionKind.Return;
   value: TypedValue;
 }
@@ -1028,6 +1107,98 @@ export function buildReturnInstruction(
   return inst;
 }
 
+export interface UndefinedInstruction extends TypedBlockInstruction {
+  kind: InstructionKind.Undefined;
+}
+
+export function buildUndefinedInstruction(
+  ctx: WhackoFunctionContext,
+  currentBlock: BlockContext,
+  type: V128Type,
+): UndefinedInstruction {
+  return buildInstruction(
+    ctx,
+    currentBlock,
+    type,
+    InstructionKind.Undefined,
+    {},
+  );
+}
+
+export interface InsertElementInstruction extends TypedBlockInstruction {
+  kind: InstructionKind.InsertElement;
+  value: RuntimeValue;
+  target: RuntimeValue;
+  type: V128Type;
+  index: number;
+}
+
+export function buildInsertElementInstruction(
+  ctx: WhackoFunctionContext,
+  currentBlock: BlockContext,
+  target: RuntimeValue,
+  value: RuntimeValue,
+  index: number,
+): InsertElementInstruction {
+  assert(value.type.kind === ConcreteTypeKind.V128);
+  return buildInstruction(
+    ctx,
+    currentBlock,
+    target.type as V128Type,
+    InstructionKind.InsertElement,
+    { target, value, index },
+  );
+}
+
+export interface FreeInstruction extends UntypedBlockInstruction {
+  kind: InstructionKind.Free;
+  value: RuntimeValue;
+}
+
+export function buildFreeInstruction(
+  ctx: WhackoFunctionContext,
+  currentBlock: BlockContext,
+  value: RuntimeValue,
+): FreeInstruction {
+  return buildInstruction(ctx, currentBlock, null, InstructionKind.Free, {
+    value,
+  });
+}
+
+export interface IntToPtrInstruction extends BlockInstruction {
+  kind: InstructionKind.IntToPtr;
+  type: ClassType | RawPointerType;
+  value: RuntimeValue;
+}
+
+export function buildIntToPtrInstruction(
+  ctx: WhackoFunctionContext,
+  currentBlock: BlockContext,
+  type: ClassType | RawPointerType,
+  value: RuntimeValue,
+): IntToPtrInstruction {
+  return buildInstruction(ctx, currentBlock, type, InstructionKind.IntToPtr, {
+    value,
+  });
+}
+
+export interface PtrToIntInstruction extends BlockInstruction {
+  kind: InstructionKind.PtrToInt;
+  type: IntegerType;
+  value: RuntimeValue;
+}
+
+export function buildPtrToIntInstruction(
+  ctx: WhackoFunctionContext,
+  currentBlock: BlockContext,
+  type: IntegerType,
+  value: RuntimeValue,
+): PtrToIntInstruction {
+  return buildInstruction(ctx, currentBlock, type, InstructionKind.PtrToInt, {
+    value,
+  });
+}
+
 export function printProgramToString(prg: WhackoProgram): string {
   let result = `program:\n`;
 
@@ -1042,14 +1213,30 @@ export function printFunctionContextToString(
 ): string {
   let result = getFullyQualifiedCallableName(ctx.node, ctx.type) + "\n";
 
-  if (ctx.isWhackoFunction) {
-    const func = ctx as WhackoFunctionContext;
-    for (const block of func.blocks.values()) {
-      result += printBlockToString(block);
+  switch (ctx.kind) {
+    case CallableKind.Constructor:
+    case CallableKind.Function:
+    case CallableKind.Method: {
+      const func = ctx as WhackoFunctionContext;
+      for (const block of func.blocks.values()) {
+        result += printBlockToString(block);
+      }
+      break;
     }
-  } else {
-    result += "    (extern or declare function)\n";
+    case CallableKind.Declare: {
+      result += "(declared function)";
+      break;
+    }
+    case CallableKind.Extern: {
+      result += "(extern function)";
+      break;
+    }
+    case CallableKind.InterfaceMethod: {
+      result += "(interface method)";
+      break;
+    }
   }
+
   return result;
 }
 
@@ -1066,12 +1253,11 @@ export function printBlockToString(block: BlockContext): string {
 export function getValueString(value: Value): string {
   switch (value.kind) {
     case ValueKind.Void:
-      // void has no value, but really this is okay
-      return "(void value)";
+      return "(void)";
     case ValueKind.Invalid:
-      return "(invalid value)";
+      return "(invalid)";
     case ValueKind.Null:
-      return "(null value)";
+      return "(null)";
     // TODO: https://www.npmjs.com/package/js-string-escape
     case ValueKind.Integer: {
       const integerValue = value as ConstIntegerValue;
@@ -1096,6 +1282,7 @@ export function getValueString(value: Value): string {
     case ValueKind.Method:
     // case ValueKind.UnresolvedFunction:
     case ValueKind.ConcreteFunction: // TODO: Remove
+      console.log(value);
       UNREACHABLE("WE HIT SOMETHING THAT SHOULDN'T BE HERE. (wee woo)");
     case ValueKind.Field: {
       const fieldValue = value as FieldReferenceValue;
@@ -1129,11 +1316,39 @@ export function getValueString(value: Value): string {
 
 export function printInstructionToString(inst: BlockInstruction): string {
   switch (inst.kind) {
+    case InstructionKind.PtrToInt: {
+      const cast = inst as PtrToIntInstruction;
+      return `      ${cast.name} = ptrtoint: ${getValueString(cast.value)}`;
+    }
+    case InstructionKind.Malloc: {
+      const cast = inst as MallocInstruction;
+      return `      ${cast.name} = malloc: ${getValueString(cast.size)}`;
+    }
+    case InstructionKind.IntToPtr: {
+      const cast = inst as IntToPtrInstruction;
+      return `      ${cast.name} = inttoptr: ${getValueString(
+        cast.value,
+      )} as ${getFullyQualifiedTypeName(cast.type)}`;
+    }
+    case InstructionKind.Free: {
+      const cast = inst as FreeInstruction;
+      return `      free: ${getValueString(cast.value)}`;
+    }
+    case InstructionKind.Undefined: {
+      const undef = inst as UndefinedInstruction;
+      return `      ${inst.name} = undefined: ${getFullyQualifiedTypeName(
+        undef.type,
+      )}`;
+    }
+    case InstructionKind.InsertElement: {
+      const casted = inst as InsertElementInstruction;
+      return `      ${inst.name} = insertelement: ${getValueString(
+        casted.target,
+      )}[${casted.index}] = ${getValueString(casted.value)}`;
+    }
     case InstructionKind.Const: {
       const constInsn = inst as ConstInstruction;
-      return `      ${constInsn.name} = const: ${getValueString(
-        constInsn.child,
-      )}`;
+      return `      ${constInsn.name} = ${getValueString(constInsn.child)}`;
     }
     case InstructionKind.Alloca:
       return `      ${inst.name} = alloca: ${getFullyQualifiedTypeName(
@@ -1141,7 +1356,7 @@ export function printInstructionToString(inst: BlockInstruction): string {
       )}`;
     case InstructionKind.Binary:
       const binary = inst as BinaryInstruction;
-      return `      ${binary.name} = binary: ${
+      return `      ${binary.name} = ${
         binary.lhs.instruction
       } ${getBinaryOperatorString(binary.op)} ${binary.rhs.instruction}`;
     case InstructionKind.Call:
@@ -1170,7 +1385,7 @@ export function printInstructionToString(inst: BlockInstruction): string {
       const cast = inst as StoreInstruction;
       return `      ${inst.name} = store: ${getValueString(
         cast.target,
-      )}} = ${getValueString(cast.value)}`;
+      )} = ${getValueString(cast.value)}`;
     }
     case InstructionKind.Unreachable: {
       return `      ${inst.name} = unreachable`;
@@ -1194,19 +1409,19 @@ export function printInstructionToString(inst: BlockInstruction): string {
     }
     case InstructionKind.Load: {
       const casted = inst as LoadInstruction;
-      return `      ${inst.name} = load ${getValueString(casted.source)}`;
+      return `      ${inst.name} = load: ${getValueString(casted.source)}`;
     }
     case InstructionKind.LogicalNot: {
       const cast = inst as LogicalNotInstruction;
-      return `      ${inst.name} = not ${getValueString(cast.operand)}`;
+      return `      ${inst.name} = not: ${getValueString(cast.operand)}`;
     }
     case InstructionKind.BitwiseNot: {
       const cast = inst as BitwiseNotInstruction;
-      return `      ${inst.name} = bitwisenot ${getValueString(cast.operand)}`;
+      return `      ${inst.name} = bitwisenot: ${getValueString(cast.operand)}`;
     }
     case InstructionKind.Negate: {
       const cast = inst as NegateInstruction;
-      return `      ${inst.name} = negate ${getValueString(cast.operand)}`;
+      return `      ${inst.name} = negate: ${getValueString(cast.operand)}`;
     }
   }
 }
@@ -1226,6 +1441,42 @@ export function ensureDereferenced(
         buildLoadInstruction(ctx, currentBlock, value as FieldReferenceValue),
       );
     }
+    case ValueKind.ScopeElement: {
+      const { element } = value as ScopeElementValue;
+      switch (element.type) {
+        case ScopeElementType.VariableDeclarator:
+        case ScopeElementType.GrabbedVariable:
+        case ScopeElementType.Parameter: {
+          const site = assert(
+            ctx.stackAllocationSites.get(element.node),
+            "The stack allocation site for this node must exist.",
+          );
+          if (site.immutable && site.value) return site.value;
+
+          return createVariableReference(site);
+        }
+        case ScopeElementType.Class:
+        case ScopeElementType.Function:
+        case ScopeElementType.Method:
+        case ScopeElementType.Namespace:
+        case ScopeElementType.TypeDeclaration:
+        case ScopeElementType.Builtin:
+        case ScopeElementType.NamespaceStub:
+        case ScopeElementType.AsyncBlock:
+        case ScopeElementType.Enum:
+        case ScopeElementType.DeclareFunction:
+        case ScopeElementType.BuiltinType:
+        case ScopeElementType.Block:
+        case ScopeElementType.Extern:
+        case ScopeElementType.Constructor:
+        case ScopeElementType.ClassSetter:
+        case ScopeElementType.ClassGetter: {
+          UNREACHABLE(
+            `I tried to dereference a scope element kind (${element.type}) I didn't expect. Maybe we need to implement callbacks.`,
+          );
+        }
+      }
+    }
     case ValueKind.Variable: {
       return createRuntimeValue(
         buildLoadInstruction(
@@ -1235,8 +1486,30 @@ export function ensureDereferenced(
         ),
       );
     }
-    default: {
+    case ValueKind.Invalid:
+    case ValueKind.Void:
+    case ValueKind.Null:
+    case ValueKind.Integer:
+    case ValueKind.Float:
+    case ValueKind.Str:
+    case ValueKind.ConcreteFunction:
+    case ValueKind.Runtime:
       return value;
-    }
+    case ValueKind.Method:
+      UNREACHABLE("Methods should not be dereferenced (I think?)");
   }
+}
+
+export function isWhackoFunction(func: CallableFunctionContext) {
+  return (
+    func.kind === CallableKind.Constructor ||
+    func.kind === CallableKind.Function ||
+    func.kind === CallableKind.Method
+  );
+}
+
+export function isWhackoMethod(func: CallableFunctionContext) {
+  return (
+    func.kind === CallableKind.Constructor || func.kind === CallableKind.Method
+  );
 }

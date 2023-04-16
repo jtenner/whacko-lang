@@ -11,10 +11,15 @@ import {
   addStaticLibraryToProgram,
   CompilationOutput,
   compile,
+  createProgram,
   WhackoModule,
   WhackoProgram,
 } from "../language-server/program";
-import { createChildScope, createNewScope } from "../language-server/scope";
+import {
+  addScopeElement,
+  createChildScope,
+  createNewScope,
+} from "../language-server/scope";
 import { Module as LLVMModule } from "llvm-js";
 import { DiagnosticLevel } from "../language-server/diagnostic";
 import { printProgramToString } from "../language-server/ir";
@@ -38,7 +43,7 @@ export default async function main(args: string[]): Promise<CompilerOutput> {
   const { values, positionals } = parseArgs({
     args,
     options: {
-      outWasm: { type: "string" },
+      outWASM: { type: "string" },
       outWIR: { type: "string" },
       outLL: { type: "string" },
       outBC: { type: "string" },
@@ -48,25 +53,13 @@ export default async function main(args: string[]): Promise<CompilerOutput> {
     allowPositionals: true,
   }) as any;
 
-  const moduleName = LLVMUtil.lower("whacko-module");
-  const program: WhackoProgram = {
-    baseDir: process.cwd(),
-    builtinTypeFunctions: new Map(),
-    enums: new Map(),
-    diagnostics: [],
-    functions: new Map(),
-    globalScope: createNewScope(null),
+  const program: WhackoProgram = createProgram(
+    LLC,
+    LLD,
     LLVM,
-    llvmBuilder: LLVM._LLVMCreateBuilder(),
-    llvmCtx: LLVM._LLVMContextCreate(),
-    llvmModule: LLVM._LLVMModuleCreateWithName(moduleName),
+    "whacko-module",
     LLVMUtil,
-    modules: new Map(),
-    staticLibraries: new Set(),
-    builtinFunctions: new Map(),
-    queue: [],
-  };
-  LLVM._free(moduleName);
+  );
 
   // first step in any program is registering the builtins
   const stdLibs = glob("std/*.wo", {
@@ -74,23 +67,19 @@ export default async function main(args: string[]): Promise<CompilerOutput> {
     root: __dirname,
   });
 
-  const stdLibModules = await Promise.all(
+  await Promise.all(
     stdLibs.map(async (stdLib) => {
       const dirname = path.dirname(stdLib);
       const basename = path.basename(stdLib);
-      const module = await addModuleToProgram(
-        program,
-        basename,
-        dirname,
-        false,
-        program.globalScope,
+      const module = assert(
+        await addModuleToProgram(program, basename, dirname, false),
       );
-      return assert(module, `std lib ${stdLib} failed to create a module.`);
+      program.stdLibModules.push(module);
     }),
   );
 
   // then we register static lib files
-  const staticLibs = glob("std/*.a", {
+  const staticLibs = glob("std/link/*.a", {
     absolute: true,
     root: __dirname,
   });
@@ -98,19 +87,12 @@ export default async function main(args: string[]): Promise<CompilerOutput> {
   for (const staticLib of staticLibs) {
     const dirname = path.dirname(staticLib);
     const basename = path.basename(staticLib);
-    addStaticLibraryToProgram(program, basename, dirname);
+    await addStaticLibraryToProgram(program, basename, dirname);
   }
 
   // whacko input.wo
   for (const positional of positionals) {
-    const scope = createChildScope(program.globalScope);
-    scope.module = await addModuleToProgram(
-      program,
-      positional,
-      process.cwd(),
-      true,
-      scope,
-    );
+    await addModuleToProgram(program, positional, process.cwd(), true);
   }
 
   const result = {
@@ -119,7 +101,12 @@ export default async function main(args: string[]): Promise<CompilerOutput> {
   } as CompilerOutput;
 
   try {
-    const { bitcode: bcFile, textIR: llFile, object: oFile } = compile(program);
+    const {
+      bitcode: bcFile,
+      textIR: llFile,
+      object: oFile,
+      wasm: wasmFile,
+    } = compile(program);
 
     if (values.outBC && bcFile) result.files[values.outBC] = bcFile;
     if (values.outLL && llFile)
@@ -127,6 +114,7 @@ export default async function main(args: string[]): Promise<CompilerOutput> {
     if (values.outO && oFile) result.files[values.outO] = oFile;
     if (values.outWIR)
       result.files[values.outWIR] = printProgramToString(program);
+    if (values.outWASM && wasmFile) result.files[values.outWASM] = wasmFile;
 
     // if (values.outWasm) "Can't output wasm files yet"; // fs.writeFile("./out.wasm", wasmFile);
   } catch (ex) {

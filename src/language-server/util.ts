@@ -7,6 +7,8 @@ import {
   isConstructorClassMember,
   Decorator,
   isStringLiteral,
+  InterfaceDeclaration,
+  ClassDeclaration,
 } from "./generated/ast";
 import {
   BlockInstruction,
@@ -30,12 +32,15 @@ import {
   FloatType,
   IntegerType,
   IntegerKind,
+  InterfaceType,
   V128Type,
   V128Kind,
   TypeMap,
   typesEqual,
   NullableType,
 } from "./types";
+
+import type { LLVMStringRef, Pointer } from "llvm-js";
 
 export function assert<T>(
   condition: T,
@@ -55,7 +60,7 @@ export function cleanNode(node: AstNode): any {
       .filter(([key, entry]) => key === "$type" || !key.startsWith("$"))
       .map(([key, obj]) => [
         key,
-        (obj.constructor === Object ? cleanNode(obj) : obj) as any,
+        (obj?.constructor === Object ? cleanNode(obj) : obj) as any,
       ]),
   );
 }
@@ -70,10 +75,6 @@ export function getNodeName(node: Nameable | ConstructorClassMember): string {
     : node.name.name;
 
   const scope = assert(getScope(node), "The scope must exist for this node.");
-  if (!scope.module) {
-    logNode(node);
-    console.log("This scope's module doesn't exist", scope);
-  }
   const module = assert(scope.module, "The module for this scope must exist.");
 
   let accumulator: AstNode = node;
@@ -85,7 +86,10 @@ export function getNodeName(node: Nameable | ConstructorClassMember): string {
     }
   }
 
-  return `[${module.relativePath}]${accumulatedName}`;
+  const result = `[${module.relativePath}]${accumulatedName}`;
+  if (scope.module?.relativePath === "std/Box.wo")
+    console.log(scope.id, result);
+  return result;
 }
 
 export type ConstructorSentinel = symbol & { __constructorSentinel: never };
@@ -102,17 +106,16 @@ export function getFullyQualifiedCallableName(
 
 export function getFullyQualifiedTypeName(type: ConcreteType): string {
   switch (type.kind) {
+    case ConcreteTypeKind.UnresolvedFunction:
+      return `unresolvedFunction`;
     case ConcreteTypeKind.Nullable: {
       return `nullableType:${getFullyQualifiedTypeName(
         (type as NullableType).child,
       )}`;
     }
     case ConcreteTypeKind.Class: {
-      const classType = type as ClassType;
-      const typeParameters = classType.typeParameters
-        .map(getFullyQualifiedTypeName)
-        .join(",");
-      return `classType:${getNodeName(classType.node)}<${typeParameters}>`;
+      const cast = type as ClassType;
+      return getFullyQualifiedClassName(cast.node, cast.typeParameters);
     }
     case ConcreteTypeKind.Enum: {
       const enumType = type as EnumType;
@@ -134,9 +137,6 @@ export function getFullyQualifiedTypeName(type: ConcreteType): string {
         .join(",");
       const returnType = getFullyQualifiedTypeName(methodType.returnType);
       return `methodType:${thisTypeName}#(${parameterTypes})=>${returnType}`;
-    }
-    case ConcreteTypeKind.Str: {
-      return `strType`;
     }
     case ConcreteTypeKind.Array: {
       const arrayType = type as ArrayType;
@@ -234,13 +234,41 @@ export function getFullyQualifiedTypeName(type: ConcreteType): string {
     case ConcreteTypeKind.Void: {
       return "voidType";
     }
-    default: {
-      return assert(
-        false,
-        "Unknown type kind for generating qualified type name",
-      ) as never;
+    case ConcreteTypeKind.Interface: {
+      const interfaceType = type as InterfaceType;
+      return getFullyQualifiedInterfaceName(
+        interfaceType.node,
+        interfaceType.typeParameters,
+      );
     }
+    case ConcreteTypeKind.Null:
+      return "nullType";
+    case ConcreteTypeKind.Invalid:
+      return "invalidType";
+    case ConcreteTypeKind.Pointer:
+      return "ptrType";
   }
+}
+
+export function getFullyQualifiedClassName(
+  node: ClassDeclaration,
+  typeParameters: ConcreteType[],
+): string {
+  // const classType = type as ClassType;
+  const typeParametersResult = typeParameters
+    .map(getFullyQualifiedTypeName)
+    .join(",");
+  return `classType:${getNodeName(node)}<${typeParametersResult}>`;
+}
+
+export function getFullyQualifiedInterfaceName(
+  node: InterfaceDeclaration,
+  typeParameters: ConcreteType[],
+) {
+  const typeParametersResult = typeParameters
+    .map(getFullyQualifiedTypeName)
+    .join(",");
+  return `interfaceType:${getNodeName(node)}<${typeParametersResult}>`;
 }
 
 export function isAssignmentOperator(node: BinaryExpression): boolean {
@@ -319,6 +347,10 @@ export function assertIsBinaryOpString(op: string): BinaryOpString {
     case ">>":
     case "==":
     case "!=":
+    case "<":
+    case "<=":
+    case ">":
+    case ">=":
       return op as BinaryOpString;
     default:
       UNREACHABLE(`Binary operator string ${op} is not valid.`);
@@ -328,27 +360,35 @@ export function assertIsBinaryOpString(op: string): BinaryOpString {
 export function getBinaryOperatorString(op: BinaryOperator): string {
   switch (op) {
     case BinaryOperator.Add:
-      return "Add";
+      return "+";
     case BinaryOperator.Sub:
-      return "Sub";
+      return "-";
     case BinaryOperator.Mul:
-      return "Mul";
+      return "*";
     case BinaryOperator.Div:
-      return "Div";
+      return "/";
     case BinaryOperator.BitwiseAnd:
-      return "BitwiseAnd";
+      return "&";
     case BinaryOperator.BitwiseOr:
-      return "BitwiseOr";
+      return "|";
     case BinaryOperator.BitwiseXor:
-      return "BitwiseXor";
+      return "^";
     case BinaryOperator.Shl:
-      return "Shl";
+      return "<<";
     case BinaryOperator.Eq:
-      return "Eq";
+      return "==";
     case BinaryOperator.Shr:
-      return "Shr";
+      return ">>";
     case BinaryOperator.Neq:
-      return "Neq";
+      return "!=";
+    case BinaryOperator.Gt:
+      return ">";
+    case BinaryOperator.Gte:
+      return ">=";
+    case BinaryOperator.Lt:
+      return "<";
+    case BinaryOperator.Lte:
+      return "<=";
   }
 }
 
@@ -410,6 +450,18 @@ export function stringOpToEnum(op: BinaryOpString): BinaryOperator {
     case "!=": {
       return BinaryOperator.Neq;
     }
+    case "<": {
+      return BinaryOperator.Lt;
+    }
+    case "<=": {
+      return BinaryOperator.Lte;
+    }
+    case ">": {
+      return BinaryOperator.Gt;
+    }
+    case ">=": {
+      return BinaryOperator.Gte;
+    }
   }
 }
 
@@ -449,7 +501,11 @@ export type BinaryOpString =
   | ">>="
   | ">>"
   | "=="
-  | "!=";
+  | "!="
+  | "<"
+  | "<="
+  | ">"
+  | ">=";
 
 export const I64_MIN = -(2n ** 63n);
 export const I64_MAX = 2n ** 63n - 1n;
@@ -458,3 +514,38 @@ export const U64_MAX = 2n ** 64n - 1n;
 export const idCounter = {
   value: 0,
 };
+
+export interface LLVMJSUtil {
+  _main(argc: number, argv: Pointer<LLVMStringRef[]>): number;
+  _free(ptr: number): void;
+  _malloc<T>(size: number): Pointer<T>;
+  stringToUTF8<T>(value: string, ptr: Pointer<T>, size: number): void;
+  FS: {
+    readFile(...args: any[]): any;
+    writeFile(...args: any[]): any;
+    chmod(...args: any[]): any;
+  };
+  HEAPU8: Uint8Array;
+  HEAPU32: Uint32Array;
+}
+
+export function lowerStringArray(mod: LLVMJSUtil, args: string[]) {
+  const ptrs = [] as LLVMStringRef[];
+
+  for (const arg of args) {
+    const size = Buffer.byteLength(arg) + 1;
+    const ptr = mod._malloc<"LLVMStringRef">(size);
+    ptrs.push(ptr);
+    mod.stringToUTF8(arg, ptr, size);
+  }
+
+  const arraySize = args.length * 4 + 1;
+  // but that's in llvm-js
+  const arrayPtr = mod._malloc<LLVMStringRef[]>(arraySize);
+  for (let i = 0; i < ptrs.length; i++) {
+    const ptr = ptrs[i];
+    mod.HEAPU32[(arrayPtr >>> 2) + i] = ptr;
+  }
+
+  return { ptrs, arrayPtr };
+}

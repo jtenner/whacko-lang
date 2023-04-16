@@ -1,0 +1,30 @@
+program:
+  callable:[test/programs/while.wo]_start;functionType:()=>voidType
+    block: entry~1
+      br to condition~2
+    block: condition~2
+      4~inst = load: (variable const cond)
+      br to body~5 if (runtime boolType 4~inst); else to next~6
+    block: body~5
+      br to condition~8
+    block: next~6
+      return (void)
+    block: condition~8
+      10~inst = load: (variable a)
+      11~inst = (i64 10)
+      12~inst = 10~inst < 11~inst
+      br to body~13 if (runtime i64Type 12~inst); else to next~14
+    block: body~13
+      16~inst = load: (variable a)
+      17~inst = load: (variable a)
+      18~inst = (i64 1)
+      19~inst = 17~inst + 18~inst
+      20~inst = store: (variable a) = (runtime i64Type 19~inst)
+      br to condition~8
+    block: next~14
+      br to next~6
+    block: unused~21
+      br to condition~8
+    block: unused~24
+      br to condition~2
+

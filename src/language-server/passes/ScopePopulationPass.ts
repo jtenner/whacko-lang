@@ -18,6 +18,8 @@ import {
   GetterClassMember,
   GrabStatement,
   ID,
+  InterfaceDeclaration,
+  InterfaceMethodDeclaration,
   MethodClassMember,
   NamespaceDeclaration,
   Parameter,
@@ -25,6 +27,7 @@ import {
   TypeDeclaration,
   TypeDeclarationStatement,
   VariableDeclarator,
+  WhileStatement,
 } from "../generated/ast";
 import { WhackoModule, WhackoProgram } from "../program";
 import {
@@ -346,6 +349,7 @@ export class ScopePopulationPass extends WhackoVisitor {
       scopeElement,
       parentScope,
     );
+
     this.stack.push(scopeElement);
     super.visitVariableDeclarator(node);
     this.stack.pop();
@@ -778,5 +782,103 @@ export class ScopePopulationPass extends WhackoVisitor {
     this.stack.push(grabbedScopeElement);
     super.visitGrabStatement(node);
     this.stack.pop();
+  }
+
+  override visitInterfaceDeclaration(node: InterfaceDeclaration): void {
+    const parent = assert(
+      this.stack.at(-1),
+      "The parent must exist at this point.",
+    );
+    const parentScope = assert(
+      parent.scope,
+      "The parent scope must exist at this point.",
+    );
+    const innerScope = createChildScope(parentScope);
+    setScope(node, innerScope);
+    const scopeElement = createNewScopeElement(
+      node,
+      ScopeElementType.Interface,
+      innerScope,
+    );
+
+    putTypeParametersInScope(
+      this.program,
+      this.currentModule,
+      node.typeParameters,
+      innerScope,
+    );
+    putElementInScope(
+      this.program,
+      this.currentModule,
+      node.name,
+      scopeElement,
+      parentScope,
+    );
+    if (node.export)
+      putElementInExports(
+        this.program,
+        this.currentModule,
+        node.name,
+        scopeElement,
+        parent,
+      );
+
+    this.stack.push(scopeElement);
+    super.visitInterfaceDeclaration(node);
+    this.stack.pop();
+  }
+
+  override visitInterfaceMethodDeclaration(
+    node: InterfaceMethodDeclaration,
+  ): void {
+    const parent = assert(
+      this.stack.at(-1),
+      "The parent must exist at this point.",
+    );
+    const parentScope = assert(
+      parent.scope,
+      "The parent scope must exist at this point.",
+    );
+    const innerScope = createChildScope(parentScope);
+    setScope(node, innerScope);
+    const element = createNewScopeElement(
+      node,
+      ScopeElementType.InterfaceMethod,
+      innerScope,
+    );
+
+    putTypeParametersInScope(
+      this.program,
+      this.currentModule,
+      node.typeParameters,
+      innerScope,
+    );
+  }
+
+  override visitWhileStatement(node: WhileStatement): void {
+    if (node.label) {
+      const parent = assert(
+        this.stack.at(-1),
+        "The parent must exist at this point.",
+      );
+      const parentScope = assert(
+        parent.scope,
+        "The parent scope must exist at this point.",
+      );
+      const element = createNewScopeElement(
+        node.label,
+        ScopeElementType.Label,
+        parentScope,
+      );
+      putElementInScope(
+        this.program,
+        this.currentModule,
+        node.label,
+        element,
+        parentScope,
+      );
+    }
+
+    super.visitWhileStatement(node);
   }
 }

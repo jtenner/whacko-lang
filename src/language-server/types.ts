@@ -3,6 +3,7 @@ import { LLVMTypeRef, LLVMValueRef } from "llvm-js";
 import { reportErrorDiagnostic } from "./diagnostic";
 import {
   TypeExpression,
+  InterfaceDeclaration,
   ClassDeclaration,
   FunctionDeclaration,
   BuiltinDeclaration,
@@ -33,12 +34,19 @@ import {
   ExternDeclaration,
   isExternDeclaration,
   isBinaryExpression,
+  isInterfaceFieldDeclaration,
+  InterfaceFieldDeclaration,
+  isInterfaceDeclaration,
+  InterfaceMethodDeclaration,
+  isInterfaceMethodDeclaration,
 } from "./generated/ast";
 import {
   WhackoMethodContext,
   WhackoFunctionContext,
   TypedValue,
   ValueKind,
+  CallableKind,
+  CallableFunctionContext,
 } from "./ir";
 import { ensureCallableCompiled, WhackoModule, WhackoProgram } from "./program";
 import {
@@ -55,15 +63,19 @@ import {
   getNameDecoratorValue,
   logNode,
   UNREACHABLE,
+  getFullyQualifiedTypeName,
+  getFullyQualifiedInterfaceName,
+  getFullyQualifiedClassName,
 } from "./util";
 
 export const enum ConcreteTypeKind {
   Invalid,
+  Pointer,
   Class,
+  Interface,
   Function,
   Enum,
   Method,
-  Str,
   Array,
   Integer,
   Float,
@@ -72,6 +84,7 @@ export const enum ConcreteTypeKind {
   Void,
   Null,
   Nullable,
+  UnresolvedFunction,
 }
 
 export const enum V128Kind {
@@ -119,25 +132,37 @@ export interface FunctionType extends ConcreteType {
 
 export interface MethodType extends FunctionType {
   kind: ConcreteTypeKind.Method;
-  thisType: ClassType;
+  thisType: ClassType | InterfaceType;
 }
 
 export interface ConcreteField {
   name: string;
+  node: FieldClassMember | InterfaceFieldDeclaration;
   type: ConcreteType;
-  node: FieldClassMember;
 }
 
 export interface ClassType extends ConcreteType {
+  classConstructor: WhackoFunctionContext | null;
+  fields: Map<string, ConcreteField>;
+  id: number;
+  implements: Map<InterfaceType, NamedTypeExpression>;
   kind: ConcreteTypeKind.Class;
+  methods: Map<string, WhackoFunctionContext>;
+  node: ClassDeclaration;
   resolvedTypes: TypeMap;
   typeParameters: ConcreteType[];
-  node: ClassDeclaration;
-  // @ts-ignore TODO: Add cachable concrete constructors
-  classConstructor: WhackoFunctionContext | null;
-  // @ts-ignore TODO: Add cachable concrete methods based on name of method and parameters
-  methods: Map<string, WhackoFunctionContext>;
+}
+
+export interface InterfaceType extends ConcreteType {
+  kind: ConcreteTypeKind.Interface;
+  resolvedTypes: TypeMap;
+  typeParameters: ConcreteType[];
+  // TODO: Allow interfaces to extend one another
+  //       Add an `implements` field to match classes.
+  implementers: Set<ClassType>;
+  node: InterfaceDeclaration;
   fields: Map<string, ConcreteField>;
+  llvmType: null;
 }
 
 export interface NullableType extends ConcreteType {
@@ -171,6 +196,19 @@ export interface NullType extends ConcreteType {
   kind: ConcreteTypeKind.Null;
 }
 
+export interface RawPointerType extends ConcreteType {
+  kind: ConcreteTypeKind.Pointer;
+}
+
+export interface UnresolvedFunctionType extends ConcreteType {
+  kind: ConcreteTypeKind.UnresolvedFunction;
+}
+
+export const theRawPointerType: RawPointerType = {
+  kind: ConcreteTypeKind.Pointer,
+  llvmType: null,
+};
+
 export const theNullType: NullType = {
   kind: ConcreteTypeKind.Null,
   llvmType: null,
@@ -185,6 +223,51 @@ export const theVoidType: VoidType = {
   kind: ConcreteTypeKind.Void,
   llvmType: null,
 };
+
+export const theUnresolvedFunctionType: UnresolvedFunctionType = {
+  kind: ConcreteTypeKind.UnresolvedFunction,
+  llvmType: null,
+};
+
+export function simdOf(type: ConcreteType) {
+  switch (type.kind) {
+    case ConcreteTypeKind.Integer: {
+      switch ((type as IntegerType).integerKind) {
+        case IntegerKind.Bool:
+        case IntegerKind.I8:
+          return getV128Type(V128Kind.I8x16);
+        case IntegerKind.U8:
+          return getV128Type(V128Kind.U8x16);
+        case IntegerKind.I16:
+          return getV128Type(V128Kind.I16x8);
+        case IntegerKind.U16:
+          return getV128Type(V128Kind.U16x8);
+        case IntegerKind.ISize:
+        case IntegerKind.I32:
+          return getV128Type(V128Kind.I32x4);
+        case IntegerKind.USize:
+        case IntegerKind.U32:
+          return getV128Type(V128Kind.U32x4);
+        case IntegerKind.I64:
+          return getV128Type(V128Kind.I64x2);
+        case IntegerKind.U64:
+          return getV128Type(V128Kind.U64x2);
+      }
+      UNREACHABLE("Impossible things are happening everyday.");
+    }
+    case ConcreteTypeKind.Float: {
+      switch ((type as FloatType).floatKind) {
+        case FloatKind.F32:
+          return getV128Type(V128Kind.F32x4);
+        case FloatKind.F64:
+          return getV128Type(V128Kind.F64x2);
+      }
+      UNREACHABLE("Impossible things are happening everyday.");
+    }
+    default:
+      return theInvalidType;
+  }
+}
 
 export function isSignedIntegerKind(kind: IntegerKind): boolean {
   switch (kind) {
@@ -227,6 +310,25 @@ export function isFloatV128Kind(kind: V128Kind): boolean {
   return kind === V128Kind.F32x4 || kind === V128Kind.F64x2;
 }
 
+export function getLaneCount(kind: V128Kind): 2 | 4 | 8 | 16 {
+  switch (kind) {
+    case V128Kind.I8x16:
+    case V128Kind.U8x16:
+      return 16;
+    case V128Kind.I16x8:
+    case V128Kind.U16x8:
+      return 8;
+    case V128Kind.I32x4:
+    case V128Kind.U32x4:
+    case V128Kind.F32x4:
+      return 4;
+    case V128Kind.I64x2:
+    case V128Kind.U64x2:
+    case V128Kind.F64x2:
+      return 2;
+  }
+}
+
 export function getIntegerBitCount(kind: IntegerKind): 1 | 8 | 16 | 32 | 64 {
   switch (kind) {
     case IntegerKind.Bool:
@@ -253,7 +355,6 @@ export function getSize(ty: ConcreteType): 1 | 2 | 4 | 8 | 16 {
     case ConcreteTypeKind.Array:
     case ConcreteTypeKind.Nullable:
     case ConcreteTypeKind.Class:
-    case ConcreteTypeKind.Str:
     case ConcreteTypeKind.Function:
     case ConcreteTypeKind.Method: {
       return 4;
@@ -443,6 +544,10 @@ export function resolveClass(
   typeParameters: ConcreteType[],
 ): ClassType | null {
   const node = classElement.node as ClassDeclaration;
+  const name = getFullyQualifiedClassName(node, typeParameters);
+
+  if (program.classes.has(name)) return program.classes.get(name)!;
+
   assert(
     isClassDeclaration(node),
     "Scope element must have a class declaration inside it.",
@@ -513,16 +618,197 @@ export function resolveClass(
     });
   }
 
-  return {
-    node,
+  const interfaces = new Map();
+  const result: ClassType = {
     classConstructor: null,
+    fields,
+    id: program.classId++,
+    implements: interfaces,
+    kind: ConcreteTypeKind.Class,
     llvmType: null,
     methods: new Map(),
-    fields,
-    kind: ConcreteTypeKind.Class,
+    node,
     resolvedTypes: newTypeMap,
     typeParameters,
   };
+
+  program.classes.set(name, result);
+
+  // 0. Type params, type maps, fields, basically everything above us.
+  // 1. Ensure the interface is compiled
+  // 2. Add the class to each interface's array of implementors
+  // 3. Validate field existence/types and method existence/signatures
+  // 4. WHEN A METHOD IS ACCESSED FROM THE INTERFACE: ensure all the implementors' methods are compiled
+
+  for (const implement of node.implements) {
+    const type = resolveType(program, module, implement, nodeScope, newTypeMap);
+    if (!type) {
+      reportErrorDiagnostic(
+        program,
+        module,
+        "type",
+        implement,
+        "The implemented interface type could not be resolved.",
+      );
+      continue;
+    }
+
+    if (type.kind !== ConcreteTypeKind.Interface) {
+      reportErrorDiagnostic(
+        program,
+        module,
+        "type",
+        implement,
+        "The implemented interface type wasn't even an interface! Are you gaslighting me?",
+      );
+      continue;
+    }
+
+    const interfaceType = type as InterfaceType;
+    interfaces.set(interfaceType, implement);
+
+    for (const [name, field] of interfaceType.fields) {
+      const concreteField = fields.get(name);
+      if (!concreteField) {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          implement,
+          `The field '${name}' is not implemented by this class.`,
+        );
+        continue;
+      }
+
+      // We check for equality because someone could cast the class to its parent
+      // interface and modify the field there. That would be inherently type
+      // type unsafe, because an object could be assignable to the parent's type
+      // but not the child's. Once a child's method implementation runs with that
+      // modified child, all bets are off.
+      if (!typesEqual(field.type, concreteField.type)) {
+        // `implement` is intentionally used instead of `concreteField.node.type`.
+        // Otherwise, we would need to indicate which interface was the issue
+        // somehow. That means stringifying a ConcreteType, which isn't worth the
+        // effort. Just point at the referenced interface in "implements Foo"
+        // instead.
+
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          implement,
+          `The field '${name}' is not compatible with the given interface.`,
+        );
+        continue;
+      }
+
+      // Everything is fine and dandy, field-wise.
+    }
+  }
+
+  for (const interfaceType of interfaces.keys()) {
+    interfaceType.implementers.add(result);
+  }
+
+  return result;
+}
+
+// Note: For now, these are separate. If nothing changes for a while, we could
+//       possibly merge resolveInterface() and resolveClass() together.
+export function resolveInterface(
+  program: WhackoProgram,
+  module: WhackoModule,
+  interfaceElement: ScopeElement,
+  typeParameters: ConcreteType[],
+): InterfaceType | null {
+  const node = interfaceElement.node as InterfaceDeclaration;
+
+  const name = getFullyQualifiedInterfaceName(node, typeParameters);
+  if (program.interfaces.has(name)) return program.interfaces.get(name)!;
+
+  assert(
+    isInterfaceDeclaration(node),
+    "Scope element must have an interface declaration inside it.",
+  );
+
+  const nodeScope = assert(
+    getScope(node),
+    "Interface must have a scope at this point.",
+  );
+
+  if (typeParameters.length !== node.typeParameters.length) {
+    reportErrorDiagnostic(
+      program,
+      module,
+      "type",
+      node,
+      "Number of type parameters given does not match the declaration.",
+    );
+    return null;
+  }
+
+  const newTypeMap: TypeMap = new Map();
+  for (let i = 0; i < typeParameters.length; i++) {
+    newTypeMap.set(node.typeParameters[i].name, typeParameters[i]);
+  }
+
+  const fields = new Map<string, ConcreteField>();
+
+  for (const member of node.members) {
+    if (!isInterfaceFieldDeclaration(member)) continue;
+
+    const field: InterfaceFieldDeclaration = member;
+
+    const type = field.type;
+    if (!type) {
+      reportErrorDiagnostic(
+        program,
+        module,
+        "type",
+        field,
+        "TODO: Field types are mandatory for now.",
+      );
+      return null;
+    }
+
+    const interfaceFieldType = resolveType(
+      program,
+      module,
+      type,
+      nodeScope,
+      newTypeMap,
+    );
+
+    if (!interfaceFieldType) {
+      reportErrorDiagnostic(
+        program,
+        module,
+        "type",
+        field,
+        "Field type failed to resolve.",
+      );
+      return null;
+    }
+
+    fields.set(field.name.name, {
+      name: field.name.name,
+      node: field,
+      type: interfaceFieldType,
+    });
+  }
+
+  const result = {
+    node,
+    implementers: new Set(),
+    methods: new Set(),
+    fields,
+    kind: ConcreteTypeKind.Interface,
+    resolvedTypes: newTypeMap,
+    typeParameters,
+    llvmType: null,
+  } as InterfaceType;
+  program.interfaces.set(name, result);
+  return result as InterfaceType;
 }
 
 export function resolveNamedTypeScopeElement(
@@ -564,6 +850,14 @@ export function resolveNamedTypeScopeElement(
         module,
         scopeElement,
         scope,
+        concreteTypeParameters,
+      );
+    }
+    case ScopeElementType.Interface: {
+      return resolveInterface(
+        program,
+        module,
+        scopeElement,
         concreteTypeParameters,
       );
     }
@@ -822,8 +1116,9 @@ export function getCallableType(
     | FunctionDeclaration
     | BuiltinDeclaration
     | DeclareFunction
-    | ExternDeclaration,
-  thisType: ClassType | null,
+    | ExternDeclaration
+    | InterfaceMethodDeclaration,
+  thisType: ClassType | InterfaceType | null,
   typeParameters: ConcreteType[],
 ): FunctionType | null {
   const scope = assert(
@@ -885,7 +1180,7 @@ export function getCallableType(
 
   returnType = maybeReturnType;
 
-  if (isMethodClassMember(node)) {
+  if (isMethodClassMember(node) || isInterfaceMethodDeclaration(node)) {
     // We have an extra branch here in case we forget to initialize MethodType properties
     const result: MethodType = {
       kind: ConcreteTypeKind.Method,
@@ -960,24 +1255,36 @@ export function typesEqual(left: ConcreteType, right: ConcreteType): boolean {
         (right as NullableType).child,
       );
     }
+    case ConcreteTypeKind.UnresolvedFunction:
+    case ConcreteTypeKind.Pointer:
     case ConcreteTypeKind.Void:
     case ConcreteTypeKind.Never:
-    case ConcreteTypeKind.Str:
     case ConcreteTypeKind.Null:
       return true;
     case ConcreteTypeKind.Invalid:
     case ConcreteTypeKind.Function:
     case ConcreteTypeKind.Class:
+    case ConcreteTypeKind.Interface:
     case ConcreteTypeKind.Enum:
     case ConcreteTypeKind.Method:
       return false; // cached
   }
 }
 
-export const theStrType = {
-  kind: ConcreteTypeKind.Str,
-  llvmType: null,
-};
+let theStrType: ClassType | null = null;
+
+export function getStrType(
+  program: WhackoProgram,
+  module: WhackoModule,
+): ClassType {
+  if (theStrType) return theStrType;
+  const strScopeElement = getElementInScope(program.globalScope, "str");
+  assert(strScopeElement, "str must be defined in the global scope!");
+  assert(isClassDeclaration(strScopeElement!.node), "str must be a class!");
+  theStrType = resolveClass(program, module, strScopeElement!, []);
+  assert(theStrType, "Somehow, the str class could not be resolved!");
+  return theStrType!;
+}
 
 export function getOperatorOverloadMethod(
   program: WhackoProgram,
@@ -1156,32 +1463,65 @@ export function getOperatorOverloadMethod(
   return result;
 }
 
+export function isFunctionTypeAssignable(
+  superType: FunctionType,
+  subType: FunctionType,
+): boolean {
+  if (!isAssignable(superType.returnType, subType.returnType)) return false;
+  if (superType.parameterTypes.length !== subType.parameterTypes.length)
+    return false;
+
+  for (let i = 0; i < superType.parameterTypes.length; i++) {
+    if (!isAssignable(superType.parameterTypes[i], subType.parameterTypes[i]))
+      return false;
+  }
+
+  return true;
+}
+
 export function isAssignable(
   superType: ConcreteType,
   subType: ConcreteType,
 ): boolean {
-  // TODO: Interfaces
-  // if (
-  //   superType.kind === ConcreteTypeKind.Class &&
-  //   subType.kind === ConcreteTypeKind.Class
-  // ) {
-  //   const superClassType = superType as ClassType;
-  //   let accumulator = subType as ClassType | null;
+  if (
+    superType.kind === ConcreteTypeKind.Function &&
+    subType.kind === ConcreteTypeKind.Function
+  )
+    return isFunctionTypeAssignable(
+      superType as FunctionType,
+      subType as FunctionType,
+    );
 
-  //   while (accumulator) {
-  //     if (typesEqual(superClassType, accumulator)) return true;
-  //     accumulator = accumulator.extendsClass;
-  //   }
+  if (
+    superType.kind === ConcreteTypeKind.Method &&
+    subType.kind === ConcreteTypeKind.Method
+  ) {
+    const castedSuper = superType as MethodType;
+    const castedSub = subType as MethodType;
+    return (
+      isAssignable(castedSuper.thisType, castedSub.thisType) &&
+      isFunctionTypeAssignable(castedSuper, castedSub)
+    );
+  }
 
-  //   return false;
-  // }
-
+  // TODO: (... || subType.kind === ConcreteTypeKind.Interface)
+  //       when interfaces can extend one another.
+  if (
+    superType.kind === ConcreteTypeKind.Interface &&
+    subType.kind === ConcreteTypeKind.Class
+  ) {
+    return (superType as InterfaceType).implementers.has(subType as ClassType);
+  }
   return typesEqual(superType, subType);
 }
 
-export function isNumeric(type: ConcreteType): boolean {
+export function isNumeric(type: ConcreteType): type is FloatType | IntegerType {
   return (
     type.kind === ConcreteTypeKind.Float ||
     type.kind === ConcreteTypeKind.Integer
   );
+}
+
+export function isClassType(type: ConcreteType): type is ClassType {
+  return type.kind === ConcreteTypeKind.Class;
 }

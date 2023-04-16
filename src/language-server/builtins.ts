@@ -2,7 +2,7 @@ import { Module } from "llvm-js";
 import { reportErrorDiagnostic, reportWarningDiagnostic } from "./diagnostic";
 import {
   buildFloatCastInstruction,
-  buildIntCastInstruction as buildIntegerCastInstruction,
+  buildIntegerCastInstruction,
   ConstFloatValue,
   ConstIntegerValue,
   createIntegerValue,
@@ -17,12 +17,26 @@ import {
   buildUnreachable,
   buildBrIfInstruction,
   buildBasicBlock,
+  buildUndefinedInstruction,
+  buildInsertElementInstruction,
+  theVoidValue,
+  buildFreeInstruction,
+  buildIntToPtrInstruction,
+  buildNewInstruction,
+  buildMallocInstruction,
+  buildPtrToIntInstruction,
+  ScopeElementValue,
+  buildCallInstruction,
+  createStrValue,
+  buildLoadInstruction,
+  createFieldReference,
 } from "./ir";
 import {
   WhackoProgram,
   BuiltinFunctionParameters,
   addBuiltinToProgram,
   addBuiltinTypeToProgram,
+  ensureCallableCompiled,
 } from "./program";
 import {
   getFloatType,
@@ -38,9 +52,59 @@ import {
   ClassType,
   isNumeric,
   getNonnullableType,
+  simdOf,
+  V128Type,
+  getSize,
+  getLaneCount,
+  IntegerType,
+  theRawPointerType,
+  theUnresolvedFunctionType,
+  theVoidType,
+  isClassType,
+  FunctionType,
+  UnresolvedFunctionType,
+  isAssignable,
+  getStrType,
 } from "./types";
-import { assert } from "./util";
+import { assert, getFullyQualifiedTypeName } from "./util";
 import { isNumberObject } from "util/types";
+import { FunctionDeclaration, isFunctionDeclaration } from "./generated/ast";
+
+const simdInitialize =
+  (type: V128Type) =>
+  ({
+    args,
+    caller,
+    funcType,
+    getCurrentBlock,
+    module,
+    node,
+    program,
+    setCurrentBlock,
+    typeParameters,
+  }: BuiltinFunctionParameters) => {
+    const laneCount = getLaneCount(type.v128Kind);
+    const currentBlock = getCurrentBlock();
+
+    let running = createRuntimeValue(
+      buildUndefinedInstruction(caller, currentBlock, type),
+      type,
+    );
+
+    for (let i = 0; i < laneCount; i++) {
+      running = createRuntimeValue(
+        buildInsertElementInstruction(
+          caller,
+          currentBlock,
+          running,
+          ensureRuntime(caller, currentBlock, args[i]),
+          i,
+        ),
+      );
+    }
+
+    return running;
+  };
 
 const integerCast =
   (integerKind: IntegerKind) =>
@@ -269,44 +333,217 @@ export function registerDefaultBuiltins(program: WhackoProgram): void {
       return getNonnullableType(nullableType);
     },
   );
+
+  addBuiltinTypeToProgram(
+    program,
+    "v128",
+    ({ module, typeParameters, node }) => {
+      const [param] = typeParameters;
+      if (isNumeric(param)) {
+        return simdOf(param);
+      }
+      reportErrorDiagnostic(
+        program,
+        module,
+        "type",
+        node,
+        `Generic type '${getFullyQualifiedTypeName(param)}' is not numeric.`,
+      );
+      return theInvalidType;
+    },
+  );
+
+  addBuiltinToProgram(
+    program,
+    "heap.free",
+    ({
+      program,
+      module,
+      caller,
+      getCurrentBlock,
+      typeParameters: [argType],
+      args: [arg],
+      node,
+    }) => {
+      const currentBlock = getCurrentBlock();
+      if (argType.kind === ConcreteTypeKind.Class) {
+        buildFreeInstruction(
+          caller,
+          currentBlock,
+          ensureRuntime(caller, currentBlock, arg),
+        );
+        return theVoidValue;
+      } else if (
+        argType.kind === ConcreteTypeKind.Integer &&
+        (argType as IntegerType).integerKind === IntegerKind.USize
+      ) {
+        const value = createRuntimeValue(
+          buildIntToPtrInstruction(
+            caller,
+            currentBlock,
+            theRawPointerType,
+            ensureRuntime(caller, currentBlock, arg),
+          ),
+          theRawPointerType,
+        );
+        buildFreeInstruction(caller, getCurrentBlock(), value);
+        return theVoidValue;
+      }
+
+      reportErrorDiagnostic(
+        program,
+        module,
+        "type",
+        node,
+        `heap.free() can only free objects and raw pointers (usize).`,
+      );
+      return theInvalidValue;
+    },
+  );
+
+  addBuiltinToProgram(
+    program,
+    "heap.malloc",
+    ({ program, module, caller, getCurrentBlock, args: [arg], node }) => {
+      const currentBlock = getCurrentBlock();
+      const usizeType = getIntegerType(IntegerKind.USize);
+      const value = ensureRuntime(caller, currentBlock, arg);
+
+      const thePointerInstruction = buildMallocInstruction(
+        caller,
+        currentBlock,
+        value,
+      );
+      const thePointerValue = createRuntimeValue(
+        thePointerInstruction,
+        theRawPointerType,
+      );
+      const castedInstruction = buildPtrToIntInstruction(
+        caller,
+        currentBlock,
+        usizeType,
+        thePointerValue,
+      );
+
+      return createRuntimeValue(castedInstruction, usizeType);
+    },
+  );
+
+  addBuiltinTypeToProgram(
+    program,
+    "UnresolvedFunction",
+    () => theUnresolvedFunctionType,
+  );
+
+  addBuiltinToProgram(
+    program,
+    "types.forFieldsIn",
+    ({
+      args,
+      caller,
+      funcType,
+      getCurrentBlock,
+      module,
+      node,
+      program,
+      setCurrentBlock,
+      typeParameters,
+    }) => {
+      const [classType, contextType] = typeParameters;
+      const [classValue, contextValue, unresolvedFunc] = args;
+      if (!isClassType(classType)) {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          node,
+          `The first parameter of types.forIn must be a class type.`,
+        );
+        return theInvalidValue;
+      }
+
+      // some basic assumptions at this point
+      assert(unresolvedFunc.type?.kind === ConcreteTypeKind.UnresolvedFunction);
+      const unresolvedFunction = (unresolvedFunc as ScopeElementValue).element;
+      assert(isFunctionDeclaration(unresolvedFunction.node));
+      const currentBlock = getCurrentBlock();
+      const runtimeClassValue = ensureRuntime(
+        caller,
+        currentBlock,
+        contextValue,
+      );
+      const runtimeContext = ensureRuntime(caller, currentBlock, contextValue);
+
+      for (const [name, field] of classType.fields) {
+        // the compiled function must be the following type
+        const targetFunctionType: FunctionType = {
+          kind: ConcreteTypeKind.Function,
+          llvmType: null,
+          parameterTypes: [
+            contextType,
+            field.type,
+            getStrType(program, module),
+            classType,
+          ],
+          returnType: theVoidType,
+        };
+
+        const iteratorCallable = ensureCallableCompiled(
+          program,
+          module,
+          unresolvedFunction.node as FunctionDeclaration,
+          null,
+          [field.type],
+          caller.typeMap,
+        );
+
+        // validate the function
+        if (
+          !iteratorCallable ||
+          !isAssignable(iteratorCallable.type, targetFunctionType)
+        ) {
+          reportErrorDiagnostic(
+            program,
+            module,
+            "type",
+            node,
+            "Invalid callback, the function could not be compiled or the function type was not assignable to the correct function signature.",
+          );
+          return theInvalidValue;
+        }
+
+        const fieldReference = createFieldReference(
+          runtimeClassValue,
+          field,
+          node,
+        );
+        const loadInst = buildLoadInstruction(
+          caller,
+          currentBlock,
+          fieldReference,
+        );
+        const fieldRuntimeValue = createRuntimeValue(loadInst, field.type);
+        buildCallInstruction(caller, currentBlock, iteratorCallable, [
+          runtimeContext,
+          fieldRuntimeValue,
+          ensureRuntime(
+            caller,
+            currentBlock,
+            createStrValue(program, module, name),
+          ),
+          runtimeClassValue,
+        ]);
+      }
+
+      return theVoidValue;
+    },
+  );
 }
+
 /*
 
 
-const simdInitialize =
-  (typeEnum: Type) =>
-  ({ ast, pass, program, ctx, parameters }: BuiltinFunctionProps) => {
-    const numberType =
-      typeEnum === Type.f32 || typeEnum === Type.f64
-        ? new FloatType(typeEnum, null, ast)
-        : new IntegerType(typeEnum as IntegerEnumType, null, ast);
-    const llvmIntType = numberType.llvmType(program.LLVM, program.LLVMUtil)!;
-    const simdType = simdOf(numberType);
-    const undef = pass.LLVM._LLVMGetUndef(
-      simdType.llvmType(program.LLVM, program.LLVMUtil)!,
-    );
-    const laneCount = 16n / numberType.size;
 
-    for (let i = 0; i < laneCount; i++) {
-      if (numberType.isEqual(parameters[i].ty)) continue;
-      ctx.stack.push(new RuntimeValue(undef, simdType));
-      return;
-    }
-
-    let running = undef;
-    for (let i = 0; i < laneCount; i++) {
-      const name = program.LLVMUtil.lower(pass.getTempName());
-      running = pass.LLVM._LLVMBuildInsertElement(
-        pass.builder,
-        running,
-        pass.ensureCompiled(parameters[0]).ref,
-        pass.LLVM._LLVMConstInt(llvmIntType, 0n, 0),
-        name,
-      );
-    }
-
-    ctx.stack.push(new RuntimeValue(running, simdType));
-  };
 
 export function registerDefaultBuiltins(program: WhackoProgram) {
   addBuiltinToProgram(program, "i8", integerCast(IntegerKind.I8));
@@ -1059,13 +1296,7 @@ export function registerDefaultBuiltins(program: WhackoProgram) {
   program.addBuiltin("u64x2", simdInitialize(Type.u64));
   program.addBuiltin("f64x2", simdInitialize(Type.f64));
 
-  program.addBuiltinType("v128", ({ typeParameters, ast }) => {
-    const [param] = typeParameters;
-    if (param.isNumeric) {
-      return simdOf(param);
-    }
-    return new InvalidType(ast);
-  });
+
 
   program.addBuiltin("isString", ({ typeParameters, ast, parameters, ctx }) => {
     const [param] = parameters;

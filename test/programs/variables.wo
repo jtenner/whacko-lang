@@ -1,0 +1,4 @@
+export fn _start(): void {
+  let a = 10;
+  a = 10;
+}

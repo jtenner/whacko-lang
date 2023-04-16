@@ -1,0 +1,4 @@
+export fn _start(): void {
+  let a = heap.malloc(usize(100));
+  heap.free(a);
+}

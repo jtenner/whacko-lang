@@ -1,0 +1,12 @@
+program:
+  callable:[test/programs/heap.wo]_start;functionType:()=>voidType
+    block: entry~248
+      249~inst = (u32 100)
+      250~inst = malloc: (runtime usizeType 249~inst)
+      251~inst = ptrtoint: (runtime ptrType 250~inst)
+      252~inst = store: (variable a) = (runtime usizeType 251~inst)
+      253~inst = load: (variable a)
+      254~inst = inttoptr: (runtime usizeType 253~inst) as ptrType
+      free: (runtime ptrType 254~inst)
+      return (void)
+

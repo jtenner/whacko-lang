@@ -19,7 +19,7 @@ for (const file of files) {
   const llFileName = join(fileDir, fileBase + ".ll");
   const bcFileName = join(fileDir, fileBase + ".bc");
   const wirFileName = join(fileDir, fileBase + ".wir");
-
+  const wasmFileName = join(fileDir, fileBase + ".wasm");
   const result = await main([
     file,
     "--outO",
@@ -30,6 +30,8 @@ for (const file of files) {
     llFileName,
     "--outBC",
     bcFileName,
+    "--outWASM",
+    wasmFileName,
   ]);
 
   let success = true;
@@ -45,7 +47,8 @@ for (const file of files) {
     if (outputFileContents.constructor === String) {
       if (snapExists && !update) {
         const expectedFileContents = await readFile(snapFileName, "utf-8");
-        success &&= compareStringsToStdOut(
+        // we can't use &&= becuase emscripten reasons :\
+        success = success && compareStringsToStdOut(
           expectedFileContents,
           outputFileContents,
           outputFileName,
@@ -63,7 +66,7 @@ for (const file of files) {
         } else {
           process.stdout.write(colors.red(`[${fileName}]: Fail!\n`));
         }
-        success &&= buffersEqual;
+        success = success && buffersEqual;
       } else {
         await writeFile(snapFileName, outputFileContents);
       }
