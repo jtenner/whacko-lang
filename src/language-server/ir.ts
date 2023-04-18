@@ -43,15 +43,13 @@ import {
   NullType,
   theNullType,
   isNumeric,
-  VoidType,
-  theVoidType,
   V128Type,
   RawPointerType,
-  theRawPointerType,
   theUnresolvedFunctionType,
   UnresolvedFunctionType,
-  getStrType,
+  getStringType,
   InterfaceType,
+  VoidType,
 } from "./types";
 import {
   assert,
@@ -122,13 +120,21 @@ export const enum ValueKind {
   Null,
   Integer,
   Float,
-  Str,
+  String,
   ScopeElement,
   Method,
   Field,
   ConcreteFunction,
   Variable, // includes parameters
   Runtime,
+}
+
+export function isVariableValue(value: Value): value is VariableReferenceValue {
+  return value.kind === ValueKind.Variable;
+}
+
+export function isFieldValue(value: Value): value is FieldReferenceValue {
+  return value.kind === ValueKind.Field;
 }
 
 export interface Value {
@@ -391,6 +397,7 @@ export function buildUnreachable(
     func,
     currentBlock,
     {
+      id: idCounter.value++,
       kind: ConcreteTypeKind.Never,
       llvmType: null,
     },
@@ -439,19 +446,19 @@ export function createFloatValue(
   };
 }
 
-export interface ConstStrValue extends TypedValue {
-  kind: ValueKind.Str;
+export interface ConstStringValue extends TypedValue {
+  kind: ValueKind.String;
   value: string;
 }
 
-export function createStrValue(
+export function createStringValue(
   program: WhackoProgram,
   module: WhackoModule,
   value: string,
-): ConstStrValue {
+): ConstStringValue {
   return {
-    kind: ValueKind.Str,
-    type: getStrType(program, module),
+    kind: ValueKind.String,
+    type: getStringType(program, module),
     value,
   };
 }
@@ -479,11 +486,6 @@ export interface VoidValue extends TypedValue {
 export const theInvalidValue: InvalidValue = {
   kind: ValueKind.Invalid,
   type: theInvalidType,
-};
-
-export const theVoidValue: VoidValue = {
-  kind: ValueKind.Void,
-  type: theVoidType,
 };
 
 export interface ScopeElementValue extends MaybeTypedValue {
@@ -588,29 +590,6 @@ export function buildDeclareFunction(
   return result;
 }
 
-export function buildExternFunction(
-  program: WhackoProgram,
-  module: WhackoModule,
-  type: FunctionType,
-  declaration: ExternDeclaration,
-): CallableFunctionContext {
-  const name = getNameDecoratorValue(declaration) ?? declaration.name.name;
-  if (program.functions.has(name)) return program.functions.get(name)!;
-
-  const result = {
-    attributes: [],
-    funcRef: null,
-    id: idCounter.value++,
-    kind: CallableKind.Extern,
-    module,
-    node: declaration,
-    name,
-    type,
-  };
-  program.functions.set(name, result);
-  return result;
-}
-
 export interface IntegerCastInstruction extends TypedBlockInstruction {
   kind: InstructionKind.IntegerCast;
   type: IntegerType;
@@ -672,7 +651,14 @@ export function buildLoadInstruction(
   );
 }
 
+export const enum GCBarrierKind {
+  Forward,
+  Backward,
+  Unset,
+}
+
 export interface StoreInstruction extends UntypedBlockInstruction {
+  gcBarrierKind: GCBarrierKind;
   kind: InstructionKind.Store;
   target: FieldReferenceValue | VariableReferenceValue;
   value: RuntimeValue;
@@ -683,8 +669,11 @@ export function buildStoreInstruction(
   currentBlock: BlockContext,
   target: StoreInstruction["target"],
   value: RuntimeValue,
+  gcBarrierKind: GCBarrierKind,
 ): StoreInstruction {
+  if (isFieldValue(target)) assert(target.thisValue);
   return buildInstruction(ctx, currentBlock, null, InstructionKind.Store, {
+    gcBarrierKind,
     target,
     value,
   });
@@ -723,7 +712,11 @@ export function buildMallocInstruction(
   return buildInstruction(
     ctx,
     currentBlock,
-    theRawPointerType,
+    {
+      id: idCounter.value++,
+      kind: ConcreteTypeKind.Pointer,
+      llvmType: null,
+    },
     InstructionKind.Malloc,
     { size },
   );
@@ -921,7 +914,7 @@ export function asComptimeConditional(value: Value): ComptimeConditional {
       return (value as ConstFloatValue).value
         ? ComptimeConditional.Truthy
         : ComptimeConditional.Falsy;
-    case ValueKind.Str:
+    case ValueKind.String:
       return ComptimeConditional.Truthy;
     case ValueKind.ScopeElement:
       return ComptimeConditional.Runtime;
@@ -999,7 +992,7 @@ export function buildBrIfInstruction(
 export type ComptimeValue =
   | ConstFloatValue
   | ConstIntegerValue
-  | ConstStrValue
+  | ConstStringValue
   | NullValue
   | InvalidValue
   | ConcreteFunctionReferenceValue;
@@ -1029,9 +1022,9 @@ export function ensureRuntime(
       return createRuntimeValue(
         buildConstInstruction(ctx, currentBlock, value as NullValue),
       );
-    case ValueKind.Str:
+    case ValueKind.String:
       return createRuntimeValue(
-        buildConstInstruction(ctx, currentBlock, value as ConstStrValue),
+        buildConstInstruction(ctx, currentBlock, value as ConstStringValue),
       );
     case ValueKind.ScopeElement:
       UNREACHABLE(
@@ -1272,8 +1265,8 @@ export function getValueString(value: Value): string {
         floatValue.value
       })`;
     }
-    case ValueKind.Str: {
-      const strValue = value as ConstStrValue;
+    case ValueKind.String: {
+      const strValue = value as ConstStringValue;
       return `(str "${strValue.value}")`;
     }
     // can be used as callbacks and in variables
@@ -1491,7 +1484,7 @@ export function ensureDereferenced(
     case ValueKind.Null:
     case ValueKind.Integer:
     case ValueKind.Float:
-    case ValueKind.Str:
+    case ValueKind.String:
     case ValueKind.ConcreteFunction:
     case ValueKind.Runtime:
       return value;
@@ -1512,4 +1505,8 @@ export function isWhackoMethod(func: CallableFunctionContext) {
   return (
     func.kind === CallableKind.Constructor || func.kind === CallableKind.Method
   );
+}
+
+export function isVoidValue(value: Value): value is VoidValue {
+  return value.kind === ValueKind.Void;
 }

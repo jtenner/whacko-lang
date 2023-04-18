@@ -19,7 +19,6 @@ import {
   buildBasicBlock,
   buildUndefinedInstruction,
   buildInsertElementInstruction,
-  theVoidValue,
   buildFreeInstruction,
   buildIntToPtrInstruction,
   buildNewInstruction,
@@ -27,9 +26,10 @@ import {
   buildPtrToIntInstruction,
   ScopeElementValue,
   buildCallInstruction,
-  createStrValue,
+  createStringValue,
   buildLoadInstruction,
   createFieldReference,
+  VoidValue,
 } from "./ir";
 import {
   WhackoProgram,
@@ -50,6 +50,7 @@ import {
   theInvalidType,
   getNullableType,
   ClassType,
+  InterfaceType,
   isNumeric,
   getNonnullableType,
   simdOf,
@@ -57,16 +58,14 @@ import {
   getSize,
   getLaneCount,
   IntegerType,
-  theRawPointerType,
   theUnresolvedFunctionType,
-  theVoidType,
   isClassType,
   FunctionType,
   UnresolvedFunctionType,
   isAssignable,
-  getStrType,
+  getStringType,
 } from "./types";
-import { assert, getFullyQualifiedTypeName } from "./util";
+import { assert, getFullyQualifiedTypeName, idCounter } from "./util";
 import { isNumberObject } from "util/types";
 import { FunctionDeclaration, isFunctionDeclaration } from "./generated/ast";
 
@@ -217,6 +216,20 @@ const floatCast =
   };
 
 export function registerDefaultBuiltins(program: WhackoProgram): void {
+  addBuiltinToProgram(
+    program,
+    "unreachable",
+    ({ caller, getCurrentBlock, setCurrentBlock }) => {
+      const currentBlock = getCurrentBlock();
+      buildUnreachable(caller, currentBlock);
+      const nextBlock = buildBasicBlock(caller, "unreachable");
+      setCurrentBlock(nextBlock);
+      return {
+        kind: ValueKind.Void,
+        type: program.voidType,
+      } as VoidValue;
+    },
+  );
   addBuiltinToProgram(program, "i8", integerCast(IntegerKind.I8));
   addBuiltinToProgram(program, "u8", integerCast(IntegerKind.U8));
   addBuiltinToProgram(program, "i16", integerCast(IntegerKind.I16));
@@ -312,8 +325,11 @@ export function registerDefaultBuiltins(program: WhackoProgram): void {
       const [type] = typeParameters;
       if (type.kind === ConcreteTypeKind.Nullable) {
         return type;
-      } else if (type.kind === ConcreteTypeKind.Class) {
-        return getNullableType(type as ClassType);
+      } else if (
+        type.kind === ConcreteTypeKind.Class ||
+        type.kind === ConcreteTypeKind.Interface
+      ) {
+        return getNullableType(type as ClassType | InterfaceType);
       } else {
         reportErrorDiagnostic(
           program,
@@ -372,7 +388,10 @@ export function registerDefaultBuiltins(program: WhackoProgram): void {
           currentBlock,
           ensureRuntime(caller, currentBlock, arg),
         );
-        return theVoidValue;
+        return {
+          kind: ValueKind.Void,
+          type: program.voidType,
+        };
       } else if (
         argType.kind === ConcreteTypeKind.Integer &&
         (argType as IntegerType).integerKind === IntegerKind.USize
@@ -381,13 +400,16 @@ export function registerDefaultBuiltins(program: WhackoProgram): void {
           buildIntToPtrInstruction(
             caller,
             currentBlock,
-            theRawPointerType,
+            program.ptrType,
             ensureRuntime(caller, currentBlock, arg),
           ),
-          theRawPointerType,
+          program.ptrType,
         );
         buildFreeInstruction(caller, getCurrentBlock(), value);
-        return theVoidValue;
+        return {
+          kind: ValueKind.Void,
+          type: program.voidType,
+        };
       }
 
       reportErrorDiagnostic(
@@ -416,7 +438,7 @@ export function registerDefaultBuiltins(program: WhackoProgram): void {
       );
       const thePointerValue = createRuntimeValue(
         thePointerInstruction,
-        theRawPointerType,
+        program.ptrType,
       );
       const castedInstruction = buildPtrToIntInstruction(
         caller,
@@ -477,15 +499,16 @@ export function registerDefaultBuiltins(program: WhackoProgram): void {
       for (const [name, field] of classType.fields) {
         // the compiled function must be the following type
         const targetFunctionType: FunctionType = {
+          id: idCounter.value++,
           kind: ConcreteTypeKind.Function,
           llvmType: null,
           parameterTypes: [
             contextType,
             field.type,
-            getStrType(program, module),
+            getStringType(program, module),
             classType,
           ],
-          returnType: theVoidType,
+          returnType: program.voidType,
         };
 
         const iteratorCallable = ensureCallableCompiled(
@@ -529,13 +552,50 @@ export function registerDefaultBuiltins(program: WhackoProgram): void {
           ensureRuntime(
             caller,
             currentBlock,
-            createStrValue(program, module, name),
+            createStringValue(program, module, name),
           ),
           runtimeClassValue,
         ]);
       }
 
-      return theVoidValue;
+      return {
+        kind: ValueKind.Void,
+        type: program.voidType,
+      };
+    },
+  );
+
+  addBuiltinTypeToProgram(
+    program,
+    "types.RawPointer",
+    ({ module, node, program, scope, typeParameters }) => {
+      return program.ptrType;
+    },
+  );
+
+  addBuiltinToProgram(
+    program,
+    "types.asRawPointer",
+    ({
+      args,
+      caller,
+      funcType,
+      getCurrentBlock,
+      module,
+      node,
+      program,
+      setCurrentBlock,
+      typeParameters,
+    }) => {
+      const currentBlock = getCurrentBlock();
+      const value = ensureRuntime(caller, currentBlock, args[0]);
+      const intToPtr = buildIntToPtrInstruction(
+        caller,
+        currentBlock,
+        program.ptrType,
+        value,
+      );
+      return createRuntimeValue(intToPtr, program.ptrType);
     },
   );
 }

@@ -39,6 +39,13 @@ import {
   typesEqual,
   NullableType,
 } from "./types";
+import {
+  LLVMTypeRef,
+  Module as LLVM,
+  LLVMValueKind,
+  LLVMValueRef,
+} from "llvm-js";
+import { LLVMUtil } from "./codegen";
 
 import type { LLVMStringRef, Pointer } from "llvm-js";
 
@@ -47,7 +54,7 @@ export function assert<T>(
   message: string = "No message provided",
 ) {
   if (!condition) throw new Error(message);
-  return condition;
+  return condition as NonNullable<T>;
 }
 
 export function logNode(node: AstNode) {
@@ -55,6 +62,7 @@ export function logNode(node: AstNode) {
 }
 
 export function cleanNode(node: AstNode): any {
+  if (node instanceof Array) return node.map(cleanNode);
   return Object.fromEntries(
     Object.entries(node)
       .filter(([key, entry]) => key === "$type" || !key.startsWith("$"))
@@ -91,11 +99,6 @@ export function getNodeName(node: Nameable | ConstructorClassMember): string {
     console.log(scope.id, result);
   return result;
 }
-
-export type ConstructorSentinel = symbol & { __constructorSentinel: never };
-export const theConstructorSentinel = Symbol(
-  "whacko constructor sentinel",
-) as ConstructorSentinel;
 
 export function getFullyQualifiedCallableName(
   node: CallableFunctionContext["node"],
@@ -548,4 +551,28 @@ export function lowerStringArray(mod: LLVMJSUtil, args: string[]) {
   }
 
   return { ptrs, arrayPtr };
+}
+
+export function logLLVMType(
+  LLVM: LLVM,
+  LLVMUtil: LLVMUtil,
+  type: LLVMTypeRef,
+): void {
+  const allocaTypeStr = LLVM._LLVMPrintTypeToString(type);
+  console.log(LLVMUtil.lift(allocaTypeStr));
+  LLVM._free(allocaTypeStr);
+}
+
+export function logLLVMValue(
+  LLVM: LLVM,
+  LLVMUtil: LLVMUtil,
+  val: LLVMValueRef,
+): void {
+  const allocaTypeStr = LLVM._LLVMPrintValueToString(val);
+  console.log(LLVMUtil.lift(allocaTypeStr));
+  LLVM._free(allocaTypeStr);
+}
+
+export function hasDecorator(node: Decorated, name: string): boolean {
+  return !!node.decorators.find((e) => e.name.name === name);
 }

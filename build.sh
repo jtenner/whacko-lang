@@ -1,7 +1,24 @@
 clear
-node --enable-source-maps bin/cli testFile.wo --outBC out.bc --outLL out.ll --outO out.o 
-## opt-16 -O3 test.bc -o test.bc 
-## llc-16 test.bc --march=wasm32 -o test.o -filetype=obj --experimental-debug-variable-locations --emit-call-site-info --polly -O3
 
-## UNCOMMENT THE FOLLOWING LINE IF YOU HAVE LLVM INSTALLED:
-wasm-ld-16 out.o -o test.wasm std/libc.a std/libm.a -O3
+cd std/gc
+
+# get wasi-sysroot
+[ ! -f wasi-sysroot-20.0.tar.gz ] && wget https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-20/wasi-sysroot-20.0.tar.gz
+tar -xvf wasi-sysroot-20.0.tar.gz
+cd ../..
+
+# llvm and clang 16
+[ ! -f llvm.sh ] wget https://apt.llvm.org/llvm.sh
+chmod +x llvm.sh
+sudo ./llvm.sh 16
+
+clang-16 \
+  --target=wasm32-wasi \
+  ./std/gc/gc.c \
+  -Ofast \
+  -flto \
+  -o ./std/link/whacko-std.o \
+  --sysroot=./std/gc/wasi-sysroot \
+  -c
+
+npm install

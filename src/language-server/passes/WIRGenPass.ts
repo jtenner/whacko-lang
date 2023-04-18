@@ -66,7 +66,6 @@ import {
   buildCallInstruction,
   buildBasicBlock,
   buildDeclareFunction,
-  buildExternFunction,
   buildBinaryInstruction,
   BinaryOperator,
   buildStoreInstruction,
@@ -99,15 +98,18 @@ import {
   buildBrIfInstruction,
   buildBrInstruction,
   buildReturnInstruction,
-  theVoidValue,
   TypedValue,
   CallableKind,
   buildConstInstruction,
   ComptimeValue,
-  createStrValue,
+  createStringValue,
   buildPtrToIntInstruction,
+  GCBarrierKind,
+  isFieldValue,
+  isVariableValue,
 } from "../ir";
 import {
+  buildExternFunction,
   ensureCallableCompiled,
   ensureConstructorCompiled,
   getBuiltinFunction,
@@ -146,13 +148,14 @@ import {
   TypeMap,
   resolveClass,
   getConstructorType,
-  theVoidType,
   ClassType,
   NullableType,
   getNonnullableType,
   getNullableType,
   InterfaceType,
-  getStrType,
+  getStringType,
+  isInterfaceType,
+  isClassType,
 } from "../types";
 import {
   assert,
@@ -166,9 +169,25 @@ import {
   U64_MAX,
   UNREACHABLE,
   getFullyQualifiedTypeName,
+  idCounter,
 } from "../util";
 import { WhackoVisitor } from "../WhackoVisitor";
 import { Module } from "llvm-js";
+
+export function getGCBarrierKind(
+  ctx: CallableFunctionContext,
+  target: FieldReferenceValue | VariableReferenceValue,
+): GCBarrierKind {
+  const isInConstructor = isConstructorClassMember(ctx.node);
+  // const isArrayStore = isArrayStore(target);
+  const isTargetInterface = isInterfaceType(target.type);
+  const isTargetClass = isClassType(target.type);
+
+  if (isTargetInterface || isTargetClass) {
+    return isInConstructor ? GCBarrierKind.Backward : GCBarrierKind.Forward;
+  }
+  return GCBarrierKind.Unset;
+}
 
 export function inferTypeParameters(
   program: WhackoProgram,
@@ -713,7 +732,7 @@ export class WIRGenPass extends WhackoVisitor {
 
       if (isConstructorClassMember(node)) {
         assert(
-          type.returnType === theVoidType,
+          type.returnType === this.program.voidType,
           "Constructor return type should be void.",
         );
       }
@@ -738,7 +757,10 @@ export class WIRGenPass extends WhackoVisitor {
       ctx.type.returnType.kind === ConcreteTypeKind.Void &&
       !lastBlock.terminator
     ) {
-      buildReturnInstruction(this.ctx, lastBlock, theVoidValue);
+      buildReturnInstruction(this.ctx, lastBlock, {
+        kind: ValueKind.Void,
+        type: this.program.voidType,
+      });
     } else if (!lastBlock.terminator) {
       reportErrorDiagnostic(
         this.program,
@@ -816,7 +838,7 @@ export class WIRGenPass extends WhackoVisitor {
   }
 
   override visitBinaryExpression(node: BinaryExpression): void {
-    const theStrType = getStrType(this.program, this.module);
+    const theStrType = getStringType(this.program, this.module);
     this.visit(node.lhs);
     const lhs = this.assertValue;
     const derefLHS = ensureDereferenced(this.ctx, this.currentBlock, lhs);
@@ -859,7 +881,7 @@ export class WIRGenPass extends WhackoVisitor {
     // Codegen can (a) turn field references into a GEP.
     //             (b) turn variable references into that pointer.
     if (node.op === "=") {
-      if (lhs.kind !== ValueKind.Field && lhs.kind !== ValueKind.Variable) {
+      if (!isFieldValue(lhs) && !isVariableValue(lhs)) {
         reportErrorDiagnostic(
           this.program,
           this.module,
@@ -867,13 +889,15 @@ export class WIRGenPass extends WhackoVisitor {
           node.lhs,
           "LHS of assignment operator must be a field or variable reference",
         );
+      } else {
+        buildStoreInstruction(
+          this.ctx,
+          this.currentBlock,
+          lhs,
+          ensureRuntime(this.ctx, this.currentBlock, derefRHS),
+          getGCBarrierKind(this.ctx, lhs),
+        );
       }
-      buildStoreInstruction(
-        this.ctx,
-        this.currentBlock,
-        lhs as FieldReferenceValue | VariableReferenceValue,
-        ensureRuntime(this.ctx, this.currentBlock, derefRHS),
-      );
       this.value = derefRHS;
       return;
     }
@@ -1054,11 +1078,14 @@ export class WIRGenPass extends WhackoVisitor {
               this.currentBlock,
               derefRHS,
             );
+            const variableReference = createVariableReference(site);
+            const barrierKind = getGCBarrierKind(this.ctx, variableReference);
             buildStoreInstruction(
               this.ctx,
               this.currentBlock,
-              createVariableReference(site),
+              variableReference,
               runtimeRhsValue,
+              barrierKind,
             );
             buildBrInstruction(this.ctx, this.currentBlock, nextBlock);
 
@@ -1067,8 +1094,9 @@ export class WIRGenPass extends WhackoVisitor {
             buildStoreInstruction(
               this.ctx,
               this.currentBlock,
-              createVariableReference(site),
+              variableReference,
               runtimeLhsValue,
+              barrierKind,
             );
             buildBrInstruction(this.ctx, this.currentBlock, nextBlock);
 
@@ -1099,11 +1127,14 @@ export class WIRGenPass extends WhackoVisitor {
 
             // LHS is truthy: set the temporary variable to contain the LHS
             this.currentBlock = truthyBlock;
+            const variableReference = createVariableReference(site);
+            const barrierKind = getGCBarrierKind(this.ctx, variableReference);
             buildStoreInstruction(
               this.ctx,
               this.currentBlock,
-              createVariableReference(site),
+              variableReference,
               runtimeLhsValue,
+              barrierKind,
             );
             buildBrInstruction(this.ctx, this.currentBlock, nextBlock);
 
@@ -1117,8 +1148,9 @@ export class WIRGenPass extends WhackoVisitor {
             buildStoreInstruction(
               this.ctx,
               this.currentBlock,
-              createVariableReference(site),
+              variableReference,
               runtimeRhsValue,
+              barrierKind,
             );
             buildBrInstruction(this.ctx, this.currentBlock, nextBlock);
 
@@ -1153,7 +1185,7 @@ export class WIRGenPass extends WhackoVisitor {
     }
 
     if (isAssignmentOperator(node)) {
-      if (lhs.kind !== ValueKind.Field && lhs.kind !== ValueKind.Variable) {
+      if (!isFieldValue(lhs) && !isVariableValue(lhs)) {
         console.log("We hit this?");
         reportErrorDiagnostic(
           this.program,
@@ -1162,14 +1194,16 @@ export class WIRGenPass extends WhackoVisitor {
           node.lhs,
           "LHS of assignment operator must be a field or variable reference",
         );
+      } else {
+        buildStoreInstruction(
+          this.ctx,
+          this.currentBlock,
+          lhs,
+          ensureRuntime(this.ctx, this.currentBlock, resultValue),
+          getGCBarrierKind(this.ctx, lhs),
+        );
       }
 
-      buildStoreInstruction(
-        this.ctx,
-        this.currentBlock,
-        lhs as FieldReferenceValue | VariableReferenceValue,
-        ensureRuntime(this.ctx, this.currentBlock, resultValue),
-      );
       // Do not modify resultValue. `foo &&= bar` does not return `bar`.
     }
 
@@ -1177,76 +1211,14 @@ export class WIRGenPass extends WhackoVisitor {
   }
 
   override visitStringLiteral(expression: StringLiteral): void {
-    const theStrType = getStrType(this.program, this.module);
-    const newInst = buildNewInstruction(
+    const theStrType = getStringType(this.program, this.module);
+    const newInst = buildConstInstruction(
       this.ctx,
       this.currentBlock,
-      theStrType,
-    );
-    const newValue = createRuntimeValue(newInst, theStrType);
-
-    const theStrConstructorMember = assert(
-      theStrType.node.members.find((member) =>
-        isConstructorClassMember(member),
-      ) as ConstructorClassMember | undefined,
-      "The str constructor must exist.",
+      createStringValue(this.program, this.module, expression.value),
     );
 
-    const constructorType = assert(
-      getConstructorType(
-        this.program,
-        this.module,
-        theStrType,
-        theStrConstructorMember,
-      ),
-      "The constructor method for this class must be compilable.",
-    );
-
-    const strConstructor = ensureConstructorCompiled(
-      this.program,
-      this.module,
-      theStrType,
-      constructorType,
-      theStrConstructorMember,
-    );
-
-    const comptimeStrValue = createStrValue(
-      this.program,
-      this.module,
-      expression.value,
-    );
-    const runtimeStrValue = ensureRuntime(
-      this.ctx,
-      this.currentBlock,
-      comptimeStrValue,
-    );
-
-    const usizeType = getIntegerType(IntegerKind.USize);
-    const strDataPtrUSizeInst = buildPtrToIntInstruction(
-      this.ctx,
-      this.currentBlock,
-      usizeType,
-      runtimeStrValue,
-    );
-    const strDataPtrUSize = createRuntimeValue(strDataPtrUSizeInst, usizeType);
-
-    const comptimeStrSizeValue = createIntegerValue(
-      BigInt(Buffer.byteLength(expression.value)),
-      usizeType,
-    );
-    const runtimeStrSizeValue = ensureRuntime(
-      this.ctx,
-      this.currentBlock,
-      comptimeStrSizeValue,
-    );
-
-    buildCallInstruction(this.ctx, this.currentBlock, strConstructor, [
-      newValue,
-      strDataPtrUSize,
-      runtimeStrSizeValue,
-    ]);
-
-    this.value = newValue;
+    this.value = createRuntimeValue(newInst, theStrType);
     return;
   }
 
@@ -1822,7 +1794,7 @@ export class WIRGenPass extends WhackoVisitor {
                 this.module,
                 "type",
                 node,
-                "Builtin could not be found",
+                `Builtin for ${declaration.name.name} could not be found`,
               );
               this.value = theInvalidValue;
               return;
@@ -2168,6 +2140,7 @@ export class WIRGenPass extends WhackoVisitor {
           args: [operandDereferenced],
           caller: this.ctx,
           funcType: {
+            id: idCounter.value++,
             kind: ConcreteTypeKind.Function,
             llvmType: null,
             returnType: getNonnullableType(operandDereferenced.type),
@@ -2201,10 +2174,7 @@ export class WIRGenPass extends WhackoVisitor {
           return;
         }
 
-        if (
-          operand.kind !== ValueKind.Variable &&
-          operand.kind !== ValueKind.Field
-        ) {
+        if (!isVariableValue(operand) && !isFieldValue(operand)) {
           reportErrorDiagnostic(
             this.program,
             this.module,
@@ -2216,10 +2186,7 @@ export class WIRGenPass extends WhackoVisitor {
           return;
         }
 
-        if (
-          operand.kind === ValueKind.Variable &&
-          (operand as VariableReferenceValue).variable.immutable
-        ) {
+        if (isVariableValue(operand) && operand.variable.immutable) {
           reportErrorDiagnostic(
             this.program,
             this.module,
@@ -2259,8 +2226,9 @@ export class WIRGenPass extends WhackoVisitor {
         buildStoreInstruction(
           this.ctx,
           this.currentBlock,
-          operand as FieldReferenceValue | VariableReferenceValue,
+          operand,
           modified,
+          getGCBarrierKind(this.ctx, operand),
         );
 
         this.value = loaded;
@@ -2677,11 +2645,13 @@ export class WIRGenPass extends WhackoVisitor {
     if (isCompileTimeValue(initializer)) {
       site.value = initializer;
     } else {
+      const variableReference = createVariableReference(site);
       buildStoreInstruction(
         this.ctx,
         this.currentBlock,
-        createVariableReference(site),
+        variableReference,
         ensureRuntime(this.ctx, this.currentBlock, initializer),
+        getGCBarrierKind(this.ctx, variableReference),
       );
     }
 
@@ -2699,7 +2669,7 @@ export class WIRGenPass extends WhackoVisitor {
           this.module,
           "type",
           node.expression,
-          this.ctx.type.returnType === theVoidType
+          this.ctx.type.returnType === this.program.voidType
             ? "Void functions/methods must not return values."
             : "The return value is not compatible with the function/method signature.",
         );
@@ -2708,7 +2678,7 @@ export class WIRGenPass extends WhackoVisitor {
 
       buildReturnInstruction(this.ctx, this.currentBlock, value as TypedValue);
     } else {
-      if (this.ctx.type.returnType !== theVoidType) {
+      if (this.ctx.type.returnType !== this.program.voidType) {
         reportErrorDiagnostic(
           this.program,
           this.module,
@@ -2718,7 +2688,10 @@ export class WIRGenPass extends WhackoVisitor {
         );
         return;
       }
-      buildReturnInstruction(this.ctx, this.currentBlock, theVoidValue);
+      buildReturnInstruction(this.ctx, this.currentBlock, {
+        kind: ValueKind.Void,
+        type: this.program.voidType,
+      });
     }
   }
 }

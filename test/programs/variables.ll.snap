@@ -2,10 +2,31 @@
 source_filename = "whacko"
 target triple = "wasm32-wasi"
 
+declare ptr @__whacko_gc_alloc(i32, i32)
+
+declare void @__whacko_gc_store_field_ptr(i32, ptr, ptr, ptr)
+
 define void @_start() {
 entry:
   %"alloca~0" = alloca i64, align 8
-  %"30~inst" = load i64, ptr %"alloca~0", align 4
+  %"60~inst" = load i64, ptr %"alloca~0", align 4
   store i64 10, ptr %"alloca~0", align 4
+  ret void
+}
+
+declare void @__whacko_gc_visit(ptr)
+
+define void @__visit_whacko_object(ptr %0) {
+"entry~65":
+  %"typeGEP~67" = getelementptr { ptr, ptr, i32, i32 }, ptr %0, i32 2
+  %1 = load i32, ptr %"typeGEP~67", align 4
+  switch i32 %1, label %"unreachable~66" [
+    i32 1, label %"classType:[std/String.wo]String<>"
+  ]
+
+"unreachable~66":                                 ; preds = %"entry~65"
+  unreachable
+
+"classType:[std/String.wo]String<>":              ; preds = %"entry~65"
   ret void
 }

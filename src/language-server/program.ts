@@ -42,6 +42,7 @@ import { ImportCollectionPass } from "./passes/ImportCollectionPass";
 import {
   BuiltinDeclaration,
   ConstructorClassMember,
+  ExternDeclaration,
   FunctionDeclaration,
   InterfaceMethodDeclaration,
   isConstructorClassMember,
@@ -66,7 +67,9 @@ import {
   InterfaceType,
   isAssignable,
   MethodType,
+  RawPointerType,
   TypeMap,
+  VoidType,
 } from "./types";
 import {
   BlockContext,
@@ -85,6 +88,7 @@ import { inspect } from "node:util";
 import { ValidatorPass } from "./passes/ValidatorPass";
 import { codegen } from "./codegen";
 import crypto from "node:crypto";
+import { EnsurePass } from "./passes/EnsurePass";
 
 export function addBuiltinTypeToProgram(
   program: WhackoProgram,
@@ -171,8 +175,12 @@ export interface WhackoProgram {
   llvmCtx: LLVMContextRef;
   llvmModule: LLVMModuleRef;
   LLVMUtil: Awaited<typeof import("llvm-js")>;
+  stringType: ClassType | null;
+  ptrType: RawPointerType;
+  voidType: VoidType;
   /** Absolute path to module. */
   modules: Map<string, WhackoModule>;
+  strings: Map<string, LLVMValueRef>;
   queue: (WhackoFunctionContext | TrampolineFunctionContext)[];
   staticLibraries: Map<string, Buffer>;
 }
@@ -298,6 +306,13 @@ export function compile(program: WhackoProgram): CompilationOutput {
     validatorPass.visitModule(module);
   }
 
+  registerDefaultBuiltins(program);
+
+  const ensurePass = new EnsurePass(program);
+  for (const module of modules) {
+    ensurePass.visitModule(module);
+  }
+
   // if there are any errors at this point, we need to stop because codegen is unsafe
   if (
     program.diagnostics.filter(
@@ -351,8 +366,6 @@ export function compile(program: WhackoProgram): CompilationOutput {
     [],
     new Map(),
   );
-
-  registerDefaultBuiltins(program);
 
   const cache = new WeakMap();
   const cleanIR = (obj: any) => {
@@ -749,7 +762,42 @@ export function createProgram(
     queue: [],
     staticLibraries: new Map(),
     stdLibModules: [],
+    strings: new Map(),
+    stringType: null,
+    ptrType: {
+      id: idCounter.value++,
+      kind: ConcreteTypeKind.Pointer,
+      llvmType: null,
+    } as RawPointerType,
+    voidType: {
+      id: idCounter.value++,
+      kind: ConcreteTypeKind.Void,
+      llvmType: null,
+    } as VoidType,
   };
   LLVM._free(llvmModuleName);
+  return result;
+}
+
+export function buildExternFunction(
+  program: WhackoProgram,
+  module: WhackoModule,
+  type: FunctionType,
+  declaration: ExternDeclaration,
+): CallableFunctionContext {
+  const name = getNameDecoratorValue(declaration) ?? declaration.name.name;
+  if (program.functions.has(name)) return program.functions.get(name)!;
+
+  const result = {
+    attributes: [],
+    funcRef: null,
+    id: idCounter.value++,
+    kind: CallableKind.Extern,
+    module,
+    node: declaration,
+    name,
+    type,
+  };
+  program.functions.set(name, result);
   return result;
 }

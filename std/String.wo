@@ -1,9 +1,9 @@
 export class String {
   constructor() {
-
+    unreachable();
   }
 
-  appendStr(val: str): String {
-    return this;
+  length(): u32 {
+    return types.sizeOf(this);
   }
 }

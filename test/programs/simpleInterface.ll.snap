@@ -2,264 +2,64 @@
 source_filename = "whacko"
 target triple = "wasm32-wasi"
 
+declare ptr @__whacko_gc_alloc(i32, i32)
+
+declare void @__whacko_gc_store_field_ptr(i32, ptr, ptr, ptr)
+
 define void @_start() {
 entry:
-  %"alloca~0.i3.i39" = alloca ptr, align 8
-  %"alloca~0.i2.i40" = alloca ptr, align 8
-  %"alloca~0.i1.i41" = alloca ptr, align 8
-  %"alloca~0.i.i42" = alloca ptr, align 8
-  %"alloca~0.i3.i27" = alloca ptr, align 8
-  %"alloca~0.i2.i28" = alloca ptr, align 8
-  %"alloca~0.i1.i29" = alloca ptr, align 8
-  %"alloca~0.i.i30" = alloca ptr, align 8
-  %"alloca~0.i3.i15" = alloca ptr, align 8
-  %"alloca~0.i2.i16" = alloca ptr, align 8
-  %"alloca~0.i1.i17" = alloca ptr, align 8
-  %"alloca~0.i.i18" = alloca ptr, align 8
-  %"alloca~0.i3.i" = alloca ptr, align 8
-  %"alloca~0.i2.i" = alloca ptr, align 8
-  %"alloca~0.i1.i" = alloca ptr, align 8
-  %"alloca~0.i.i" = alloca ptr, align 8
-  %"alloca~0.i11" = alloca ptr, align 8
-  %"alloca~0.i8" = alloca ptr, align 8
-  %"alloca~0.i5" = alloca ptr, align 8
-  %"alloca~0.i4" = alloca ptr, align 8
-  %"alloca~0.i3" = alloca ptr, align 8
-  %"alloca~0.i2" = alloca ptr, align 8
-  %"alloca~0.i1" = alloca ptr, align 8
-  %"alloca~0.i" = alloca ptr, align 8
   %"alloca~0" = alloca ptr, align 8
   %"alloca~1" = alloca ptr, align 8
   %"alloca~2" = alloca ptr, align 8
   %"alloca~3" = alloca ptr, align 8
-  %"61~inst" = tail call ptr @malloc(i32 ptrtoint (ptr getelementptr (ptr, ptr null, i32 1) to i32))
-  store i32 1, ptr %"61~inst", align 4
-  %"sizeOfGEP~136" = getelementptr ptr, ptr %"61~inst", i32 1
-  store i32 ptrtoint (ptr getelementptr (ptr, ptr null, i32 1) to i32), ptr %"sizeOfGEP~136", align 4
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i")
-  store ptr %"61~inst", ptr %"alloca~0.i", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i")
-  store ptr %"61~inst", ptr %"alloca~0", align 8
-  %"65~inst" = tail call ptr @malloc(i32 ptrtoint (ptr getelementptr (ptr, ptr null, i32 1) to i32))
-  store i32 2, ptr %"65~inst", align 4
-  %"sizeOfGEP~138" = getelementptr ptr, ptr %"65~inst", i32 1
-  store i32 ptrtoint (ptr getelementptr (ptr, ptr null, i32 1) to i32), ptr %"sizeOfGEP~138", align 4
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i1")
-  store ptr %"65~inst", ptr %"alloca~0.i1", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i1")
-  store ptr %"65~inst", ptr %"alloca~1", align 8
-  %"69~inst" = tail call ptr @malloc(i32 ptrtoint (ptr getelementptr (ptr, ptr null, i32 1) to i32))
-  store i32 3, ptr %"69~inst", align 4
-  %"sizeOfGEP~140" = getelementptr ptr, ptr %"69~inst", i32 1
-  store i32 ptrtoint (ptr getelementptr (ptr, ptr null, i32 1) to i32), ptr %"sizeOfGEP~140", align 4
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i3")
-  store ptr %"69~inst", ptr %"alloca~0.i3", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i3")
-  store ptr %"69~inst", ptr %"alloca~2", align 8
-  %"73~inst" = tail call ptr @malloc(i32 ptrtoint (ptr getelementptr (ptr, ptr null, i32 1) to i32))
-  store i32 4, ptr %"73~inst", align 4
-  %"sizeOfGEP~142" = getelementptr ptr, ptr %"73~inst", i32 1
-  store i32 ptrtoint (ptr getelementptr (ptr, ptr null, i32 1) to i32), ptr %"sizeOfGEP~142", align 4
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i2")
-  store ptr %"73~inst", ptr %"alloca~0.i2", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i2")
-  store ptr %"73~inst", ptr %"alloca~3", align 8
-  %"76~inst" = load ptr, ptr %"alloca~0", align 8
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i8")
-  store ptr %"76~inst", ptr %"alloca~0.i8", align 8
-  %"111~inst.i9" = load ptr, ptr %"alloca~0.i8", align 8
-  %"loadType~145.i19" = load i32, ptr %"111~inst.i9", align 4
-  switch i32 %"loadType~145.i19", label %"default~146.i20" [
-    i32 1, label %"callable:[test/programs/simpleInterface.wo]A.test;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>i32Type.i21"
-    i32 2, label %"callable:[test/programs/simpleInterface.wo]B.test;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>i32Type.i22"
-    i32 3, label %"callable:[test/programs/simpleInterface.wo]C.test;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>i32Type.i23"
-    i32 4, label %"callable:[test/programs/simpleInterface.wo]D.test;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>i32Type.i24"
-  ]
+  %"result~227" = call ptr @__whacko_gc_alloc(i32 1, i32 ptrtoint (ptr getelementptr ({ ptr, ptr, i32, i32 }, ptr null, i32 1) to i32))
+  call void @"callable:[test/programs/simpleInterface.wo]A.constructor;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>voidType"(ptr %"result~227")
+  store ptr %"result~227", ptr %"alloca~0", align 8
+  %"result~229" = call ptr @__whacko_gc_alloc(i32 2, i32 ptrtoint (ptr getelementptr ({ ptr, ptr, i32, i32 }, ptr null, i32 1) to i32))
+  call void @"callable:[test/programs/simpleInterface.wo]B.constructor;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>voidType"(ptr %"result~229")
+  store ptr %"result~229", ptr %"alloca~1", align 8
+  %"result~231" = call ptr @__whacko_gc_alloc(i32 3, i32 ptrtoint (ptr getelementptr ({ ptr, ptr, i32, i32 }, ptr null, i32 1) to i32))
+  call void @"callable:[test/programs/simpleInterface.wo]C.constructor;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>voidType"(ptr %"result~231")
+  store ptr %"result~231", ptr %"alloca~2", align 8
+  %"result~233" = call ptr @__whacko_gc_alloc(i32 4, i32 ptrtoint (ptr getelementptr ({ ptr, ptr, i32, i32 }, ptr null, i32 1) to i32))
+  call void @"callable:[test/programs/simpleInterface.wo]D.constructor;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>voidType"(ptr %"result~233")
+  store ptr %"result~233", ptr %"alloca~3", align 8
+  %"101~inst" = load ptr, ptr %"alloca~0", align 8
+  %"105~inst" = call i32 @callTest(ptr %"101~inst")
+  %"111~inst" = icmp eq i32 %"105~inst", 42
+  br i1 %"111~inst", label %"next~114", label %"falsy~113"
 
-"default~146.i20":                                ; preds = %entry
+"falsy~113":                                      ; preds = %entry
   unreachable
 
-"callable:[test/programs/simpleInterface.wo]A.test;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>i32Type.i21": ; preds = %entry
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i1.i17")
-  store ptr %"111~inst.i9", ptr %"alloca~0.i1.i17", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i1.i17")
-  br label %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit25"
+"next~114":                                       ; preds = %entry
+  %"118~inst" = load ptr, ptr %"alloca~1", align 8
+  %"121~inst" = call i32 @callTest(ptr %"118~inst")
+  %"127~inst" = icmp eq i32 %"121~inst", 69
+  br i1 %"127~inst", label %"next~130", label %"falsy~129"
 
-"callable:[test/programs/simpleInterface.wo]B.test;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>i32Type.i22": ; preds = %entry
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i2.i16")
-  store ptr %"111~inst.i9", ptr %"alloca~0.i2.i16", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i2.i16")
-  br label %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit25"
-
-"callable:[test/programs/simpleInterface.wo]C.test;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>i32Type.i23": ; preds = %entry
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i3.i15")
-  store ptr %"111~inst.i9", ptr %"alloca~0.i3.i15", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i3.i15")
-  br label %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit25"
-
-"callable:[test/programs/simpleInterface.wo]D.test;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>i32Type.i24": ; preds = %entry
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i.i18")
-  store ptr %"111~inst.i9", ptr %"alloca~0.i.i18", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i.i18")
-  br label %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit25"
-
-"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit25": ; preds = %"callable:[test/programs/simpleInterface.wo]D.test;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>i32Type.i24", %"callable:[test/programs/simpleInterface.wo]C.test;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>i32Type.i23", %"callable:[test/programs/simpleInterface.wo]B.test;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>i32Type.i22", %"callable:[test/programs/simpleInterface.wo]A.test;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>i32Type.i21"
-  %"113~inst.i1026" = phi i32 [ 42, %"callable:[test/programs/simpleInterface.wo]A.test;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>i32Type.i21" ], [ 69, %"callable:[test/programs/simpleInterface.wo]B.test;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>i32Type.i22" ], [ 123, %"callable:[test/programs/simpleInterface.wo]C.test;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>i32Type.i23" ], [ 456, %"callable:[test/programs/simpleInterface.wo]D.test;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>i32Type.i24" ]
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i8")
-  %"80~inst" = icmp eq i32 %"113~inst.i1026", 42
-  br i1 %"80~inst", label %"next~82", label %"falsy~81"
-
-"falsy~81":                                       ; preds = %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit25"
+"falsy~129":                                      ; preds = %"next~114"
   unreachable
 
-"next~82":                                        ; preds = %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit25"
-  %"85~inst" = load ptr, ptr %"alloca~1", align 8
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i5")
-  store ptr %"85~inst", ptr %"alloca~0.i5", align 8
-  %"111~inst.i6" = load ptr, ptr %"alloca~0.i5", align 8
-  %"loadType~145.i43" = load i32, ptr %"111~inst.i6", align 4
-  switch i32 %"loadType~145.i43", label %"default~146.i44" [
-    i32 1, label %"callable:[test/programs/simpleInterface.wo]A.test;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>i32Type.i45"
-    i32 2, label %"callable:[test/programs/simpleInterface.wo]B.test;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>i32Type.i46"
-    i32 3, label %"callable:[test/programs/simpleInterface.wo]C.test;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>i32Type.i47"
-    i32 4, label %"callable:[test/programs/simpleInterface.wo]D.test;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>i32Type.i48"
-  ]
+"next~130":                                       ; preds = %"next~114"
+  %"134~inst" = load ptr, ptr %"alloca~2", align 8
+  %"137~inst" = call i32 @callTest(ptr %"134~inst")
+  %"143~inst" = icmp eq i32 %"137~inst", 123
+  br i1 %"143~inst", label %"next~146", label %"falsy~145"
 
-"default~146.i44":                                ; preds = %"next~82"
+"falsy~145":                                      ; preds = %"next~130"
   unreachable
 
-"callable:[test/programs/simpleInterface.wo]A.test;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>i32Type.i45": ; preds = %"next~82"
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i1.i41")
-  store ptr %"111~inst.i6", ptr %"alloca~0.i1.i41", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i1.i41")
-  br label %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit49"
+"next~146":                                       ; preds = %"next~130"
+  %"150~inst" = load ptr, ptr %"alloca~3", align 8
+  %"153~inst" = call i32 @callTest(ptr %"150~inst")
+  %"159~inst" = icmp eq i32 %"153~inst", 456
+  br i1 %"159~inst", label %"next~162", label %"falsy~161"
 
-"callable:[test/programs/simpleInterface.wo]B.test;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>i32Type.i46": ; preds = %"next~82"
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i2.i40")
-  store ptr %"111~inst.i6", ptr %"alloca~0.i2.i40", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i2.i40")
-  br label %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit49"
-
-"callable:[test/programs/simpleInterface.wo]C.test;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>i32Type.i47": ; preds = %"next~82"
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i3.i39")
-  store ptr %"111~inst.i6", ptr %"alloca~0.i3.i39", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i3.i39")
-  br label %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit49"
-
-"callable:[test/programs/simpleInterface.wo]D.test;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>i32Type.i48": ; preds = %"next~82"
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i.i42")
-  store ptr %"111~inst.i6", ptr %"alloca~0.i.i42", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i.i42")
-  br label %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit49"
-
-"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit49": ; preds = %"callable:[test/programs/simpleInterface.wo]D.test;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>i32Type.i48", %"callable:[test/programs/simpleInterface.wo]C.test;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>i32Type.i47", %"callable:[test/programs/simpleInterface.wo]B.test;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>i32Type.i46", %"callable:[test/programs/simpleInterface.wo]A.test;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>i32Type.i45"
-  %"113~inst.i750" = phi i32 [ 42, %"callable:[test/programs/simpleInterface.wo]A.test;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>i32Type.i45" ], [ 69, %"callable:[test/programs/simpleInterface.wo]B.test;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>i32Type.i46" ], [ 123, %"callable:[test/programs/simpleInterface.wo]C.test;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>i32Type.i47" ], [ 456, %"callable:[test/programs/simpleInterface.wo]D.test;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>i32Type.i48" ]
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i5")
-  %"88~inst" = icmp eq i32 %"113~inst.i750", 69
-  br i1 %"88~inst", label %"next~90", label %"falsy~89"
-
-"falsy~89":                                       ; preds = %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit49"
+"falsy~161":                                      ; preds = %"next~146"
   unreachable
 
-"next~90":                                        ; preds = %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit49"
-  %"93~inst" = load ptr, ptr %"alloca~2", align 8
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i11")
-  store ptr %"93~inst", ptr %"alloca~0.i11", align 8
-  %"111~inst.i12" = load ptr, ptr %"alloca~0.i11", align 8
-  %"loadType~145.i31" = load i32, ptr %"111~inst.i12", align 4
-  switch i32 %"loadType~145.i31", label %"default~146.i32" [
-    i32 1, label %"callable:[test/programs/simpleInterface.wo]A.test;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>i32Type.i33"
-    i32 2, label %"callable:[test/programs/simpleInterface.wo]B.test;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>i32Type.i34"
-    i32 3, label %"callable:[test/programs/simpleInterface.wo]C.test;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>i32Type.i35"
-    i32 4, label %"callable:[test/programs/simpleInterface.wo]D.test;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>i32Type.i36"
-  ]
-
-"default~146.i32":                                ; preds = %"next~90"
-  unreachable
-
-"callable:[test/programs/simpleInterface.wo]A.test;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>i32Type.i33": ; preds = %"next~90"
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i1.i29")
-  store ptr %"111~inst.i12", ptr %"alloca~0.i1.i29", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i1.i29")
-  br label %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit37"
-
-"callable:[test/programs/simpleInterface.wo]B.test;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>i32Type.i34": ; preds = %"next~90"
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i2.i28")
-  store ptr %"111~inst.i12", ptr %"alloca~0.i2.i28", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i2.i28")
-  br label %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit37"
-
-"callable:[test/programs/simpleInterface.wo]C.test;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>i32Type.i35": ; preds = %"next~90"
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i3.i27")
-  store ptr %"111~inst.i12", ptr %"alloca~0.i3.i27", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i3.i27")
-  br label %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit37"
-
-"callable:[test/programs/simpleInterface.wo]D.test;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>i32Type.i36": ; preds = %"next~90"
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i.i30")
-  store ptr %"111~inst.i12", ptr %"alloca~0.i.i30", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i.i30")
-  br label %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit37"
-
-"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit37": ; preds = %"callable:[test/programs/simpleInterface.wo]D.test;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>i32Type.i36", %"callable:[test/programs/simpleInterface.wo]C.test;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>i32Type.i35", %"callable:[test/programs/simpleInterface.wo]B.test;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>i32Type.i34", %"callable:[test/programs/simpleInterface.wo]A.test;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>i32Type.i33"
-  %"113~inst.i1338" = phi i32 [ 42, %"callable:[test/programs/simpleInterface.wo]A.test;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>i32Type.i33" ], [ 69, %"callable:[test/programs/simpleInterface.wo]B.test;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>i32Type.i34" ], [ 123, %"callable:[test/programs/simpleInterface.wo]C.test;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>i32Type.i35" ], [ 456, %"callable:[test/programs/simpleInterface.wo]D.test;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>i32Type.i36" ]
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i11")
-  %"96~inst" = icmp eq i32 %"113~inst.i1338", 123
-  br i1 %"96~inst", label %"next~98", label %"falsy~97"
-
-"falsy~97":                                       ; preds = %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit37"
-  unreachable
-
-"next~98":                                        ; preds = %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit37"
-  %"101~inst" = load ptr, ptr %"alloca~3", align 8
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i4")
-  store ptr %"101~inst", ptr %"alloca~0.i4", align 8
-  %"111~inst.i" = load ptr, ptr %"alloca~0.i4", align 8
-  %"loadType~145.i" = load i32, ptr %"111~inst.i", align 4
-  switch i32 %"loadType~145.i", label %"default~146.i" [
-    i32 1, label %"callable:[test/programs/simpleInterface.wo]A.test;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>i32Type.i"
-    i32 2, label %"callable:[test/programs/simpleInterface.wo]B.test;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>i32Type.i"
-    i32 3, label %"callable:[test/programs/simpleInterface.wo]C.test;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>i32Type.i"
-    i32 4, label %"callable:[test/programs/simpleInterface.wo]D.test;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>i32Type.i"
-  ]
-
-"default~146.i":                                  ; preds = %"next~98"
-  unreachable
-
-"callable:[test/programs/simpleInterface.wo]A.test;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>i32Type.i": ; preds = %"next~98"
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i1.i")
-  store ptr %"111~inst.i", ptr %"alloca~0.i1.i", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i1.i")
-  br label %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit"
-
-"callable:[test/programs/simpleInterface.wo]B.test;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>i32Type.i": ; preds = %"next~98"
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i2.i")
-  store ptr %"111~inst.i", ptr %"alloca~0.i2.i", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i2.i")
-  br label %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit"
-
-"callable:[test/programs/simpleInterface.wo]C.test;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>i32Type.i": ; preds = %"next~98"
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i3.i")
-  store ptr %"111~inst.i", ptr %"alloca~0.i3.i", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i3.i")
-  br label %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit"
-
-"callable:[test/programs/simpleInterface.wo]D.test;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>i32Type.i": ; preds = %"next~98"
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i.i")
-  store ptr %"111~inst.i", ptr %"alloca~0.i.i", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i.i")
-  br label %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit"
-
-"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit": ; preds = %"callable:[test/programs/simpleInterface.wo]D.test;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>i32Type.i", %"callable:[test/programs/simpleInterface.wo]C.test;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>i32Type.i", %"callable:[test/programs/simpleInterface.wo]B.test;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>i32Type.i", %"callable:[test/programs/simpleInterface.wo]A.test;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>i32Type.i"
-  %"113~inst.i14" = phi i32 [ 42, %"callable:[test/programs/simpleInterface.wo]A.test;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>i32Type.i" ], [ 69, %"callable:[test/programs/simpleInterface.wo]B.test;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>i32Type.i" ], [ 123, %"callable:[test/programs/simpleInterface.wo]C.test;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>i32Type.i" ], [ 456, %"callable:[test/programs/simpleInterface.wo]D.test;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>i32Type.i" ]
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i4")
-  %"104~inst" = icmp eq i32 %"113~inst.i14", 456
-  br i1 %"104~inst", label %"next~106", label %"falsy~105"
-
-"falsy~105":                                      ; preds = %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit"
-  unreachable
-
-"next~106":                                       ; preds = %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit"
+"next~162":                                       ; preds = %"next~146"
   ret void
 }
 
@@ -293,94 +93,42 @@ entry:
 
 define i32 @callTest(ptr %0) {
 entry:
-  %"alloca~0.i3.i" = alloca ptr, align 8
-  %"alloca~0.i2.i" = alloca ptr, align 8
-  %"alloca~0.i1.i" = alloca ptr, align 8
-  %"alloca~0.i.i" = alloca ptr, align 8
   %"alloca~0" = alloca ptr, align 8
   store ptr %0, ptr %"alloca~0", align 8
-  %"111~inst" = load ptr, ptr %"alloca~0", align 8
-  %"loadType~145.i" = load i32, ptr %"111~inst", align 4
-  switch i32 %"loadType~145.i", label %"default~146.i" [
-    i32 1, label %"callable:[test/programs/simpleInterface.wo]A.test;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>i32Type.i"
-    i32 2, label %"callable:[test/programs/simpleInterface.wo]B.test;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>i32Type.i"
-    i32 3, label %"callable:[test/programs/simpleInterface.wo]C.test;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>i32Type.i"
-    i32 4, label %"callable:[test/programs/simpleInterface.wo]D.test;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>i32Type.i"
-  ]
-
-"default~146.i":                                  ; preds = %entry
-  unreachable
-
-"callable:[test/programs/simpleInterface.wo]A.test;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>i32Type.i": ; preds = %entry
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i1.i")
-  store ptr %"111~inst", ptr %"alloca~0.i1.i", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i1.i")
-  br label %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit"
-
-"callable:[test/programs/simpleInterface.wo]B.test;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>i32Type.i": ; preds = %entry
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i2.i")
-  store ptr %"111~inst", ptr %"alloca~0.i2.i", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i2.i")
-  br label %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit"
-
-"callable:[test/programs/simpleInterface.wo]C.test;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>i32Type.i": ; preds = %entry
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i3.i")
-  store ptr %"111~inst", ptr %"alloca~0.i3.i", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i3.i")
-  br label %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit"
-
-"callable:[test/programs/simpleInterface.wo]D.test;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>i32Type.i": ; preds = %entry
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i.i")
-  store ptr %"111~inst", ptr %"alloca~0.i.i", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i.i")
-  br label %"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit"
-
-"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type.exit": ; preds = %"callable:[test/programs/simpleInterface.wo]D.test;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>i32Type.i", %"callable:[test/programs/simpleInterface.wo]C.test;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>i32Type.i", %"callable:[test/programs/simpleInterface.wo]B.test;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>i32Type.i", %"callable:[test/programs/simpleInterface.wo]A.test;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>i32Type.i"
-  %"113~inst1" = phi i32 [ 42, %"callable:[test/programs/simpleInterface.wo]A.test;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>i32Type.i" ], [ 69, %"callable:[test/programs/simpleInterface.wo]B.test;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>i32Type.i" ], [ 123, %"callable:[test/programs/simpleInterface.wo]C.test;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>i32Type.i" ], [ 456, %"callable:[test/programs/simpleInterface.wo]D.test;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>i32Type.i" ]
-  ret i32 %"113~inst1"
+  %"168~inst" = load ptr, ptr %"alloca~0", align 8
+  %"172~inst" = call i32 @"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type"(ptr %"168~inst")
+  ret i32 %"172~inst"
 }
 
 define i32 @"callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type"(ptr %0) {
-"entry~143":
-  %"alloca~0.i3" = alloca ptr, align 8
-  %"alloca~0.i2" = alloca ptr, align 8
-  %"alloca~0.i1" = alloca ptr, align 8
-  %"alloca~0.i" = alloca ptr, align 8
-  %"typeGEP~144" = getelementptr { i32, i32 }, ptr %0, i32 0
-  %"loadType~145" = load i32, ptr %"typeGEP~144", align 4
-  switch i32 %"loadType~145", label %"default~146" [
+"entry~234":
+  %"typeGEP~235" = getelementptr { ptr, ptr, i32, i32 }, ptr %0, i32 2
+  %1 = load i32, ptr %"typeGEP~235", align 4
+  switch i32 %1, label %"default~236" [
     i32 1, label %"callable:[test/programs/simpleInterface.wo]A.test;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>i32Type"
     i32 2, label %"callable:[test/programs/simpleInterface.wo]B.test;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>i32Type"
     i32 3, label %"callable:[test/programs/simpleInterface.wo]C.test;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>i32Type"
     i32 4, label %"callable:[test/programs/simpleInterface.wo]D.test;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>i32Type"
   ]
 
-"default~146":                                    ; preds = %"entry~143"
+"default~236":                                    ; preds = %"entry~234"
   unreachable
 
-"callable:[test/programs/simpleInterface.wo]A.test;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>i32Type": ; preds = %"entry~143"
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i1")
-  store ptr %0, ptr %"alloca~0.i1", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i1")
-  ret i32 42
+"callable:[test/programs/simpleInterface.wo]A.test;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>i32Type": ; preds = %"entry~234"
+  %2 = call i32 @"callable:[test/programs/simpleInterface.wo]A.test;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>i32Type"(ptr %0)
+  ret i32 %2
 
-"callable:[test/programs/simpleInterface.wo]B.test;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>i32Type": ; preds = %"entry~143"
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i2")
-  store ptr %0, ptr %"alloca~0.i2", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i2")
-  ret i32 69
+"callable:[test/programs/simpleInterface.wo]B.test;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>i32Type": ; preds = %"entry~234"
+  %3 = call i32 @"callable:[test/programs/simpleInterface.wo]B.test;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>i32Type"(ptr %0)
+  ret i32 %3
 
-"callable:[test/programs/simpleInterface.wo]C.test;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>i32Type": ; preds = %"entry~143"
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i3")
-  store ptr %0, ptr %"alloca~0.i3", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i3")
-  ret i32 123
+"callable:[test/programs/simpleInterface.wo]C.test;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>i32Type": ; preds = %"entry~234"
+  %4 = call i32 @"callable:[test/programs/simpleInterface.wo]C.test;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>i32Type"(ptr %0)
+  ret i32 %4
 
-"callable:[test/programs/simpleInterface.wo]D.test;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>i32Type": ; preds = %"entry~143"
-  call void @llvm.lifetime.start.p0(i64 8, ptr %"alloca~0.i")
-  store ptr %0, ptr %"alloca~0.i", align 8
-  call void @llvm.lifetime.end.p0(i64 8, ptr %"alloca~0.i")
-  ret i32 456
+"callable:[test/programs/simpleInterface.wo]D.test;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>i32Type": ; preds = %"entry~234"
+  %5 = call i32 @"callable:[test/programs/simpleInterface.wo]D.test;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>i32Type"(ptr %0)
+  ret i32 %5
 }
 
 define i32 @"callable:[test/programs/simpleInterface.wo]A.test;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>i32Type"(ptr %0) {
@@ -411,13 +159,35 @@ entry:
   ret i32 456
 }
 
-declare noalias ptr @malloc(i32) #0
+declare void @__whacko_gc_visit(ptr)
 
-; Function Attrs: nocallback nofree nosync nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.lifetime.start.p0(i64 immarg, ptr nocapture) #1
+define void @__visit_whacko_object(ptr %0) {
+"entry~237":
+  %"typeGEP~239" = getelementptr { ptr, ptr, i32, i32 }, ptr %0, i32 2
+  %1 = load i32, ptr %"typeGEP~239", align 4
+  switch i32 %1, label %"unreachable~238" [
+    i32 1, label %"classType:[test/programs/simpleInterface.wo]A<>"
+    i32 2, label %"classType:[test/programs/simpleInterface.wo]B<>"
+    i32 3, label %"classType:[test/programs/simpleInterface.wo]C<>"
+    i32 4, label %"classType:[test/programs/simpleInterface.wo]D<>"
+    i32 5, label %"classType:[std/String.wo]String<>"
+  ]
 
-; Function Attrs: nocallback nofree nosync nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.lifetime.end.p0(i64 immarg, ptr nocapture) #1
+"unreachable~238":                                ; preds = %"entry~237"
+  unreachable
 
-attributes #0 = { "alloc-family"="malloc" "allockind"="alloc,zeroed" "allocsize"="0" }
-attributes #1 = { nocallback nofree nosync nounwind willreturn memory(argmem: readwrite) }
+"classType:[test/programs/simpleInterface.wo]A<>": ; preds = %"entry~237"
+  ret void
+
+"classType:[test/programs/simpleInterface.wo]B<>": ; preds = %"entry~237"
+  ret void
+
+"classType:[test/programs/simpleInterface.wo]C<>": ; preds = %"entry~237"
+  ret void
+
+"classType:[test/programs/simpleInterface.wo]D<>": ; preds = %"entry~237"
+  ret void
+
+"classType:[std/String.wo]String<>":              ; preds = %"entry~237"
+  ret void
+}

@@ -3,10 +3,9 @@ program:
 (extern function)
   callable:[std/builtins.wo]gc.store_field_ptr;functionType:(i32Type,ptrType,ptrType,ptrType)=>voidType
 (extern function)
-  callable:[test/programs/variables.wo]_start;functionType:()=>voidType
-    block: entry~58
-      60~inst = load: (variable a)
-      62~inst = (i64 10)
-      63~inst = store: (variable a) = (runtime i64Type 62~inst)
+  callable:[test/programs/String.wo]_start;functionType:()=>voidType
+    block: entry~480
+      481~inst = (str "Hello world")
+      482~inst = store: (variable a) = (runtime classType:[std/String.wo]String<> 481~inst)
       return (void)
 

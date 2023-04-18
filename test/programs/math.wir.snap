@@ -1,30 +1,34 @@
 program:
+  callable:[std/builtins.wo]gc.alloc;functionType:(u32Type,usizeType)=>ptrType
+(extern function)
+  callable:[std/builtins.wo]gc.store_field_ptr;functionType:(i32Type,ptrType,ptrType,ptrType)=>voidType
+(extern function)
   callable:[test/programs/math.wo]_start;functionType:()=>voidType
-    block: entry~148
-      150~inst = new: classType:[test/programs/math.wo]Foo<>
-      151~inst = call: callable:[test/programs/math.wo]Foo.constructor;methodType:classType:[test/programs/math.wo]Foo<>#()=>voidType with (runtime classType:[test/programs/math.wo]Foo<> 150~inst)
-      152~inst = store: (variable foo) = (runtime classType:[test/programs/math.wo]Foo<> 150~inst)
-      153~inst = (f32 1)
-      155~inst = call: callable:[std/builtins.wo]math.asinf;functionType:(f32Type)=>f32Type with (runtime f32Type 153~inst)
-      157~inst = call: callable:[test/programs/math.wo]bar;functionType:()=>f64Type with 
-      158~inst = (f64 1)
-      159~inst = 157~inst - 158~inst
-      161~inst = call: callable:[std/builtins.wo]math.asin;functionType:(f64Type)=>f64Type with (runtime f64Type 159~inst)
-      162~inst = load: (variable foo)
-      free: (runtime classType:[test/programs/math.wo]Foo<> 162~inst)
+    block: entry~251
+      255~inst = new: classType:[test/programs/math.wo]Foo<>
+      256~inst = call: callable:[test/programs/math.wo]Foo.constructor;methodType:classType:[test/programs/math.wo]Foo<>#()=>voidType with (runtime classType:[test/programs/math.wo]Foo<> 255~inst)
+      257~inst = store: (variable foo) = (runtime classType:[test/programs/math.wo]Foo<> 255~inst)
+      265~inst = (f32 1)
+      267~inst = call: callable:[std/builtins.wo]math.asinf;functionType:(f32Type)=>f32Type with (runtime f32Type 265~inst)
+      271~inst = call: callable:[test/programs/math.wo]bar;functionType:()=>f64Type with 
+      273~inst = (f64 1)
+      274~inst = 271~inst - 273~inst
+      279~inst = call: callable:[std/builtins.wo]math.asin;functionType:(f64Type)=>f64Type with (runtime f64Type 274~inst)
+      280~inst = load: (variable foo)
+      free: (runtime classType:[test/programs/math.wo]Foo<> 280~inst)
       return (void)
 
   callable:[test/programs/math.wo]Foo.constructor;methodType:classType:[test/programs/math.wo]Foo<>#()=>voidType
-    block: entry~167
-      168~inst = load: (field classType:[test/programs/math.wo]Foo<>#someField)
-      169~inst = (i32 0)
-      170~inst = store: (field classType:[test/programs/math.wo]Foo<>#someField) = (runtime i32Type 169~inst)
+    block: entry~287
+      288~inst = load: (field classType:[test/programs/math.wo]Foo<>#someField)
+      293~inst = (i32 0)
+      294~inst = store: (field classType:[test/programs/math.wo]Foo<>#someField) = (runtime i32Type 293~inst)
       return (void)
 
   callable:[std/builtins.wo]math.asinf;functionType:(f32Type)=>f32Type
 (extern function)
   callable:[test/programs/math.wo]bar;functionType:()=>f64Type
-    block: entry~165
+    block: entry~284
       return (f64 2)
 
   callable:[std/builtins.wo]math.asin;functionType:(f64Type)=>f64Type

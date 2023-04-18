@@ -1,4 +1,0 @@
-Error: why
-    at createNewScope (/home/jtenner/whacko-lang/src/language-server/scope.ts:109:30)
-    at main (/home/jtenner/whacko-lang/src/cli/index.ts:61:32)
-    at async file:///home/jtenner/whacko-lang/test/compiler.mjs:18:18

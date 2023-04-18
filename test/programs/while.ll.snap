@@ -2,40 +2,61 @@
 source_filename = "whacko"
 target triple = "wasm32-wasi"
 
+declare ptr @__whacko_gc_alloc(i32, i32)
+
+declare void @__whacko_gc_store_field_ptr(i32, ptr, ptr, ptr)
+
 define void @_start() {
 entry:
   %"alloca~0" = alloca i1, align 1
   %"alloca~1" = alloca i64, align 8
-  br label %"condition~2"
+  br label %"condition~16"
 
-"condition~2":                                    ; preds = %"unused~24", %entry
-  %"4~inst" = load i1, ptr %"alloca~0", align 1
-  br i1 %"4~inst", label %"body~5", label %"next~6"
+"condition~16":                                   ; preds = %"unused~40", %entry
+  %"18~inst" = load i1, ptr %"alloca~0", align 1
+  br i1 %"18~inst", label %"body~19", label %"next~20"
 
-"body~5":                                         ; preds = %"condition~2"
-  br label %"condition~8"
+"body~19":                                        ; preds = %"condition~16"
+  br label %"condition~23"
 
-"next~6":                                         ; preds = %"next~14", %"condition~2"
+"next~20":                                        ; preds = %"next~30", %"condition~16"
   ret void
 
-"condition~8":                                    ; preds = %"unused~21", %"body~13", %"body~5"
-  %"10~inst" = load i64, ptr %"alloca~1", align 4
-  %"12~inst" = icmp slt i64 %"10~inst", 10
-  br i1 %"12~inst", label %"body~13", label %"next~14"
+"condition~23":                                   ; preds = %"unused~37", %"body~29", %"body~19"
+  %"25~inst" = load i64, ptr %"alloca~1", align 4
+  %"28~inst" = icmp slt i64 %"25~inst", 10
+  br i1 %"28~inst", label %"body~29", label %"next~30"
 
-"body~13":                                        ; preds = %"condition~8"
-  %"16~inst" = load i64, ptr %"alloca~1", align 4
-  %"17~inst" = load i64, ptr %"alloca~1", align 4
-  %"19~inst" = add i64 %"17~inst", 1
-  store i64 %"19~inst", ptr %"alloca~1", align 4
-  br label %"condition~8"
+"body~29":                                        ; preds = %"condition~23"
+  %"32~inst" = load i64, ptr %"alloca~1", align 4
+  %"33~inst" = load i64, ptr %"alloca~1", align 4
+  %"35~inst" = add i64 %"33~inst", 1
+  store i64 %"35~inst", ptr %"alloca~1", align 4
+  br label %"condition~23"
 
-"next~14":                                        ; preds = %"condition~8"
-  br label %"next~6"
+"next~30":                                        ; preds = %"condition~23"
+  br label %"next~20"
 
-"unused~21":                                      ; No predecessors!
-  br label %"condition~8"
+"unused~37":                                      ; No predecessors!
+  br label %"condition~23"
 
-"unused~24":                                      ; No predecessors!
-  br label %"condition~2"
+"unused~40":                                      ; No predecessors!
+  br label %"condition~16"
+}
+
+declare void @__whacko_gc_visit(ptr)
+
+define void @__visit_whacko_object(ptr %0) {
+"entry~44":
+  %"typeGEP~46" = getelementptr { ptr, ptr, i32, i32 }, ptr %0, i32 2
+  %1 = load i32, ptr %"typeGEP~46", align 4
+  switch i32 %1, label %"unreachable~45" [
+    i32 1, label %"classType:[std/String.wo]String<>"
+  ]
+
+"unreachable~45":                                 ; preds = %"entry~44"
+  unreachable
+
+"classType:[std/String.wo]String<>":              ; preds = %"entry~44"
+  ret void
 }

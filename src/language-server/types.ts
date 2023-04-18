@@ -66,6 +66,7 @@ import {
   getFullyQualifiedTypeName,
   getFullyQualifiedInterfaceName,
   getFullyQualifiedClassName,
+  idCounter,
 } from "./util";
 
 export const enum ConcreteTypeKind {
@@ -120,6 +121,7 @@ export const enum IntegerKind {
 }
 
 export interface ConcreteType {
+  id: number;
   kind: ConcreteTypeKind;
   llvmType: LLVMTypeRef | null;
 }
@@ -151,6 +153,7 @@ export interface ClassType extends ConcreteType {
   node: ClassDeclaration;
   resolvedTypes: TypeMap;
   typeParameters: ConcreteType[];
+  llvmStructType: LLVMTypeRef | null;
 }
 
 export interface InterfaceType extends ConcreteType {
@@ -167,11 +170,14 @@ export interface InterfaceType extends ConcreteType {
 
 export interface NullableType extends ConcreteType {
   kind: ConcreteTypeKind.Nullable;
-  child: ClassType;
+  child: ClassType | InterfaceType;
 }
 
-export function getNullableType(child: ClassType): NullableType {
+export function getNullableType(
+  child: ClassType | InterfaceType,
+): NullableType {
   return {
+    id: idCounter.value++,
     kind: ConcreteTypeKind.Nullable,
     child,
     llvmType: null,
@@ -204,27 +210,20 @@ export interface UnresolvedFunctionType extends ConcreteType {
   kind: ConcreteTypeKind.UnresolvedFunction;
 }
 
-export const theRawPointerType: RawPointerType = {
-  kind: ConcreteTypeKind.Pointer,
-  llvmType: null,
-};
-
 export const theNullType: NullType = {
+  id: idCounter.value++,
   kind: ConcreteTypeKind.Null,
   llvmType: null,
 };
 
 export const theInvalidType: InvalidType = {
+  id: idCounter.value++,
   kind: ConcreteTypeKind.Invalid,
   llvmType: null,
 };
 
-export const theVoidType: VoidType = {
-  kind: ConcreteTypeKind.Void,
-  llvmType: null,
-};
-
 export const theUnresolvedFunctionType: UnresolvedFunctionType = {
+  id: idCounter.value++,
   kind: ConcreteTypeKind.UnresolvedFunction,
   llvmType: null,
 };
@@ -412,6 +411,7 @@ export interface ArrayType extends ConcreteType {
 export function getFloatType(kind: FloatKind): FloatType {
   // TODO: Cache this?
   return {
+    id: idCounter.value++,
     kind: ConcreteTypeKind.Float,
     floatKind: kind,
     llvmType: null,
@@ -421,6 +421,7 @@ export function getFloatType(kind: FloatKind): FloatType {
 export function getIntegerType(kind: IntegerKind): IntegerType {
   // TODO: Cache this?
   return {
+    id: idCounter.value++,
     kind: ConcreteTypeKind.Integer,
     integerKind: kind,
     llvmType: null,
@@ -430,6 +431,7 @@ export function getIntegerType(kind: IntegerKind): IntegerType {
 export function getV128Type(kind: V128Kind): V128Type {
   // TODO: Cache this?
   return {
+    id: idCounter.value++,
     kind: ConcreteTypeKind.V128,
     v128Kind: kind,
     llvmType: null,
@@ -526,6 +528,7 @@ export function resolveEnumType(
   // TODO: Add enum member values to the EnumType
 
   const enumType: EnumType = {
+    id: idCounter.value++,
     kind: ConcreteTypeKind.Enum,
     node,
     name,
@@ -625,6 +628,7 @@ export function resolveClass(
     id: program.classId++,
     implements: interfaces,
     kind: ConcreteTypeKind.Class,
+    llvmStructType: null,
     llvmType: null,
     methods: new Map(),
     node,
@@ -798,6 +802,7 @@ export function resolveInterface(
   }
 
   const result = {
+    id: idCounter.value++,
     node,
     implementers: new Set(),
     methods: new Set(),
@@ -953,7 +958,7 @@ export function resolveType(
           case "f64x2":
             return getV128Type(V128Kind.F64x2);
           case "void":
-            return theVoidType;
+            return program.voidType;
         }
 
         if (typeMap.has(node.name)) return typeMap.get(node.name)!;
@@ -1067,6 +1072,7 @@ export function resolveType(
       }
 
       const result: FunctionType = {
+        id: idCounter.value++,
         kind: ConcreteTypeKind.Function,
         llvmType: null,
         parameterTypes,
@@ -1183,6 +1189,7 @@ export function getCallableType(
   if (isMethodClassMember(node) || isInterfaceMethodDeclaration(node)) {
     // We have an extra branch here in case we forget to initialize MethodType properties
     const result: MethodType = {
+      id: idCounter.value++,
       kind: ConcreteTypeKind.Method,
       llvmType: null,
       parameterTypes,
@@ -1193,6 +1200,7 @@ export function getCallableType(
   }
 
   return {
+    id: idCounter.value++,
     kind: ConcreteTypeKind.Function,
     llvmType: null,
     parameterTypes,
@@ -1222,11 +1230,12 @@ export function getConstructorType(
   }
 
   return {
+    id: idCounter.value++,
     kind: ConcreteTypeKind.Method,
-    thisType,
-    returnType: theVoidType,
     llvmType: null,
     parameterTypes,
+    returnType: program.voidType,
+    thisType,
   };
 }
 
@@ -1271,19 +1280,25 @@ export function typesEqual(left: ConcreteType, right: ConcreteType): boolean {
   }
 }
 
-let theStrType: ClassType | null = null;
-
-export function getStrType(
+export function getStringType(
   program: WhackoProgram,
   module: WhackoModule,
 ): ClassType {
-  if (theStrType) return theStrType;
-  const strScopeElement = getElementInScope(program.globalScope, "str");
-  assert(strScopeElement, "str must be defined in the global scope!");
-  assert(isClassDeclaration(strScopeElement!.node), "str must be a class!");
-  theStrType = resolveClass(program, module, strScopeElement!, []);
-  assert(theStrType, "Somehow, the str class could not be resolved!");
-  return theStrType!;
+  if (program.stringType) {
+    return program.stringType!;
+  }
+  const stringScopeElement = getElementInScope(program.globalScope, "String");
+  assert(stringScopeElement, "str must be defined in the global scope!");
+  assert(
+    isClassDeclaration(stringScopeElement!.node),
+    "String must be a class!",
+  );
+  program.stringType = resolveClass(program, module, stringScopeElement!, []);
+  assert(
+    program.stringType,
+    "Somehow, the String class could not be resolved!",
+  );
+  return program.stringType!;
 }
 
 export function getOperatorOverloadMethod(
@@ -1397,7 +1412,7 @@ export function getOperatorOverloadMethod(
         continue;
       }
 
-      if (typesEqual(returnType, theVoidType)) {
+      if (typesEqual(returnType, program.voidType)) {
         reportErrorDiagnostic(
           program,
           module,
@@ -1506,11 +1521,8 @@ export function isAssignable(
 
   // TODO: (... || subType.kind === ConcreteTypeKind.Interface)
   //       when interfaces can extend one another.
-  if (
-    superType.kind === ConcreteTypeKind.Interface &&
-    subType.kind === ConcreteTypeKind.Class
-  ) {
-    return (superType as InterfaceType).implementers.has(subType as ClassType);
+  if (isInterfaceType(superType) && isClassType(subType)) {
+    return superType.implementers.has(subType);
   }
   return typesEqual(superType, subType);
 }
@@ -1524,4 +1536,8 @@ export function isNumeric(type: ConcreteType): type is FloatType | IntegerType {
 
 export function isClassType(type: ConcreteType): type is ClassType {
   return type.kind === ConcreteTypeKind.Class;
+}
+
+export function isInterfaceType(type: ConcreteType): type is InterfaceType {
+  return type.kind === ConcreteTypeKind.Interface;
 }

@@ -39,6 +39,16 @@ export namespace types {
   @name("types.isReference") export builtin isReference<T>(): bool;
   @name("types.isInteger") export builtin isInteger<T>(): bool;
   @name("types.forFieldsIn") export builtin forFieldsIn<T, U>(value: T, context: U, func: UnresolvedFunction): void;
+  @name("types.RawPointer") export builtintype RawPointer;
+  @name("types.asRawPointer") export builtin asRawPointer(ptr: usize): RawPointer;
+}
+
+export namespace gc {
+  @name("__whacko_gc_initialize") export extern initialize(): void;
+  @ensure @name("__whacko_gc_alloc") export extern alloc(typeId: u32, size: usize): types.RawPointer;
+  @name("__whacko_gc_collect") export extern collect(): void;
+  @name("__whacko_gc_visit") export extern visit(ptr: usize): void;
+  @ensure @name("__whacko_gc_store_field_ptr") extern store_field_ptr(forward: i32, parent: types.RawPointer, child: types.RawPointer, field_location: types.RawPointer): void;
 }
 
 export namespace math {
