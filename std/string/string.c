@@ -1,5 +1,5 @@
-#include "gc/common-object.h"
-#include "gc/ugc/ugc.h"
+#include "../gc/common-object.h"
+#include "../gc/ugc/ugc.h"
 #include <stdio.h>
 #include <stdlib.h>
 
