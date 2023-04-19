@@ -2452,6 +2452,9 @@ export class WIRGenPass extends WhackoVisitor {
 
   override visitIfElseStatement(node: IfElseStatement): void {
     this.visit(node.condition);
+
+    // let a = 10;
+    // a.b = 42;
     const condition = ensureDereferenced(
       this.ctx,
       this.currentBlock,

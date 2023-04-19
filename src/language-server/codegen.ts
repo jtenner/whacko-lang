@@ -102,7 +102,6 @@ import {
   isVariableDeclarator,
 } from "./generated/ast";
 import { reportErrorDiagnostic } from "./diagnostic";
-import { type } from "os";
 
 export type LLVMUtil = typeof import("llvm-js");
 
@@ -334,7 +333,6 @@ export function codegen(program: WhackoProgram): CodegenResult {
     // if we need to generate instructions, then we should generate each block
     if (isWhackoFunction(func)) {
       const whackoFunc = func as WhackoFunctionContext;
-      if (!whackoFunc.entry) console.log(whackoFunc.name);
       const entryBlock = assert(
         whackoFunc.entry,
         "Whacko functions should have entries",
@@ -373,6 +371,8 @@ export function codegen(program: WhackoProgram): CodegenResult {
   }
 
   codegenGCVisitTrampoline(program, LLVM, LLVMUtil);
+
+  codegenGCInitialize(program, LLVM, LLVMUtil);
 
   const targetTriplePtr = LLVMUtil.lower("wasm32-wasi");
 
@@ -717,6 +717,53 @@ export function codegenMethodTrampoline(
   LLVM._LLVMBuildUnreachable(llvmBuilder);
 }
 
+export function codegenGCInitialize(
+  program: WhackoProgram,
+  LLVM: LLVM,
+  LLVMUtil: LLVMUtil,
+): void {
+  const startFunction = assert(
+    program.functions.get("_start"),
+    "The start method should exist.",
+  );
+
+  const startFuncRef = assert(
+    startFunction.funcRef,
+    "The start funcref should exist.",
+  );
+
+  const gcInitializeFunction = assert(
+    program.functions.get("__whacko_gc_initialize"),
+    "The __whacko_gc_initialize function should exist.",
+  );
+  const gcInitializeFuncRef = assert(
+    gcInitializeFunction.funcRef,
+    "The __whacko_gc_initialize funcref should exist.",
+  );
+
+  // write a call to the gc initialize method
+  const entryBlock = LLVM._LLVMGetEntryBasicBlock(startFuncRef);
+  const entryInstruction = LLVM._LLVMGetFirstInstruction(entryBlock);
+  LLVM._LLVMPositionBuilderBefore(program.llvmBuilder, entryInstruction);
+
+  const voidFunction = getLLVMFunctionType(
+    LLVM,
+    LLVMUtil,
+    gcInitializeFunction.type,
+  );
+
+  const noArgs = LLVMUtil.lowerPointerArray([]);
+  LLVM._LLVMBuildCall2(
+    program.llvmBuilder,
+    voidFunction,
+    gcInitializeFuncRef,
+    noArgs,
+    0,
+    0 as LLVMStringRef,
+  );
+  LLVM._free(noArgs);
+}
+
 export function codegenGCVisitTrampoline(
   program: WhackoProgram,
   LLVM: LLVM,
@@ -1005,6 +1052,7 @@ export function getLLVMValue(
         resultName,
       );
       LLVM._free(resultName);
+      LLVM._free(loweredParameters);
 
       const gepIndices = LLVMUtil.lowerPointerArray([
         LLVM._LLVMConstInt(
@@ -1054,9 +1102,6 @@ export function getLLVMValue(
         0 as LLVMStringRef,
       );
       LLVM._free(memCopyArgs);
-      // LLVM._LLVMGetParamTypes(, )
-      // logLLVMValue(LLVM, LLVMUtil, memCopy);
-      // console.log("-------------");
 
       return result;
     }
@@ -1330,6 +1375,7 @@ function appendLLVMBinaryInstruction(
           name,
         );
       }
+
       LLVM._free(name);
       return result;
     }
@@ -1994,7 +2040,7 @@ export function codegenFunction(
     if (!terminated) {
       const badBlock = printBlockToString(block);
       console.log(badBlock);
-      assert(false, "Block is not terminated");
+      assert(false, "Block is not terminated correctly. You did a bad.");
     }
     LLVM._LLVMPositionBuilderAtEnd(program.llvmBuilder, assert(llvmBlock));
 

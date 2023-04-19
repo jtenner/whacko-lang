@@ -575,8 +575,8 @@ export function buildDeclareFunction(
 
   const result: CallableFunctionContext = {
     attributes: [
-      { name: "wasm-import-module", value: functionName },
-      { name: "wasm-import-name", value: moduleName },
+      { name: "wasm-import-module", value: moduleName },
+      { name: "wasm-import-name", value: functionName },
     ],
     funcRef: null,
     id: idCounter.value++,

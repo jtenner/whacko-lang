@@ -3,3 +3,5 @@ out
 src/language-server/generated
 std/gc/wasi-sysroot
 std/gc/wasi-sysroot*
+llvm.sh
+std/link/*

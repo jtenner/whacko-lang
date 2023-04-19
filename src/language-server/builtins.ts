@@ -64,10 +64,12 @@ import {
   UnresolvedFunctionType,
   isAssignable,
   getStringType,
+  resolveNamedTypeScopeElement,
 } from "./types";
 import { assert, getFullyQualifiedTypeName, idCounter } from "./util";
 import { isNumberObject } from "util/types";
 import { FunctionDeclaration, isFunctionDeclaration } from "./generated/ast";
+import { getElementInScope } from "./scope";
 
 const simdInitialize =
   (type: V128Type) =>
@@ -230,6 +232,25 @@ export function registerDefaultBuiltins(program: WhackoProgram): void {
       } as VoidValue;
     },
   );
+
+  addBuiltinTypeToProgram(
+    program,
+    "string",
+    ({ module, node, program, scope, typeParameters }) => {
+      return assert(
+        resolveNamedTypeScopeElement(
+          program,
+          module,
+          assert(getElementInScope(scope, "String")),
+          scope,
+          [],
+          new Map(),
+        ),
+        "String must be resolvable.",
+      );
+    },
+  );
+
   addBuiltinToProgram(program, "i8", integerCast(IntegerKind.I8));
   addBuiltinToProgram(program, "u8", integerCast(IntegerKind.U8));
   addBuiltinToProgram(program, "i16", integerCast(IntegerKind.I16));

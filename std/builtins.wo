@@ -44,7 +44,7 @@ export namespace types {
 }
 
 export namespace gc {
-  @name("__whacko_gc_initialize") export extern initialize(): void;
+  @ensure @name("__whacko_gc_initialize") export extern initialize(): void;
   @ensure @name("__whacko_gc_alloc") export extern alloc(typeId: u32, size: usize): types.RawPointer;
   @name("__whacko_gc_collect") export extern collect(): void;
   @name("__whacko_gc_visit") export extern visit(ptr: usize): void;
@@ -189,3 +189,5 @@ export namespace math {
 // @name("ZExtOrBitCast") export builtin ZExtOrBitCast(): void; // ZExtOrBitCast(Builder: LLVMBuilderRef, Val: LLVMValueRef, DestTy: LLVMTypeRef, Name: LLVMStringRef): LLVMValueRef;
 
 @name("isString") export builtin isString<T>(val: T): bool;
+
+@name("string") export builtintype string;

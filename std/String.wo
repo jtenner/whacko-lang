@@ -1,3 +1,5 @@
+@name("__whacko_string_x") extern x(str: String): i32; 
+
 export class String {
   constructor() {
     unreachable();
@@ -5,5 +7,9 @@ export class String {
 
   length(): u32 {
     return types.sizeOf(this);
+  }
+
+  x(): i32 {
+    return x(this);
   }
 }

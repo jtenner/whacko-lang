@@ -79,10 +79,17 @@ export default async function main(args: string[]): Promise<CompilerOutput> {
   );
 
   // then we register static lib files
-  const staticLibs = glob("std/link/*.a", {
-    absolute: true,
-    root: __dirname,
-  });
+  const staticLibs = glob(
+    [
+      "std/link/*.a",
+      "std/gc/wasi-sysroot/lib/wasm32-wasi/*.o",
+      "std/gc/wasi-sysroot/lib/wasm32-wasi/*.a",
+    ],
+    {
+      absolute: true,
+      root: __dirname,
+    },
+  );
 
   for (const staticLib of staticLibs) {
     const dirname = path.dirname(staticLib);

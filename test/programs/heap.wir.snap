@@ -1,16 +1,18 @@
 program:
+  callable:[std/builtins.wo]gc.initialize;functionType:()=>voidType
+(extern function)
   callable:[std/builtins.wo]gc.alloc;functionType:(u32Type,usizeType)=>ptrType
 (extern function)
   callable:[std/builtins.wo]gc.store_field_ptr;functionType:(i32Type,ptrType,ptrType,ptrType)=>voidType
 (extern function)
   callable:[test/programs/heap.wo]_start;functionType:()=>voidType
-    block: entry~448
-      457~inst = (u32 100)
-      459~inst = malloc: (runtime usizeType 457~inst)
-      460~inst = ptrtoint: (runtime ptrType 459~inst)
-      461~inst = store: (variable a) = (runtime usizeType 460~inst)
-      462~inst = load: (variable a)
-      464~inst = inttoptr: (runtime usizeType 462~inst) as ptrType
-      free: (runtime ptrType 464~inst)
+    block: entry~460
+      469~inst = (u32 100)
+      471~inst = malloc: (runtime usizeType 469~inst)
+      472~inst = ptrtoint: (runtime ptrType 471~inst)
+      473~inst = store: (variable a) = (runtime usizeType 472~inst)
+      474~inst = load: (variable a)
+      476~inst = inttoptr: (runtime usizeType 474~inst) as ptrType
+      free: (runtime ptrType 476~inst)
       return (void)
 

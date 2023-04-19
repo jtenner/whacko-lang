@@ -451,6 +451,7 @@ export function compile(program: WhackoProgram): CompilationOutput {
     ...staticLibFiles,
     "--verbose",
     "-O3",
+    "-flto",
   ];
   const { arrayPtr: lldArrayPtr, ptrs: lldArrayPtrs } = lowerStringArray(
     LLD,
@@ -470,11 +471,6 @@ export function compile(program: WhackoProgram): CompilationOutput {
   };
 }
 
-// Whenever we push a function/trampoline context to the queue, we should
-// be adding it to program.functions, so let's never use program.queue
-// directly.
-
-// Uh, because churnQueue does something with it
 export function pushToQueue(
   program: WhackoProgram,
   ctx: WhackoFunctionContext | TrampolineFunctionContext,
