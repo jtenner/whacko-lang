@@ -51,6 +51,7 @@ import {
   StringLiteral,
   isInterfaceDeclaration,
   isClassDeclaration,
+  isBinaryExpression,
 } from "../generated/ast";
 import {
   BlockContext,
@@ -107,6 +108,7 @@ import {
   GCBarrierKind,
   isFieldValue,
   isVariableValue,
+  createGCRootReference,
 } from "../ir";
 import {
   buildExternFunction,
@@ -156,6 +158,7 @@ import {
   getStringType,
   isInterfaceType,
   isClassType,
+  isReferenceType,
 } from "../types";
 import {
   assert,
@@ -866,13 +869,14 @@ export class WIRGenPass extends WhackoVisitor {
     );
 
     if (overload) {
-      this.value = callBinaryOperatorOverload(
+      const value = (this.value = callBinaryOperatorOverload(
         this.ctx,
         this.currentBlock,
         overload,
         ensureRuntime(this.ctx, this.currentBlock, derefLHS),
         ensureRuntime(this.ctx, this.currentBlock, derefRHS),
-      );
+      ));
+      this.ensureGCRoot(value, node);
       return;
     }
 
@@ -1208,6 +1212,34 @@ export class WIRGenPass extends WhackoVisitor {
     }
 
     this.value = resultValue;
+    this.ensureGCRoot(resultValue, node);
+  }
+
+  private ensureGCRoot(value: Value, node: AstNode) {
+    const $container = node.$container;
+
+    const isAssignment =
+      isVariableDeclarator($container) ||
+      (isBinaryExpression($container) && isAssignmentOperator($container));
+
+    if (value.type && isReferenceType(value.type) && !isAssignment) {
+      const rootSite = {
+        immutable: false,
+        node,
+        ref: null,
+        type: value.type,
+        value: null,
+      } as StackAllocationSite;
+      this.ctx.stackAllocationSites.set(node, rootSite);
+
+      buildStoreInstruction(
+        this.ctx,
+        this.currentBlock,
+        createGCRootReference(rootSite),
+        ensureRuntime(this.ctx, this.currentBlock, value),
+        GCBarrierKind.Unset,
+      );
+    }
   }
 
   override visitStringLiteral(expression: StringLiteral): void {
@@ -1219,6 +1251,7 @@ export class WIRGenPass extends WhackoVisitor {
     );
 
     this.value = createRuntimeValue(newInst, theStrType);
+    this.ensureGCRoot(this.value, expression);
     return;
   }
 
@@ -1374,6 +1407,7 @@ export class WIRGenPass extends WhackoVisitor {
     );
 
     this.value = result;
+    this.ensureGCRoot(this.value, node);
   }
 
   override visitFloatLiteral(expression: FloatLiteral): void {
@@ -1489,6 +1523,7 @@ export class WIRGenPass extends WhackoVisitor {
                 });
               }
               this.value = createFieldReference(rootValue, field, node);
+              this.ensureGCRoot(this.value, node);
               return;
             }
             const members = classType.node.members as AstNode[];
@@ -1594,6 +1629,7 @@ export class WIRGenPass extends WhackoVisitor {
 
       if (field) {
         this.value = createFieldReference(root as TypedValue, field, node);
+        this.ensureGCRoot(this.value, node);
         return;
       }
 
@@ -1669,9 +1705,13 @@ export class WIRGenPass extends WhackoVisitor {
       this.visit(parameter);
       const argumentValue = this.assertValue;
 
-      argumentValues.push(
-        ensureDereferenced(this.ctx, this.currentBlock, argumentValue),
+      const parameterValue = ensureDereferenced(
+        this.ctx,
+        this.currentBlock,
+        argumentValue,
       );
+      this.ensureGCRoot(parameterValue, node);
+      argumentValues.push(parameterValue);
     }
 
     switch (callRoot.kind) {
@@ -1737,6 +1777,7 @@ export class WIRGenPass extends WhackoVisitor {
                 compiledArguments,
               ),
             );
+            this.ensureGCRoot(this.value, node);
             return;
           }
           case ScopeElementType.Builtin: {
@@ -1813,6 +1854,7 @@ export class WIRGenPass extends WhackoVisitor {
                 this.currentBlock = block;
               },
             });
+            this.ensureGCRoot(this.value, node);
             return;
           }
           case ScopeElementType.DeclareFunction: {
@@ -1874,6 +1916,7 @@ export class WIRGenPass extends WhackoVisitor {
                 compiledArgumentValues,
               ),
             );
+            this.ensureGCRoot(this.value, node);
             return;
           }
           case ScopeElementType.Extern: {
@@ -1938,6 +1981,7 @@ export class WIRGenPass extends WhackoVisitor {
                 compiledArgumentValues,
               ),
             );
+            this.ensureGCRoot(this.value, node);
             return;
           }
           default: {
@@ -2028,6 +2072,7 @@ export class WIRGenPass extends WhackoVisitor {
             compiledArguments,
           ),
         );
+        this.ensureGCRoot(this.value, node);
         return;
       }
       case ValueKind.ConcreteFunction:
@@ -2126,6 +2171,7 @@ export class WIRGenPass extends WhackoVisitor {
         overload,
         ensureRuntime(this.ctx, this.currentBlock, operandDereferenced),
       );
+      this.ensureGCRoot(this.value, node);
       return;
     }
 
@@ -2155,6 +2201,7 @@ export class WIRGenPass extends WhackoVisitor {
             this.currentBlock = block;
           },
         });
+        this.ensureGCRoot(this.value, node);
         return;
       }
       // do we support prefix increment/decrement? it's fine either way
@@ -2273,6 +2320,7 @@ export class WIRGenPass extends WhackoVisitor {
         overload,
         ensureRuntime(this.ctx, this.currentBlock, operand),
       );
+      this.ensureGCRoot(this.value, node);
       return;
     }
 

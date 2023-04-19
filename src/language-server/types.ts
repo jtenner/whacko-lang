@@ -1541,3 +1541,13 @@ export function isClassType(type: ConcreteType): type is ClassType {
 export function isInterfaceType(type: ConcreteType): type is InterfaceType {
   return type.kind === ConcreteTypeKind.Interface;
 }
+
+export function isNullableType(type: ConcreteType): type is NullableType {
+  return type.kind === ConcreteTypeKind.Nullable;
+}
+
+export function isReferenceType(
+  type: ConcreteType,
+): type is ClassType | IntegerType | NullableType {
+  return isClassType(type) || isInterfaceType(type) || isNullableType(type);
+}

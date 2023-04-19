@@ -20,76 +20,80 @@ program:
       105~inst = call: callable:[test/programs/simpleInterface.wo]D.constructor;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>voidType with (runtime classType:[test/programs/simpleInterface.wo]D<> 104~inst)
       106~inst = store: (variable d) = (runtime classType:[test/programs/simpleInterface.wo]D<> 104~inst)
       107~inst = load: (variable a)
-      111~inst = call: callable:[test/programs/simpleInterface.wo]callTest;functionType:(interfaceType:[test/programs/simpleInterface.wo]Test<>)=>i32Type with (runtime classType:[test/programs/simpleInterface.wo]A<> 107~inst)
-      116~inst = (i32 42)
-      117~inst = 111~inst == 116~inst
-      br to next~120 if (runtime i32Type 117~inst); else to falsy~119
-    block: falsy~119
-      123~inst = unreachable
-    block: next~120
-      124~inst = load: (variable b)
-      127~inst = call: callable:[test/programs/simpleInterface.wo]callTest;functionType:(interfaceType:[test/programs/simpleInterface.wo]Test<>)=>i32Type with (runtime classType:[test/programs/simpleInterface.wo]B<> 124~inst)
-      132~inst = (i32 69)
-      133~inst = 127~inst == 132~inst
-      br to next~136 if (runtime i32Type 133~inst); else to falsy~135
-    block: falsy~135
-      139~inst = unreachable
-    block: next~136
-      140~inst = load: (variable c)
-      143~inst = call: callable:[test/programs/simpleInterface.wo]callTest;functionType:(interfaceType:[test/programs/simpleInterface.wo]Test<>)=>i32Type with (runtime classType:[test/programs/simpleInterface.wo]C<> 140~inst)
-      148~inst = (i32 123)
-      149~inst = 143~inst == 148~inst
-      br to next~152 if (runtime i32Type 149~inst); else to falsy~151
-    block: falsy~151
-      155~inst = unreachable
-    block: next~152
-      156~inst = load: (variable d)
-      159~inst = call: callable:[test/programs/simpleInterface.wo]callTest;functionType:(interfaceType:[test/programs/simpleInterface.wo]Test<>)=>i32Type with (runtime classType:[test/programs/simpleInterface.wo]D<> 156~inst)
-      164~inst = (i32 456)
-      165~inst = 159~inst == 164~inst
-      br to next~168 if (runtime i32Type 165~inst); else to falsy~167
-    block: falsy~167
-      171~inst = unreachable
-    block: next~168
+      108~inst = store: (gcroot) = (runtime classType:[test/programs/simpleInterface.wo]A<> 107~inst)
+      112~inst = call: callable:[test/programs/simpleInterface.wo]callTest;functionType:(interfaceType:[test/programs/simpleInterface.wo]Test<>)=>i32Type with (runtime classType:[test/programs/simpleInterface.wo]A<> 107~inst)
+      117~inst = (i32 42)
+      118~inst = 112~inst == 117~inst
+      br to next~121 if (runtime i32Type 118~inst); else to falsy~120
+    block: falsy~120
+      124~inst = unreachable
+    block: next~121
+      125~inst = load: (variable b)
+      126~inst = store: (gcroot) = (runtime classType:[test/programs/simpleInterface.wo]B<> 125~inst)
+      129~inst = call: callable:[test/programs/simpleInterface.wo]callTest;functionType:(interfaceType:[test/programs/simpleInterface.wo]Test<>)=>i32Type with (runtime classType:[test/programs/simpleInterface.wo]B<> 125~inst)
+      134~inst = (i32 69)
+      135~inst = 129~inst == 134~inst
+      br to next~138 if (runtime i32Type 135~inst); else to falsy~137
+    block: falsy~137
+      141~inst = unreachable
+    block: next~138
+      142~inst = load: (variable c)
+      143~inst = store: (gcroot) = (runtime classType:[test/programs/simpleInterface.wo]C<> 142~inst)
+      146~inst = call: callable:[test/programs/simpleInterface.wo]callTest;functionType:(interfaceType:[test/programs/simpleInterface.wo]Test<>)=>i32Type with (runtime classType:[test/programs/simpleInterface.wo]C<> 142~inst)
+      151~inst = (i32 123)
+      152~inst = 146~inst == 151~inst
+      br to next~155 if (runtime i32Type 152~inst); else to falsy~154
+    block: falsy~154
+      158~inst = unreachable
+    block: next~155
+      159~inst = load: (variable d)
+      160~inst = store: (gcroot) = (runtime classType:[test/programs/simpleInterface.wo]D<> 159~inst)
+      163~inst = call: callable:[test/programs/simpleInterface.wo]callTest;functionType:(interfaceType:[test/programs/simpleInterface.wo]Test<>)=>i32Type with (runtime classType:[test/programs/simpleInterface.wo]D<> 159~inst)
+      168~inst = (i32 456)
+      169~inst = 163~inst == 168~inst
+      br to next~172 if (runtime i32Type 169~inst); else to falsy~171
+    block: falsy~171
+      175~inst = unreachable
+    block: next~172
       return (void)
 
   callable:[test/programs/simpleInterface.wo]A.constructor;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>voidType
-    block: entry~186
+    block: entry~190
       return (void)
 
   callable:[test/programs/simpleInterface.wo]B.constructor;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>voidType
-    block: entry~184
+    block: entry~188
       return (void)
 
   callable:[test/programs/simpleInterface.wo]C.constructor;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>voidType
-    block: entry~182
+    block: entry~186
       return (void)
 
   callable:[test/programs/simpleInterface.wo]D.constructor;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>voidType
-    block: entry~180
+    block: entry~184
       return (void)
 
   callable:[test/programs/simpleInterface.wo]callTest;functionType:(interfaceType:[test/programs/simpleInterface.wo]Test<>)=>i32Type
-    block: entry~173
-      174~inst = load: (variable myTest)
-      178~inst = call: callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type with (runtime interfaceType:[test/programs/simpleInterface.wo]Test<> 174~inst)
-      return (runtime i32Type 178~inst)
+    block: entry~177
+      178~inst = load: (variable myTest)
+      182~inst = call: callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type with (runtime interfaceType:[test/programs/simpleInterface.wo]Test<> 178~inst)
+      return (runtime i32Type 182~inst)
 
   callable:[test/programs/simpleInterface.wo]Test.test;methodType:interfaceType:[test/programs/simpleInterface.wo]Test<>#()=>i32Type
 (interface method)
   callable:[test/programs/simpleInterface.wo]A.test;methodType:classType:[test/programs/simpleInterface.wo]A<>#()=>i32Type
-    block: entry~218
+    block: entry~222
       return (i32 42)
 
   callable:[test/programs/simpleInterface.wo]B.test;methodType:classType:[test/programs/simpleInterface.wo]B<>#()=>i32Type
-    block: entry~212
+    block: entry~216
       return (i32 69)
 
   callable:[test/programs/simpleInterface.wo]C.test;methodType:classType:[test/programs/simpleInterface.wo]C<>#()=>i32Type
-    block: entry~206
+    block: entry~210
       return (i32 123)
 
   callable:[test/programs/simpleInterface.wo]D.test;methodType:classType:[test/programs/simpleInterface.wo]D<>#()=>i32Type
-    block: entry~200
+    block: entry~204
       return (i32 456)
 

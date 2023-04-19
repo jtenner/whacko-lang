@@ -9,5 +9,6 @@
  */
 void __whacko_console_log(whacko_object_t *obj) {
   void *ptr = (void *)&obj[1];
-  fwrite(&ptr, obj->size - (size_t)sizeof(whacko_object_t), 1, stdout);
+  fwrite(ptr, obj->size - (size_t)sizeof(whacko_object_t), 1, stdout);
+  fwrite("\n", 1, 1, stdout);
 }

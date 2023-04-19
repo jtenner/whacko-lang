@@ -127,6 +127,7 @@ export const enum ValueKind {
   ConcreteFunction,
   Variable, // includes parameters
   Runtime,
+  GCRoot,
 }
 
 export function isVariableValue(value: Value): value is VariableReferenceValue {
@@ -660,7 +661,7 @@ export const enum GCBarrierKind {
 export interface StoreInstruction extends UntypedBlockInstruction {
   gcBarrierKind: GCBarrierKind;
   kind: InstructionKind.Store;
-  target: FieldReferenceValue | VariableReferenceValue;
+  target: FieldReferenceValue | VariableReferenceValue | GCRootReferenceValue;
   value: RuntimeValue;
 }
 
@@ -816,6 +817,21 @@ export function createVariableReference(
   };
 }
 
+export interface GCRootReferenceValue extends TypedValue {
+  kind: ValueKind.GCRoot;
+  root: StackAllocationSite;
+}
+
+export function createGCRootReference(
+  gcRoot: StackAllocationSite,
+): GCRootReferenceValue {
+  return {
+    kind: ValueKind.GCRoot,
+    type: gcRoot.type,
+    root: gcRoot,
+  };
+}
+
 export interface LogicalNotInstruction extends TypedBlockInstruction {
   kind: InstructionKind.LogicalNot;
   type: IntegerType & { integerKind: IntegerKind.Bool };
@@ -898,6 +914,10 @@ export function createRuntimeValue(
 
 export function asComptimeConditional(value: Value): ComptimeConditional {
   switch (value.kind) {
+    case ValueKind.GCRoot:
+      UNREACHABLE(
+        "A GC root is never accessed. Did you accentally make a value from it?",
+      );
     case ValueKind.Void:
       UNREACHABLE(
         "Void cannot be a comptime conditional. Did you mess up somewhere?",
@@ -1269,13 +1289,15 @@ export function getValueString(value: Value): string {
       const strValue = value as ConstStringValue;
       return `(str "${strValue.value}")`;
     }
+    case ValueKind.GCRoot: {
+      return `(gcroot)`;
+    }
     // can be used as callbacks and in variables
     // case ValueKind.ConcreteFunction: {
     case ValueKind.ScopeElement:
     case ValueKind.Method:
     // case ValueKind.UnresolvedFunction:
     case ValueKind.ConcreteFunction: // TODO: Remove
-      console.log(value);
       UNREACHABLE("WE HIT SOMETHING THAT SHOULDN'T BE HERE. (wee woo)");
     case ValueKind.Field: {
       const fieldValue = value as FieldReferenceValue;
@@ -1429,6 +1451,9 @@ export function ensureDereferenced(
   value: Value,
 ): Value {
   switch (value.kind) {
+    case ValueKind.GCRoot: {
+      UNREACHABLE("GCRoots are never dereferenced. What happened?");
+    }
     case ValueKind.Field: {
       return createRuntimeValue(
         buildLoadInstruction(ctx, currentBlock, value as FieldReferenceValue),

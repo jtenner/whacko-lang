@@ -8,150 +8,165 @@ declare ptr @__whacko_gc_alloc(i32, i32)
 
 declare void @__whacko_gc_store_field_ptr(i32, ptr, ptr, ptr)
 
-define void @_start() {
+define void @_start() gc "shadow-stack" {
 entry:
   call void @__whacko_gc_initialize()
   %"alloca~0" = alloca ptr, align 8
+  call void @llvm.gcroot(ptr %"alloca~0", ptr null)
   %"alloca~1" = alloca ptr, align 8
-  %"result~423" = call ptr @__whacko_gc_alloc(i32 1, i32 ptrtoint (ptr getelementptr ({ ptr, ptr, i32, i32, i32 }, ptr null, i32 1) to i32))
-  call void @"callable:[test/programs/implements.wo]MyClass.constructor;methodType:classType:[test/programs/implements.wo]MyClass<>#()=>voidType"(ptr %"result~423")
-  store ptr %"result~423", ptr %"alloca~0", align 8
-  %"result~425" = call ptr @__whacko_gc_alloc(i32 2, i32 ptrtoint (ptr getelementptr ({ ptr, ptr, i32, i32, i32 }, ptr null, i32 1) to i32))
-  call void @"callable:[test/programs/implements.wo]MyOtherClass.constructor;methodType:classType:[test/programs/implements.wo]MyOtherClass<>#()=>voidType"(ptr %"result~425")
-  store ptr %"result~425", ptr %"alloca~1", align 8
-  %"339~inst" = load ptr, ptr %"alloca~0", align 8
-  %"343~inst" = call i32 @useMyInterface(ptr %"339~inst")
+  call void @llvm.gcroot(ptr %"alloca~1", ptr null)
+  %"alloca~2" = alloca ptr, align 8
+  call void @llvm.gcroot(ptr %"alloca~2", ptr null)
+  %"result~429" = call ptr @__whacko_gc_alloc(i32 1, i32 ptrtoint (ptr getelementptr ({ ptr, ptr, i32, i32, i32 }, ptr null, i32 1) to i32))
+  call void @"callable:[test/programs/implements.wo]MyClass.constructor;methodType:classType:[test/programs/implements.wo]MyClass<>#()=>voidType"(ptr %"result~429")
+  store ptr %"result~429", ptr %"alloca~0", align 8
+  %"result~431" = call ptr @__whacko_gc_alloc(i32 2, i32 ptrtoint (ptr getelementptr ({ ptr, ptr, i32, i32, i32 }, ptr null, i32 1) to i32))
+  call void @"callable:[test/programs/implements.wo]MyOtherClass.constructor;methodType:classType:[test/programs/implements.wo]MyOtherClass<>#()=>voidType"(ptr %"result~431")
+  store ptr %"result~431", ptr %"alloca~1", align 8
+  %"344~inst" = load ptr, ptr %"alloca~0", align 8
+  store ptr %"344~inst", ptr %"alloca~2", align 8
+  %"349~inst" = call i32 @useMyInterface(ptr %"344~inst")
   ret void
 }
 
-define void @"callable:[test/programs/implements.wo]MyClass.constructor;methodType:classType:[test/programs/implements.wo]MyClass<>#()=>voidType"(ptr %0) {
+define void @"callable:[test/programs/implements.wo]MyClass.constructor;methodType:classType:[test/programs/implements.wo]MyClass<>#()=>voidType"(ptr %0) gc "shadow-stack" {
 entry:
   %"alloca~0" = alloca ptr, align 8
+  call void @llvm.gcroot(ptr %"alloca~0", ptr null)
   store ptr %0, ptr %"alloca~0", align 8
-  %"gep~426" = getelementptr { ptr, ptr, i32, i32, i32 }, ptr %"alloca~0", i32 4
-  %"372~inst" = load i32, ptr %"gep~426", align 4
-  %"gep~427" = getelementptr { ptr, ptr, i32, i32, i32 }, ptr %"alloca~0", i32 4
-  store i32 42, ptr %"gep~427", align 4
+  %"gep~432" = getelementptr { ptr, ptr, i32, i32, i32 }, ptr %"alloca~0", i32 4
+  %"378~inst" = load i32, ptr %"gep~432", align 4
+  %"gep~433" = getelementptr { ptr, ptr, i32, i32, i32 }, ptr %"alloca~0", i32 4
+  store i32 42, ptr %"gep~433", align 4
   ret void
 }
 
-define void @"callable:[test/programs/implements.wo]MyOtherClass.constructor;methodType:classType:[test/programs/implements.wo]MyOtherClass<>#()=>voidType"(ptr %0) {
+define void @"callable:[test/programs/implements.wo]MyOtherClass.constructor;methodType:classType:[test/programs/implements.wo]MyOtherClass<>#()=>voidType"(ptr %0) gc "shadow-stack" {
 entry:
   %"alloca~0" = alloca ptr, align 8
+  call void @llvm.gcroot(ptr %"alloca~0", ptr null)
   store ptr %0, ptr %"alloca~0", align 8
-  %"gep~428" = getelementptr { ptr, ptr, i32, i32, i32 }, ptr %"alloca~0", i32 4
-  %"363~inst" = load i32, ptr %"gep~428", align 4
-  %"gep~429" = getelementptr { ptr, ptr, i32, i32, i32 }, ptr %"alloca~0", i32 4
-  store i32 42, ptr %"gep~429", align 4
+  %"gep~434" = getelementptr { ptr, ptr, i32, i32, i32 }, ptr %"alloca~0", i32 4
+  %"369~inst" = load i32, ptr %"gep~434", align 4
+  %"gep~435" = getelementptr { ptr, ptr, i32, i32, i32 }, ptr %"alloca~0", i32 4
+  store i32 42, ptr %"gep~435", align 4
   ret void
 }
 
-define i32 @useMyInterface(ptr %0) {
+define i32 @useMyInterface(ptr %0) gc "shadow-stack" {
 entry:
   %"alloca~0" = alloca ptr, align 8
+  call void @llvm.gcroot(ptr %"alloca~0", ptr null)
   store ptr %0, ptr %"alloca~0", align 8
-  %"trampolineCall~430" = call ptr @"interfaceType:[test/programs/implements.wo]MyInterface<>#field"(ptr %"alloca~0")
-  %"346~inst" = load i32, ptr %"trampolineCall~430", align 4
-  %"trampolineCall~431" = call ptr @"interfaceType:[test/programs/implements.wo]MyInterface<>#field"(ptr %"alloca~0")
-  store i32 0, ptr %"trampolineCall~431", align 4
-  %"353~inst" = load ptr, ptr %"alloca~0", align 8
-  %"360~inst" = call i32 @"callable:[test/programs/implements.wo]MyInterface.method;methodType:interfaceType:[test/programs/implements.wo]MyInterface<>#(i64Type)=>i32Type"(ptr %"353~inst", i64 69)
-  ret i32 %"360~inst"
+  %"trampolineCall~436" = call ptr @"interfaceType:[test/programs/implements.wo]MyInterface<>#field"(ptr %"alloca~0")
+  %"352~inst" = load i32, ptr %"trampolineCall~436", align 4
+  %"trampolineCall~437" = call ptr @"interfaceType:[test/programs/implements.wo]MyInterface<>#field"(ptr %"alloca~0")
+  store i32 0, ptr %"trampolineCall~437", align 4
+  %"359~inst" = load ptr, ptr %"alloca~0", align 8
+  %"366~inst" = call i32 @"callable:[test/programs/implements.wo]MyInterface.method;methodType:interfaceType:[test/programs/implements.wo]MyInterface<>#(i64Type)=>i32Type"(ptr %"359~inst", i64 69)
+  ret i32 %"366~inst"
 }
 
 define i32 @"callable:[test/programs/implements.wo]MyInterface.method;methodType:interfaceType:[test/programs/implements.wo]MyInterface<>#(i64Type)=>i32Type"(ptr %0, i64 %1) {
-"entry~441":
-  %"typeGEP~442" = getelementptr { ptr, ptr, i32, i32 }, ptr %0, i32 2
-  %2 = load i32, ptr %"typeGEP~442", align 4
-  switch i32 %2, label %"default~443" [
+"entry~447":
+  %"typeGEP~448" = getelementptr { ptr, ptr, i32, i32 }, ptr %0, i32 2
+  %2 = load i32, ptr %"typeGEP~448", align 4
+  switch i32 %2, label %"default~449" [
     i32 1, label %"callable:[test/programs/implements.wo]MyClass.method;methodType:classType:[test/programs/implements.wo]MyClass<>#(i64Type)=>i32Type"
     i32 2, label %"callable:[test/programs/implements.wo]MyOtherClass.method;methodType:classType:[test/programs/implements.wo]MyOtherClass<>#(i64Type)=>i32Type"
   ]
 
-"default~443":                                    ; preds = %"entry~441"
+"default~449":                                    ; preds = %"entry~447"
   unreachable
 
-"callable:[test/programs/implements.wo]MyClass.method;methodType:classType:[test/programs/implements.wo]MyClass<>#(i64Type)=>i32Type": ; preds = %"entry~441"
+"callable:[test/programs/implements.wo]MyClass.method;methodType:classType:[test/programs/implements.wo]MyClass<>#(i64Type)=>i32Type": ; preds = %"entry~447"
   %3 = call i32 @"callable:[test/programs/implements.wo]MyClass.method;methodType:classType:[test/programs/implements.wo]MyClass<>#(i64Type)=>i32Type"(ptr %0, i64 %1)
   ret i32 %3
 
-"callable:[test/programs/implements.wo]MyOtherClass.method;methodType:classType:[test/programs/implements.wo]MyOtherClass<>#(i64Type)=>i32Type": ; preds = %"entry~441"
+"callable:[test/programs/implements.wo]MyOtherClass.method;methodType:classType:[test/programs/implements.wo]MyOtherClass<>#(i64Type)=>i32Type": ; preds = %"entry~447"
   %4 = call i32 @"callable:[test/programs/implements.wo]MyOtherClass.method;methodType:classType:[test/programs/implements.wo]MyOtherClass<>#(i64Type)=>i32Type"(ptr %0, i64 %1)
   ret i32 %4
 }
 
-define i32 @"callable:[test/programs/implements.wo]MyClass.method;methodType:classType:[test/programs/implements.wo]MyClass<>#(i64Type)=>i32Type"(ptr %0, i64 %1) {
+define i32 @"callable:[test/programs/implements.wo]MyClass.method;methodType:classType:[test/programs/implements.wo]MyClass<>#(i64Type)=>i32Type"(ptr %0, i64 %1) gc "shadow-stack" {
 entry:
   %"alloca~0" = alloca ptr, align 8
+  call void @llvm.gcroot(ptr %"alloca~0", ptr null)
   store ptr %0, ptr %"alloca~0", align 8
   %"alloca~1" = alloca i64, align 8
   store i64 %1, ptr %"alloca~1", align 4
-  %"gep~432" = getelementptr { ptr, ptr, i32, i32, i32 }, ptr %"alloca~0", i32 4
-  %"404~inst" = load i32, ptr %"gep~432", align 4
-  %"405~inst" = load i64, ptr %"alloca~1", align 4
-  %"409~inst" = trunc i64 %"405~inst" to i32
-  %"gep~433" = getelementptr { ptr, ptr, i32, i32, i32 }, ptr %"alloca~0", i32 4
-  store i32 %"409~inst", ptr %"gep~433", align 4
+  %"gep~438" = getelementptr { ptr, ptr, i32, i32, i32 }, ptr %"alloca~0", i32 4
+  %"410~inst" = load i32, ptr %"gep~438", align 4
+  %"411~inst" = load i64, ptr %"alloca~1", align 4
+  %"415~inst" = trunc i64 %"411~inst" to i32
+  %"gep~439" = getelementptr { ptr, ptr, i32, i32, i32 }, ptr %"alloca~0", i32 4
+  store i32 %"415~inst", ptr %"gep~439", align 4
   ret i32 2
 }
 
-define i32 @"callable:[test/programs/implements.wo]MyOtherClass.method;methodType:classType:[test/programs/implements.wo]MyOtherClass<>#(i64Type)=>i32Type"(ptr %0, i64 %1) {
+define i32 @"callable:[test/programs/implements.wo]MyOtherClass.method;methodType:classType:[test/programs/implements.wo]MyOtherClass<>#(i64Type)=>i32Type"(ptr %0, i64 %1) gc "shadow-stack" {
 entry:
   %"alloca~0" = alloca ptr, align 8
+  call void @llvm.gcroot(ptr %"alloca~0", ptr null)
   store ptr %0, ptr %"alloca~0", align 8
   %"alloca~1" = alloca i64, align 8
   store i64 %1, ptr %"alloca~1", align 4
-  %"gep~434" = getelementptr { ptr, ptr, i32, i32, i32 }, ptr %"alloca~0", i32 4
-  %"390~inst" = load i32, ptr %"gep~434", align 4
-  %"391~inst" = load i64, ptr %"alloca~1", align 4
-  %"395~inst" = trunc i64 %"391~inst" to i32
-  %"gep~435" = getelementptr { ptr, ptr, i32, i32, i32 }, ptr %"alloca~0", i32 4
-  store i32 %"395~inst", ptr %"gep~435", align 4
+  %"gep~440" = getelementptr { ptr, ptr, i32, i32, i32 }, ptr %"alloca~0", i32 4
+  %"396~inst" = load i32, ptr %"gep~440", align 4
+  %"397~inst" = load i64, ptr %"alloca~1", align 4
+  %"401~inst" = trunc i64 %"397~inst" to i32
+  %"gep~441" = getelementptr { ptr, ptr, i32, i32, i32 }, ptr %"alloca~0", i32 4
+  store i32 %"401~inst", ptr %"gep~441", align 4
   ret i32 1
 }
 
+; Function Attrs: nounwind
+declare void @llvm.gcroot(ptr, ptr) #0
+
 define ptr @"interfaceType:[test/programs/implements.wo]MyInterface<>#field"(ptr %0) {
-"entry~436":
-  %"typeGEP~437" = getelementptr { ptr, ptr, i32, i32 }, ptr %0, i32 2
-  %1 = load i32, ptr %"typeGEP~437", align 4
-  switch i32 %1, label %"default~438" [
+"entry~442":
+  %"typeGEP~443" = getelementptr { ptr, ptr, i32, i32 }, ptr %0, i32 2
+  %1 = load i32, ptr %"typeGEP~443", align 4
+  switch i32 %1, label %"default~444" [
     i32 1, label %"classType:[test/programs/implements.wo]MyClass<>"
     i32 2, label %"classType:[test/programs/implements.wo]MyOtherClass<>"
   ]
 
-"default~438":                                    ; preds = %"entry~436"
+"default~444":                                    ; preds = %"entry~442"
   unreachable
 
-"classType:[test/programs/implements.wo]MyClass<>": ; preds = %"entry~436"
-  %"resultGEP~439" = getelementptr { ptr, ptr, i32, i32, i32 }, ptr %0, i32 2
-  ret ptr %"resultGEP~439"
+"classType:[test/programs/implements.wo]MyClass<>": ; preds = %"entry~442"
+  %"resultGEP~445" = getelementptr { ptr, ptr, i32, i32, i32 }, ptr %0, i32 2
+  ret ptr %"resultGEP~445"
 
-"classType:[test/programs/implements.wo]MyOtherClass<>": ; preds = %"entry~436"
-  %"resultGEP~440" = getelementptr { ptr, ptr, i32, i32, i32 }, ptr %0, i32 2
-  ret ptr %"resultGEP~440"
+"classType:[test/programs/implements.wo]MyOtherClass<>": ; preds = %"entry~442"
+  %"resultGEP~446" = getelementptr { ptr, ptr, i32, i32, i32 }, ptr %0, i32 2
+  ret ptr %"resultGEP~446"
 }
 
 declare void @__whacko_gc_visit(ptr)
 
 define void @__visit_whacko_object(ptr %0) {
-"entry~444":
-  %"typeGEP~446" = getelementptr { ptr, ptr, i32, i32 }, ptr %0, i32 2
-  %1 = load i32, ptr %"typeGEP~446", align 4
-  switch i32 %1, label %"unreachable~445" [
+"entry~450":
+  %"typeGEP~452" = getelementptr { ptr, ptr, i32, i32 }, ptr %0, i32 2
+  %1 = load i32, ptr %"typeGEP~452", align 4
+  switch i32 %1, label %"unreachable~451" [
     i32 1, label %"classType:[test/programs/implements.wo]MyClass<>"
     i32 2, label %"classType:[test/programs/implements.wo]MyOtherClass<>"
     i32 3, label %"classType:[std/String.wo]String<>"
   ]
 
-"unreachable~445":                                ; preds = %"entry~444"
+"unreachable~451":                                ; preds = %"entry~450"
   unreachable
 
-"classType:[test/programs/implements.wo]MyClass<>": ; preds = %"entry~444"
+"classType:[test/programs/implements.wo]MyClass<>": ; preds = %"entry~450"
   ret void
 
-"classType:[test/programs/implements.wo]MyOtherClass<>": ; preds = %"entry~444"
+"classType:[test/programs/implements.wo]MyOtherClass<>": ; preds = %"entry~450"
   ret void
 
-"classType:[std/String.wo]String<>":              ; preds = %"entry~444"
+"classType:[std/String.wo]String<>":              ; preds = %"entry~450"
   ret void
 }
+
+attributes #0 = { nounwind }

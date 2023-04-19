@@ -41,6 +41,7 @@ import {
   IntegerCastInstruction,
   isVoidValue,
   isFieldValue,
+  GCRootReferenceValue,
 } from "./ir";
 import {
   assert,
@@ -95,6 +96,8 @@ import {
   isClassType,
   isInterfaceType,
   resolveClass,
+  isNullableType,
+  isReferenceType,
 } from "./types";
 import {
   isClassDeclaration,
@@ -926,6 +929,10 @@ export function getLLVMValue(
   value: TypedValue,
 ): LLVMValueRef {
   switch (value.kind) {
+    case ValueKind.GCRoot: {
+      const casted = value as GCRootReferenceValue;
+      return assert(casted.root.ref);
+    }
     case ValueKind.Invalid:
       UNREACHABLE("Invalid values should never be reached in codegen.");
     case ValueKind.Void:
@@ -1891,7 +1898,6 @@ function appendLLVMInstruction(
         LLVM._free(callName);
 
         return result;
-        // we need to build a call to the extern function
       }
       const value = getLLVMValue(
         program,
@@ -2003,6 +2009,20 @@ export function codegenFunction(
 
   const { llvmBuilder: builder } = program;
 
+  const funcRef = assert(
+    func.funcRef,
+    "The funcref for this function must already be generated.",
+  );
+
+  // each whacko function uses the shadow stack
+  const shadowStack = LLVMUtil.lower("shadow-stack");
+  LLVM._LLVMSetGC(funcRef, shadowStack);
+  LLVM._free(shadowStack);
+
+  // get the void @llvm.gcroot(i8** %ptrloc, i8* %metadata) function
+  const llvmGCRootFunc = getLLVMGCRootFunc(program, LLVM, LLVMUtil);
+  const llvmGCRootFuncType = getLLVMGCRootFuncType(program, LLVM, LLVMUtil);
+
   LLVM._LLVMPositionBuilderAtEnd(builder, assert(func.entry?.llvmBlock));
 
   let allocaId = 0;
@@ -2015,6 +2035,23 @@ export function codegenFunction(
 
     // Ternarys don't have an initialized value.
     // The stack allocation site is only used as a scratch area for the result.
+
+    if (isReferenceType(site.type)) {
+      const llvmGCRootParams = LLVMUtil.lowerPointerArray([
+        site.ref,
+        LLVM._LLVMConstNull(LLVM._LLVMPointerType(LLVM._LLVMInt8Type(), 0)),
+      ]);
+      // we need to llvm.gcroot
+      LLVM._LLVMBuildCall2(
+        builder,
+        llvmGCRootFuncType,
+        llvmGCRootFunc,
+        llvmGCRootParams,
+        2,
+        0 as LLVMStringRef,
+      );
+      LLVM._free(llvmGCRootParams);
+    }
 
     if (isClassDeclaration(node)) {
       // `this` always has parameter index 0
@@ -2146,4 +2183,50 @@ function getMemCopyFuncType(LLVM: LLVM, LLVMUtil: LLVMUtil) {
   );
   LLVM._free(paramTypes);
   return memCopyFuncType;
+}
+
+// @llvm.gcroot(i8** %ptrloc, i8* %metadata)
+export function getLLVMGCRootFunc(
+  program: WhackoProgram,
+  LLVM: LLVM,
+  LLVMUtil: LLVMUtil,
+) {
+  const llvmGCRootName = LLVMUtil.lower("llvm.gcroot");
+  const funcRef = LLVM._LLVMGetNamedFunction(
+    program.llvmModule,
+    llvmGCRootName,
+  );
+
+  if (funcRef) {
+    LLVM._free(llvmGCRootName);
+    return funcRef;
+  }
+
+  const funcType = getLLVMGCRootFuncType(program, LLVM, LLVMUtil);
+  const result = LLVM._LLVMAddFunction(
+    program.llvmModule,
+    llvmGCRootName,
+    funcType,
+  );
+  LLVM._free(llvmGCRootName);
+  return result;
+}
+
+export function getLLVMGCRootFuncType(
+  program: WhackoProgram,
+  LLVM: LLVM,
+  LLVMUtil: LLVMUtil,
+) {
+  const llvmGCRootParameters = LLVMUtil.lowerPointerArray([
+    LLVM._LLVMPointerType(LLVM._LLVMPointerType(LLVM._LLVMInt8Type(), 0), 0),
+    LLVM._LLVMPointerType(LLVM._LLVMInt8Type(), 0),
+  ]);
+  const funcType = LLVM._LLVMFunctionType(
+    LLVM._LLVMVoidType(),
+    llvmGCRootParameters,
+    2,
+    Number(false) as LLVMBool,
+  );
+  LLVM._free(llvmGCRootParameters);
+  return funcType;
 }

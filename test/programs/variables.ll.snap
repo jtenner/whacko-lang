@@ -8,7 +8,7 @@ declare ptr @__whacko_gc_alloc(i32, i32)
 
 declare void @__whacko_gc_store_field_ptr(i32, ptr, ptr, ptr)
 
-define void @_start() {
+define void @_start() gc "shadow-stack" {
 entry:
   call void @__whacko_gc_initialize()
   %"alloca~0" = alloca i64, align 8
@@ -16,6 +16,9 @@ entry:
   store i64 10, ptr %"alloca~0", align 4
   ret void
 }
+
+; Function Attrs: nounwind
+declare void @llvm.gcroot(ptr, ptr) #0
 
 declare void @__whacko_gc_visit(ptr)
 
@@ -33,3 +36,5 @@ define void @__visit_whacko_object(ptr %0) {
 "classType:[std/String.wo]String<>":              ; preds = %"entry~69"
   ret void
 }
+
+attributes #0 = { nounwind }

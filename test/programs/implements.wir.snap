@@ -6,56 +6,57 @@ program:
   callable:[std/builtins.wo]gc.store_field_ptr;functionType:(i32Type,ptrType,ptrType,ptrType)=>voidType
 (extern function)
   callable:[test/programs/implements.wo]_start;functionType:()=>voidType
-    block: entry~324
-      330~inst = new: classType:[test/programs/implements.wo]MyClass<>
-      331~inst = call: callable:[test/programs/implements.wo]MyClass.constructor;methodType:classType:[test/programs/implements.wo]MyClass<>#()=>voidType with (runtime classType:[test/programs/implements.wo]MyClass<> 330~inst)
-      332~inst = store: (variable a) = (runtime classType:[test/programs/implements.wo]MyClass<> 330~inst)
-      336~inst = new: classType:[test/programs/implements.wo]MyOtherClass<>
-      337~inst = call: callable:[test/programs/implements.wo]MyOtherClass.constructor;methodType:classType:[test/programs/implements.wo]MyOtherClass<>#()=>voidType with (runtime classType:[test/programs/implements.wo]MyOtherClass<> 336~inst)
-      338~inst = store: (variable b) = (runtime classType:[test/programs/implements.wo]MyOtherClass<> 336~inst)
-      339~inst = load: (variable a)
-      343~inst = call: callable:[test/programs/implements.wo]useMyInterface;functionType:(interfaceType:[test/programs/implements.wo]MyInterface<>)=>i32Type with (runtime classType:[test/programs/implements.wo]MyClass<> 339~inst)
+    block: entry~329
+      335~inst = new: classType:[test/programs/implements.wo]MyClass<>
+      336~inst = call: callable:[test/programs/implements.wo]MyClass.constructor;methodType:classType:[test/programs/implements.wo]MyClass<>#()=>voidType with (runtime classType:[test/programs/implements.wo]MyClass<> 335~inst)
+      337~inst = store: (variable a) = (runtime classType:[test/programs/implements.wo]MyClass<> 335~inst)
+      341~inst = new: classType:[test/programs/implements.wo]MyOtherClass<>
+      342~inst = call: callable:[test/programs/implements.wo]MyOtherClass.constructor;methodType:classType:[test/programs/implements.wo]MyOtherClass<>#()=>voidType with (runtime classType:[test/programs/implements.wo]MyOtherClass<> 341~inst)
+      343~inst = store: (variable b) = (runtime classType:[test/programs/implements.wo]MyOtherClass<> 341~inst)
+      344~inst = load: (variable a)
+      345~inst = store: (gcroot) = (runtime classType:[test/programs/implements.wo]MyClass<> 344~inst)
+      349~inst = call: callable:[test/programs/implements.wo]useMyInterface;functionType:(interfaceType:[test/programs/implements.wo]MyInterface<>)=>i32Type with (runtime classType:[test/programs/implements.wo]MyClass<> 344~inst)
       return (void)
 
   callable:[test/programs/implements.wo]MyClass.constructor;methodType:classType:[test/programs/implements.wo]MyClass<>#()=>voidType
-    block: entry~371
-      372~inst = load: (field classType:[test/programs/implements.wo]MyClass<>#field)
-      377~inst = (i32 42)
-      378~inst = store: (field classType:[test/programs/implements.wo]MyClass<>#field) = (runtime i32Type 377~inst)
+    block: entry~377
+      378~inst = load: (field classType:[test/programs/implements.wo]MyClass<>#field)
+      383~inst = (i32 42)
+      384~inst = store: (field classType:[test/programs/implements.wo]MyClass<>#field) = (runtime i32Type 383~inst)
       return (void)
 
   callable:[test/programs/implements.wo]MyOtherClass.constructor;methodType:classType:[test/programs/implements.wo]MyOtherClass<>#()=>voidType
-    block: entry~362
-      363~inst = load: (field classType:[test/programs/implements.wo]MyOtherClass<>#field)
-      368~inst = (i32 42)
-      369~inst = store: (field classType:[test/programs/implements.wo]MyOtherClass<>#field) = (runtime i32Type 368~inst)
+    block: entry~368
+      369~inst = load: (field classType:[test/programs/implements.wo]MyOtherClass<>#field)
+      374~inst = (i32 42)
+      375~inst = store: (field classType:[test/programs/implements.wo]MyOtherClass<>#field) = (runtime i32Type 374~inst)
       return (void)
 
   callable:[test/programs/implements.wo]useMyInterface;functionType:(interfaceType:[test/programs/implements.wo]MyInterface<>)=>i32Type
-    block: entry~345
-      346~inst = load: (field interfaceType:[test/programs/implements.wo]MyInterface<>#field)
-      351~inst = (i32 0)
-      352~inst = store: (field interfaceType:[test/programs/implements.wo]MyInterface<>#field) = (runtime i32Type 351~inst)
-      353~inst = load: (variable a)
-      359~inst = (i64 69)
-      360~inst = call: callable:[test/programs/implements.wo]MyInterface.method;methodType:interfaceType:[test/programs/implements.wo]MyInterface<>#(i64Type)=>i32Type with (runtime interfaceType:[test/programs/implements.wo]MyInterface<> 353~inst), (runtime i64Type 359~inst)
-      return (runtime i32Type 360~inst)
+    block: entry~351
+      352~inst = load: (field interfaceType:[test/programs/implements.wo]MyInterface<>#field)
+      357~inst = (i32 0)
+      358~inst = store: (field interfaceType:[test/programs/implements.wo]MyInterface<>#field) = (runtime i32Type 357~inst)
+      359~inst = load: (variable a)
+      365~inst = (i64 69)
+      366~inst = call: callable:[test/programs/implements.wo]MyInterface.method;methodType:interfaceType:[test/programs/implements.wo]MyInterface<>#(i64Type)=>i32Type with (runtime interfaceType:[test/programs/implements.wo]MyInterface<> 359~inst), (runtime i64Type 365~inst)
+      return (runtime i32Type 366~inst)
 
   callable:[test/programs/implements.wo]MyInterface.method;methodType:interfaceType:[test/programs/implements.wo]MyInterface<>#(i64Type)=>i32Type
 (interface method)
   callable:[test/programs/implements.wo]MyClass.method;methodType:classType:[test/programs/implements.wo]MyClass<>#(i64Type)=>i32Type
-    block: entry~402
-      404~inst = load: (field classType:[test/programs/implements.wo]MyClass<>#field)
-      405~inst = load: (variable a)
-      409~inst = cast: <i32Type> [object Object]
-      410~inst = store: (field classType:[test/programs/implements.wo]MyClass<>#field) = (runtime i32Type 409~inst)
+    block: entry~408
+      410~inst = load: (field classType:[test/programs/implements.wo]MyClass<>#field)
+      411~inst = load: (variable a)
+      415~inst = cast: <i32Type> [object Object]
+      416~inst = store: (field classType:[test/programs/implements.wo]MyClass<>#field) = (runtime i32Type 415~inst)
       return (i32 2)
 
   callable:[test/programs/implements.wo]MyOtherClass.method;methodType:classType:[test/programs/implements.wo]MyOtherClass<>#(i64Type)=>i32Type
-    block: entry~388
-      390~inst = load: (field classType:[test/programs/implements.wo]MyOtherClass<>#field)
-      391~inst = load: (variable a)
-      395~inst = cast: <i32Type> [object Object]
-      396~inst = store: (field classType:[test/programs/implements.wo]MyOtherClass<>#field) = (runtime i32Type 395~inst)
+    block: entry~394
+      396~inst = load: (field classType:[test/programs/implements.wo]MyOtherClass<>#field)
+      397~inst = load: (variable a)
+      401~inst = cast: <i32Type> [object Object]
+      402~inst = store: (field classType:[test/programs/implements.wo]MyOtherClass<>#field) = (runtime i32Type 401~inst)
       return (i32 1)
 

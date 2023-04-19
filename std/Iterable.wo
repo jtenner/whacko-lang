@@ -1,5 +1,5 @@
 // TODO: `implements Iterable<T>`
-export class ForwardIterableRange<T> {
+export class ForwardIterableRange<T>  {
   current: T;
   until: T;
 
