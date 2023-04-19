@@ -1,9 +1,5 @@
 export class String {
   constructor() {
-
-  }
-
-  appendStr(val: str): String {
-    return this;
+    unreachable();
   }
 }

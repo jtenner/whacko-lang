@@ -1,18 +1,4 @@
 
 export namespace console {
-
-  export fn log(str: string): void {
-    let vec = stack.alloca(usize(8)); // usize type
-    
-    // at offset 0 of the vec, we store the pointer
-    memory.store(vec, memory.ptr(str) + usize(4));
-
-    // at offset 4 we store the length which is located at offset 0
-    memory.store(vec + usize(4), memory.load<usize>(memory.ptr(str)));
-
-    let nwritten = stack.alloca(usize(4));
-
-    // write to stdout, the single vec, and read out the nwritten bytes
-    wasi.functions.fd_write(u32(1), vec, usize(1), nwritten);
-  }
+  @name("__whacko_console_log") export extern log(str: string): void;
 }

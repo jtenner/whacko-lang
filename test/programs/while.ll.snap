@@ -1,0 +1,70 @@
+; ModuleID = 'whacko'
+source_filename = "whacko"
+target triple = "wasm32-wasi"
+
+declare void @__whacko_gc_initialize()
+
+declare ptr @__whacko_gc_alloc(i32, i32)
+
+declare void @__whacko_gc_store_field_ptr(i32, ptr, ptr, ptr)
+
+define void @_start() gc "shadow-stack" {
+entry:
+  call void @__whacko_gc_initialize()
+  %"alloca~0" = alloca i1, align 1
+  %"alloca~1" = alloca i64, align 8
+  br label %"condition~18"
+
+"condition~18":                                   ; preds = %"unused~42", %entry
+  %"20~inst" = load i1, ptr %"alloca~0", align 1
+  br i1 %"20~inst", label %"body~21", label %"next~22"
+
+"body~21":                                        ; preds = %"condition~18"
+  br label %"condition~25"
+
+"next~22":                                        ; preds = %"next~32", %"condition~18"
+  ret void
+
+"condition~25":                                   ; preds = %"unused~39", %"body~31", %"body~21"
+  %"27~inst" = load i64, ptr %"alloca~1", align 4
+  %"30~inst" = icmp slt i64 %"27~inst", 10
+  br i1 %"30~inst", label %"body~31", label %"next~32"
+
+"body~31":                                        ; preds = %"condition~25"
+  %"34~inst" = load i64, ptr %"alloca~1", align 4
+  %"35~inst" = load i64, ptr %"alloca~1", align 4
+  %"37~inst" = add i64 %"35~inst", 1
+  store i64 %"37~inst", ptr %"alloca~1", align 4
+  br label %"condition~25"
+
+"next~32":                                        ; preds = %"condition~25"
+  br label %"next~22"
+
+"unused~39":                                      ; No predecessors!
+  br label %"condition~25"
+
+"unused~42":                                      ; No predecessors!
+  br label %"condition~18"
+}
+
+; Function Attrs: nounwind
+declare void @llvm.gcroot(ptr, ptr) #0
+
+declare void @__whacko_gc_visit(ptr)
+
+define void @__visit_whacko_object(ptr %0) {
+"entry~46":
+  %"typeGEP~48" = getelementptr { ptr, ptr, i32, i32 }, ptr %0, i32 2
+  %1 = load i32, ptr %"typeGEP~48", align 4
+  switch i32 %1, label %"unreachable~47" [
+    i32 1, label %"classType:[std/String.wo]String<>"
+  ]
+
+"unreachable~47":                                 ; preds = %"entry~46"
+  unreachable
+
+"classType:[std/String.wo]String<>":              ; preds = %"entry~46"
+  ret void
+}
+
+attributes #0 = { nounwind }

@@ -7,15 +7,12 @@ import {
   Program,
   DeclareDeclaration,
   ImportDeclaration,
-  ExportDeclaration,
-  ExportDeclarator,
   ImportDeclarator,
   FunctionDeclaration,
   Parameter,
   TypeDeclaration,
   ClassDeclaration,
   TypeExpression,
-  HeldTypeExpression,
   FunctionTypeExpression,
   TupleTypeExpression,
   NamedTypeExpression,
@@ -70,8 +67,14 @@ import {
   EnumDeclaration,
   EnumDeclarator,
   ExternDeclaration,
+  ExportStarDeclaration,
+  RightUnaryExpression,
+  InterfaceDeclaration,
+  InterfaceFieldDeclaration,
+  InterfaceMethodDeclaration,
 } from "./generated/ast";
 import { createWhackoServices, WhackoServices } from "./whacko-module";
+import { TypeID } from "./generated/ast";
 
 const declarations = new Set([
   "DeclareDeclaration",
@@ -104,6 +107,8 @@ export class WhackoVisitor {
         return this.visitDeclareFunction(node);
       case "Program":
         return this.visitProgram(node);
+      case "ExportStarDeclaration":
+        return this.visitExportStarDeclaration(node);
       case "BuiltinDeclaration":
         return this.visitBuiltinDeclaration(node);
       case "DeclareDeclaration":
@@ -112,10 +117,6 @@ export class WhackoVisitor {
         return this.visitImportDeclaration(node);
       case "ImportDeclarator":
         return this.visitImportDeclarator(node);
-      case "ExportDeclaration":
-        return this.visitExportDeclaration(node);
-      case "ExportDeclarator":
-        return this.visitExportDeclarator(node);
       case "FunctionDeclaration":
         return this.visitFunctionDeclaration(node);
       case "Parameter":
@@ -124,8 +125,6 @@ export class WhackoVisitor {
         return this.visitTypeDeclaration(node);
       case "ClassDeclaration":
         return this.visitClassDeclaration(node);
-      case "HeldTypeExpression":
-        return this.visitHeldTypeExpression(node);
       case "FunctionTypeExpression":
         return this.visitFunctionTypeExpression(node);
       case "TupleTypeExpression":
@@ -174,6 +173,8 @@ export class WhackoVisitor {
         return this.visitBinaryExpression(node);
       case "LeftUnaryExpression":
         return this.visitLeftUnaryExpression(node);
+      case "RightUnaryExpression":
+        return this.visitRightUnaryExpression(node);
       case "AwaitExpression":
         return this.visitAwaitExpression(node);
       case "HoldExpression":
@@ -224,6 +225,14 @@ export class WhackoVisitor {
         return this.visitEnumDeclarator(node);
       case "ExternDeclaration":
         return this.visitExternDeclaration(node);
+      case "TypeID":
+        return this.visitTypeID(node);
+      case "InterfaceDeclaration":
+        return this.visitInterfaceDeclaration(node);
+      case "InterfaceFieldDeclaration":
+        return this.visitInterfaceFieldDeclaration(node);
+      case "InterfaceMethodDeclaration":
+        return this.visitInterfaceMethodDeclaration(node);
       // case "TypeCastExpression":
       //   return this.visitTypeCastExpression(node);
       default:
@@ -234,7 +243,12 @@ export class WhackoVisitor {
   visitProgram(node: Program) {
     this.visitAll(node.imports);
     this.visitAll(node.declarations);
-    this.visitAll(node.exports);
+  }
+
+  visitExportStarDeclaration(node: ExportStarDeclaration) {
+    this.visitAll(node.decorators);
+    this.visit(node.name);
+    this.visit(node.path);
   }
 
   visitBuiltinTypeDeclaration(node: BuiltinTypeDeclaration) {
@@ -246,7 +260,6 @@ export class WhackoVisitor {
   visitNamespaceDeclaration(node: NamespaceDeclaration) {
     this.visitAll(node.decorators);
     this.visitAll(node.declarations);
-    this.visitAll(node.exports);
   }
 
   visitDeclareDeclaration(node: DeclareDeclaration) {
@@ -281,15 +294,6 @@ export class WhackoVisitor {
     this.visit(node.path);
   }
 
-  visitExportDeclaration(node: ExportDeclaration) {
-    this.visitAll(node.declarators);
-  }
-
-  visitExportDeclarator(node: ExportDeclarator) {
-    this.visit(node.name);
-    if (node.alias) this.visit(node.alias);
-  }
-
   visitImportDeclarator(node: ImportDeclarator) {
     this.visit(node.name);
     if (node.alias) this.visit(node.alias);
@@ -319,12 +323,9 @@ export class WhackoVisitor {
   visitClassDeclaration(node: ClassDeclaration) {
     this.visitAll(node.decorators);
     this.visit(node.name);
-    if (node.extends) this.visit(node.extends);
+    this.visitAll(node.typeParameters);
+    this.visitAll(node.implements);
     this.visitAll(node.members);
-  }
-
-  visitHeldTypeExpression(node: HeldTypeExpression) {
-    this.visit(node.type);
   }
 
   visitFunctionTypeExpression(node: FunctionTypeExpression) {
@@ -336,9 +337,12 @@ export class WhackoVisitor {
     this.visitAll(node.types);
   }
 
+  visitTypeID(node: TypeID) {
+    this.visitAll(node.typeParameters);
+  }
+
   visitNamedTypeExpression(node: NamedTypeExpression) {
-    this.visit(node.namespace);
-    this.visit(node.element);
+    this.visitAll(node.path);
     this.visitAll(node.typeParameters);
   }
 
@@ -357,7 +361,7 @@ export class WhackoVisitor {
     this.visitAll(node.decorators);
     this.visit(node.name);
     this.visit(node.type);
-    if (node.initializer) this.visit(node.initializer);
+    // if (node.initializer) this.visit(node.initializer);
   }
 
   visitMethodClassMember(node: MethodClassMember) {
@@ -400,6 +404,7 @@ export class WhackoVisitor {
 
   visitGrabStatement(node: GrabStatement) {
     this.visit(node.heldExpression);
+    this.visit(node.name);
     this.visit(node.statement);
   }
 
@@ -458,7 +463,7 @@ export class WhackoVisitor {
   }
 
   visitLeftUnaryExpression(node: LeftUnaryExpression) {
-    this.visit(node.expression);
+    this.visit(node.operand);
   }
 
   visitAwaitExpression(node: AwaitExpression) {
@@ -476,8 +481,7 @@ export class WhackoVisitor {
   }
 
   visitNewExpression(node: NewExpression) {
-    this.visit(node.expression);
-    this.visitAll(node.typeParameters);
+    this.visit(node.classType);
     this.visitAll(node.parameters);
   }
 
@@ -538,6 +542,30 @@ export class WhackoVisitor {
     this.visit(node.returnType);
   }
 
+  visitRightUnaryExpression(node: RightUnaryExpression): void {
+    this.visit(node.operand);
+  }
+
+  visitInterfaceDeclaration(node: InterfaceDeclaration): void {
+    this.visitAll(node.decorators);
+    this.visit(node.name);
+    this.visitAll(node.members);
+  }
+
+  visitInterfaceFieldDeclaration(node: InterfaceFieldDeclaration) {
+    this.visitAll(node.decorators);
+    this.visit(node.name);
+    this.visit(node.type);
+  }
+
+  visitInterfaceMethodDeclaration(node: InterfaceMethodDeclaration): void {
+    this.visitAll(node.decorators);
+    this.visit(node.name);
+    this.visitAll(node.typeParameters);
+    this.visitAll(node.parameters);
+    this.visit(node.returnType);
+  }
+
   // visitTypeCastExpression(expression: TypeCastExpression) {
   //   this.visit(expression.expression);
   //   this.visit(expression.type);
@@ -547,7 +575,7 @@ export class WhackoVisitor {
     let replacer: AstNode;
     if (isExpression(node)) {
       const result = this.services.parser.LangiumParser.parse<Program>(
-        `fn a(): void { ${contents}; });`
+        `fn a(): void { ${contents}; });`,
       );
       const expression = (
         (result.value.declarations[0] as FunctionDeclaration).block!
@@ -556,7 +584,7 @@ export class WhackoVisitor {
       replacer = expression;
     } else if (isStatement(node)) {
       const result = this.services.parser.LangiumParser.parse<Program>(
-        `fn a(): void { ${contents} });`
+        `fn a(): void { ${contents} });`,
       );
       const statement = (result.value.declarations[0] as FunctionDeclaration)
         .block!.statements[0];
@@ -565,9 +593,7 @@ export class WhackoVisitor {
       const result =
         this.services.parser.LangiumParser.parse<Program>(contents);
       const declaration =
-        result.value.declarations[0] ??
-        result.value.exports[0] ??
-        result.value.imports[0];
+        result.value.declarations[0] ?? result.value.imports[0];
       replacer = declaration;
     } else {
       throw new Error("Something went wrong!");

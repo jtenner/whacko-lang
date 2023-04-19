@@ -1,0 +1,12 @@
+export fn _start(): void {
+  const cond = true;
+  while (cond) {
+    let a = 0;
+    while (a < 10) {
+      a++;
+      continue;
+    }
+
+    break;
+  }
+}

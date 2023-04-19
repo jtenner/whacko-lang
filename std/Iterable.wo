@@ -1,24 +1,19 @@
-export class Iterable<T> {
-  next(result: Box<T>): bool {
-    return false;
-  }
-}
-
-export class ForwardIterableRange<T> extends Iterable<T> {
-  current: T = types.castTo<i64, T>(0);
-  until: T = types.castTo<i64, T>(0);
+// TODO: `implements Iterable<T>`
+export class ForwardIterableRange<T>  {
+  current: T;
+  until: T;
 
   constructor(start: T, until: T) {
-    if (types.isInteger<T>()) {
-      this.current = start;
-      this.until = until;
-    }
+    assert(types.isInteger<T>());
+   
+    this.current = start;
+    this.until = until;
   }
 
   next(result: Box<T>): bool {
     let current = this.current;
     this.current = current + 1;
     let until = this.until;
-    return current _< until;
+    return current < until;
   }
 }

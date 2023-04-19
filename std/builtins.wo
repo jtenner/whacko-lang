@@ -1,4 +1,4 @@
-@name("Log") export builtin Log(val: string): void;
+@name("Log") export builtin Log(val: str): void;
 
 @name("i8") export builtin i8<T>(val: T): i8;
 @name("u8") export builtin u8<T>(val: T): u8;
@@ -14,19 +14,18 @@
 @name("f64") export builtin f64<T>(val: T): f64;
 
 export namespace heap {
-  @name("malloc") export builtin malloc(size: usize): usize;
-  @name("free") export builtin free<T>(ptr: T): void;
+  @name("heap.malloc") export builtin malloc(size: usize): usize;
+  @name("heap.free") export builtin free<T>(ptr: T): void;
 }
 
 export namespace stack {
-  @name("alloca") export builtin alloca(size: usize): usize;
+  @name("stack.alloca") export builtin alloca(size: usize): usize;
 }
 
 export namespace memory {
   @name("memory.copy") export builtin copy(src: usize, dest: usize, count: usize): usize;
   @name("memory.store") export builtin store<T>(ptr: usize, value: T): void;
   @name("memory.load") export builtin load<T>(ptr: usize): T;
-
 }
 
 export namespace types {
@@ -39,6 +38,17 @@ export namespace types {
   @name("types.ref") export builtin ref<T>(ptr: usize): T;
   @name("types.isReference") export builtin isReference<T>(): bool;
   @name("types.isInteger") export builtin isInteger<T>(): bool;
+  @name("types.forFieldsIn") export builtin forFieldsIn<T, U>(value: T, context: U, func: UnresolvedFunction): void;
+  @name("types.RawPointer") export builtintype RawPointer;
+  @name("types.asRawPointer") export builtin asRawPointer(ptr: usize): RawPointer;
+}
+
+export namespace gc {
+  @ensure @name("__whacko_gc_initialize") export extern initialize(): void;
+  @ensure @name("__whacko_gc_alloc") export extern alloc(typeId: u32, size: usize): types.RawPointer;
+  @name("__whacko_gc_collect") export extern collect(): void;
+  @name("__whacko_gc_visit") export extern visit(ptr: usize): void;
+  @ensure @name("__whacko_gc_store_field_ptr") extern store_field_ptr(forward: i32, parent: types.RawPointer, child: types.RawPointer, field_location: types.RawPointer): void;
 }
 
 export namespace math {
@@ -97,6 +107,10 @@ export namespace math {
   @name("ldexp") export extern ldexp(f: f64, n: i32): f64;
   @name("ldexpf") export extern ldexpf(f: f32, n: i32): f32;
 }
+
+@name("UnresolvedFunction") export builtintype UnresolvedFunction;
+@name("NonNullable") export builtintype NonNullable<T>;
+@name("assert") export builtin assert<T>(value: T): NonNullable<T>;
 
 // compiler intrinsics
 @name("AShr") export builtin AShr<T>(value: T, bits: T): T; // AShr(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
@@ -162,7 +176,6 @@ export namespace math {
 @name("Select") export builtin Select<T>(cond: bool, then: T, otherwise: T): T; // Select(Builder: LLVMBuilderRef, If: LLVMValueRef, Then: LLVMValueRef, Else: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("Shl") export builtin Shl(): void; // Shl(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("ShuffleVector") export builtin ShuffleVector(): void; // ShuffleVector(Builder: LLVMBuilderRef, V1: LLVMValueRef, V2: LLVMValueRef, Mask: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
-// @name("StructGEP2") export builtin StructGEP2(): void; // StructGEP2(Builder: LLVMBuilderRef, Ty: LLVMTypeRef, Pointer: LLVMValueRef, Idx: number, Name: LLVMStringRef): LLVMValueRef;
 @name("Sub") export builtin Sub<T>(lhs: T, rhs: T): T; // Sub(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("Switch") export builtin Switch(): void; // Switch(Builder: LLVMBuilderRef, V: LLVMValueRef, Else: LLVMBasicBlockRef, NumCases: number): LLVMValueRef;
 // @name("Trunc") export builtin Trunc(): void; // Trunc(Builder: LLVMBuilderRef, Val: LLVMValueRef, DestTy: LLVMTypeRef, Name: LLVMStringRef): LLVMValueRef;
@@ -170,10 +183,11 @@ export namespace math {
 // @name("UDiv") export builtin UDiv(): void; // UDiv(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("UIToFP") export builtin UIToFP(): void; // UIToFP(Builder: LLVMBuilderRef, Val: LLVMValueRef, DestTy: LLVMTypeRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("URem") export builtin URem(): void; // URem(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
-@name("Unreachable") export builtin Unreachable(): void; // Unreachable(Builder: LLVMBuilderRef): LLVMValueRef;
-// @name("VAArg") export builtin VAArg(): void; // VAArg(Builder: LLVMBuilderRef, List: LLVMValueRef, Ty: LLVMTypeRef, Name: LLVMStringRef): LLVMValueRef;
+@name("unreachable") export builtin unreachable(): void; // Unreachable(Builder: LLVMBuilderRef): LLVMValueRef;
 // @name("Xor") export builtin Xor(): void; // Xor(Builder: LLVMBuilderRef, LHS: LLVMValueRef, RHS: LLVMValueRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("ZExt") export builtin ZExt(): void; // ZExt(Builder: LLVMBuilderRef, Val: LLVMValueRef, DestTy: LLVMTypeRef, Name: LLVMStringRef): LLVMValueRef;
 // @name("ZExtOrBitCast") export builtin ZExtOrBitCast(): void; // ZExtOrBitCast(Builder: LLVMBuilderRef, Val: LLVMValueRef, DestTy: LLVMTypeRef, Name: LLVMStringRef): LLVMValueRef;
 
 @name("isString") export builtin isString<T>(val: T): bool;
+
+@name("string") export builtintype string;

@@ -1,0 +1,3 @@
+[submodule "rt/ugc"]
+	path = std/gc/ugc
+	url = https://github.com/bullno1/ugc

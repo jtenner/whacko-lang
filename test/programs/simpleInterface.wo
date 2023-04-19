@@ -1,0 +1,52 @@
+interface Test {
+  test(): i32;
+}
+
+// I'll do it
+class A implements Test {
+  constructor() {}
+
+  test(): i32 {
+    return i32(42);
+  }
+}
+
+class B implements Test {
+  constructor() {}
+
+  test(): i32 {
+    return i32(69);
+  }
+}
+
+class C implements Test {
+  constructor() {}
+
+  test(): i32 {
+    return i32(123);
+  }
+}
+
+class D implements Test {
+  constructor() {}
+
+  test(): i32 {
+    return i32(456);
+  }
+}
+
+export fn callTest(myTest: Test): i32 {
+  return myTest.test();
+}
+
+export fn _start(): void {
+  let a = new A();
+  let b = new B();
+  let c = new C();
+  let d = new D();
+
+  assert(callTest(a) == i32(42));
+  assert(callTest(b) == i32(69));
+  assert(callTest(c) == i32(123));
+  assert(callTest(d) == i32(456));
+}

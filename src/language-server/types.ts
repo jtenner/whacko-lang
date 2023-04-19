@@ -1,1191 +1,1553 @@
 import { AstNode } from "langium";
-import {} from "./types";
-import { CompileTimeValue, ExecutionContext, ExecutionContextValue, ExecutionVariable, RuntimeValue } from "./execution-context";
+import { LLVMTypeRef, LLVMValueRef } from "llvm-js";
+import { reportErrorDiagnostic } from "./diagnostic";
 import {
+  TypeExpression,
+  InterfaceDeclaration,
   ClassDeclaration,
-  ConstructorClassMember,
-  DeclareDeclaration,
-  DeclareFunction,
-  Decorator,
-  EnumDeclaration,
-  Expression,
-  ExternDeclaration,
   FunctionDeclaration,
-  isConstructorClassMember,
-  isMethodClassMember,
+  BuiltinDeclaration,
+  ConstructorClassMember,
+  ID,
+  Parameter,
+  isBuiltinTypeDeclaration,
+  BuiltinTypeDeclaration,
   isStringLiteral,
+  TypeDeclaration,
+  EnumDeclaration,
+  isEnumDeclaration,
+  isTypeDeclaration,
+  isFieldClassMember,
+  FieldClassMember,
+  TypeID,
+  isTypeDeclarationStatement,
+  isClassDeclaration,
+  NamedTypeExpression,
+  FunctionTypeExpression,
+  isMethodClassMember,
   MethodClassMember,
-  NamespaceDeclaration,
-  VariableDeclarator,
+  StringLiteral,
+  BinaryExpression,
+  isConstructorClassMember,
+  DeclareFunction,
+  isDeclareFunction,
+  ExternDeclaration,
+  isExternDeclaration,
+  isBinaryExpression,
+  isInterfaceFieldDeclaration,
+  InterfaceFieldDeclaration,
+  isInterfaceDeclaration,
+  InterfaceMethodDeclaration,
+  isInterfaceMethodDeclaration,
 } from "./generated/ast";
-import { CompilationPass, getFullyQualifiedName } from "./passes/CompilationPass";
-import { WhackoProgram } from "./program";
-import { WhackoModule } from "./module";
-import type { Module, LLVMValueRef, LLVMTypeRef } from "llvm-js";
-import { getFileName, getModule } from "./passes/ModuleCollectionPass";
-import { assert } from "./util";
+import {
+  WhackoMethodContext,
+  WhackoFunctionContext,
+  TypedValue,
+  ValueKind,
+  CallableKind,
+  CallableFunctionContext,
+} from "./ir";
+import { ensureCallableCompiled, WhackoModule, WhackoProgram } from "./program";
+import {
+  Scope,
+  ScopeElementType,
+  getScope,
+  getElementInScope,
+  ScopeElement,
+  traverseScopePath,
+} from "./scope";
+import {
+  assert,
+  getNodeName,
+  getNameDecoratorValue,
+  logNode,
+  UNREACHABLE,
+  getFullyQualifiedTypeName,
+  getFullyQualifiedInterfaceName,
+  getFullyQualifiedClassName,
+  idCounter,
+} from "./util";
 
-export const CLASS_HEADER_OFFSET = 8n; // [size, type?]
-
-export function getPtrWithOffset(ptr: LLVMValueRef, offset: bigint, pass: CompilationPass): LLVMValueRef {
-  const { LLVM, program: { LLVMUtil }, builder } = pass;
-  const llvmIntType = LLVM._LLVMIntType(32);
-  // void ptr type instead?
-  // const i8PtrType = LLVM._LLVMPointerType(LLVM._LLVMInt8Type(), 0);
-  const i8Type = LLVM._LLVMInt8Type();
-  const gepIndicies = LLVMUtil.lowerPointerArray([
-    LLVM._LLVMConstInt(llvmIntType, offset, 0),
-  ]);
-  const gepName = pass.getTempNameRef();
-  const ptrPlusOffset = LLVM._LLVMBuildGEP2(
-    builder,
-    i8Type,
-    ptr,
-    gepIndicies,
-    1,
-    gepName
-  );
-
-  LLVM._free(gepIndicies);
-  LLVM._free(gepName);
-  return ptrPlusOffset;
+export const enum ConcreteTypeKind {
+  Invalid,
+  Pointer,
+  Class,
+  Interface,
+  Function,
+  Enum,
+  Method,
+  Array,
+  Integer,
+  Float,
+  V128,
+  Never,
+  Void,
+  Null,
+  Nullable,
+  UnresolvedFunction,
 }
 
-export abstract class ScopeElement {
-  builtin: BuiltinFunction | null = null;
-  builtinType: BuiltinTypeFunction | null = null;
-  constructor(public mod: WhackoModule, public node: AstNode) {}
+export const enum V128Kind {
+  I8x16,
+  U8x16,
+  I16x8,
+  U16x8,
+  I32x4,
+  U32x4,
+  F32x4,
+  I64x2,
+  U64x2,
+  F64x2,
 }
 
-export abstract class ScopeTypeElement extends ScopeElement {
-  constructor(node: AstNode, mod: WhackoModule) {
-    super(mod, node);
-  }
+export const enum FloatKind {
+  F32,
+  F64,
 }
 
-export class NamespaceTypeScopeElement extends ScopeTypeElement {
-  exports = new Map<string, ScopeElement>();
-  scope: Scope;
-
-  constructor(node: AstNode, parentScope: Scope, mod: WhackoModule) {
-    super(node, mod);
-    this.scope = parentScope.fork();
-  }
+export const enum IntegerKind {
+  Bool,
+  I8,
+  U8,
+  I16,
+  U16,
+  I32,
+  U32,
+  I64,
+  U64,
+  ISize,
+  USize,
 }
 
-export class StaticTypeScopeElement extends ScopeTypeElement {
-  public cachedConcreteType: ConcreteType | null = null;
-
-  constructor(node: AstNode, mod: WhackoModule) {
-    super(node, mod);
-  }
+export interface ConcreteType {
+  id: number;
+  kind: ConcreteTypeKind;
+  llvmType: LLVMTypeRef | null;
 }
 
-export class VariableScopeElement extends ScopeElement {
-  constructor(node: AstNode) {
-    super(getModule(node)!, node);
-  }
+export interface FunctionType extends ConcreteType {
+  kind: ConcreteTypeKind.Function | ConcreteTypeKind.Method;
+  returnType: ConcreteType;
+  parameterTypes: ConcreteType[];
 }
 
-export interface BuiltinFunctionProps {
-  ast: AstNode;
-  ctx: ExecutionContext;
-  module: WhackoModule;
-  pass: CompilationPass;
-  program: WhackoProgram;
+export interface MethodType extends FunctionType {
+  kind: ConcreteTypeKind.Method;
+  thisType: ClassType | InterfaceType;
+}
+
+export interface ConcreteField {
+  name: string;
+  node: FieldClassMember | InterfaceFieldDeclaration;
+  type: ConcreteType;
+}
+
+export interface ClassType extends ConcreteType {
+  classConstructor: WhackoFunctionContext | null;
+  fields: Map<string, ConcreteField>;
+  id: number;
+  implements: Map<InterfaceType, NamedTypeExpression>;
+  kind: ConcreteTypeKind.Class;
+  methods: Map<string, WhackoFunctionContext>;
+  node: ClassDeclaration;
+  resolvedTypes: TypeMap;
   typeParameters: ConcreteType[];
-  parameters: ExecutionContextValue[];
+  llvmStructType: LLVMTypeRef | null;
 }
 
-export interface BuiltinTypeFunctionProps {
-  ast: AstNode;
-  ctx: ExecutionContext;
-  module: WhackoModule;
+export interface InterfaceType extends ConcreteType {
+  kind: ConcreteTypeKind.Interface;
+  resolvedTypes: TypeMap;
   typeParameters: ConcreteType[];
+  // TODO: Allow interfaces to extend one another
+  //       Add an `implements` field to match classes.
+  implementers: Set<ClassType>;
+  node: InterfaceDeclaration;
+  fields: Map<string, ConcreteField>;
+  llvmType: null;
 }
 
-export type BuiltinFunction = (props: BuiltinFunctionProps) => void;
-export type BuiltinTypeFunction = (props: BuiltinTypeFunctionProps) => ConcreteType;
-
-export class DynamicTypeScopeElement extends ScopeTypeElement {
-  cachedConcreteTypes = new Map<string, ConcreteType>();
-  constructor(
-    node: AstNode,
-    public typeParameters: string[],
-    mod: WhackoModule
-  ) {
-    super(node, mod);
-  }
+export interface NullableType extends ConcreteType {
+  kind: ConcreteTypeKind.Nullable;
+  child: ClassType | InterfaceType;
 }
 
-const scopes = new WeakMap<AstNode, Scope>();
-
-export function setScope(node: AstNode, scope: Scope) {
-  scopes.set(node, scope);
+export function getNullableType(
+  child: ClassType | InterfaceType,
+): NullableType {
+  return {
+    id: idCounter.value++,
+    kind: ConcreteTypeKind.Nullable,
+    child,
+    llvmType: null,
+  };
 }
 
-export function getScope(node: AstNode): Scope | null {
-  // @ts-ignore
-  const name = node?.name?.name;
-  while (true) {
-    const scope = scopes.get(node);
-    if (scope) {
-      return scope;
-    }
-
-    // we need to go up the tree
-    if (node.$container) {
-      node = node.$container;
-      continue;
-    }
-    return null;
-  }
+export function getNonnullableType(type: ConcreteType): ConcreteType {
+  return type.kind === ConcreteTypeKind.Nullable
+    ? (type as NullableType).child
+    : type;
 }
 
-export class Scope {
-  static id: number = 0;
-  public id: number = Scope.id++;
-  public elements = new Map<string, ScopeElement>();
-
-  constructor(public parent: Scope | null = null) {}
-
-  add(name: string, element: ScopeElement) {
-    assert(
-      !this.elements.has(name),
-      "Element has already been defined in this scope."
-    );
-    this.elements.set(name, element);
-  }
-
-  has(name: string): boolean {
-    return this.elements.has(name) || this.parent?.has(name) || false;
-  }
-
-  hasInCurrentScope(name: string): boolean {
-    return this.elements.has(name) ?? false;
-  }
-
-  get(
-    name: string,
-    predicate: (element: ScopeElement) => boolean = () => true
-  ): ScopeElement | null {
-    if (this.elements.has(name)) {
-      const element = this.elements.get(name)!;
-      return predicate(element) ? element : null;
-    }
-    return this.parent?.get(name, predicate) ?? null;
-  }
-
-  fork() {
-    const result = new Scope(this);
-    return result;
-  }
+export interface InvalidType extends ConcreteType {
+  kind: ConcreteTypeKind.Invalid;
 }
 
-export const enum Type {
-  bool,
-  i8,
-  u8,
-  i16,
-  u16,
-  i32,
-  u32,
-  i64,
-  u64,
-  f32,
-  f64,
-  string,
-  array,
-  func,
-  method,
-  v128,
-  isize,
-  usize,
-  async,
-  void,
-  tuple,
-  held,
-  scope,
-  namespace,
+export interface VoidType extends ConcreteType {
+  kind: ConcreteTypeKind.Void;
 }
 
-export abstract class ConcreteType {
-  constructor(
-    public ty: Type, // contains size info
-    public node: AstNode,
-    public name: string
-  ) {}
-
-  abstract get isNumeric(): boolean;
-
-  get isSigned() {
-    switch (this.ty) {
-      case Type.i8:
-      case Type.i16:
-      case Type.i32:
-      case Type.i64:
-      case Type.isize:
-        return true;
-    }
-    return false;
-  }
-
-  llvmType(LLVM: Module, LLVMUtil: typeof import("llvm-js")) {
-    switch (this.ty) {
-      case Type.bool:
-        return LLVM._LLVMInt1Type();
-      case Type.i8:
-        return LLVM._LLVMInt8Type();
-      case Type.u8:
-        return LLVM._LLVMInt8Type();
-      case Type.i16:
-        return LLVM._LLVMInt16Type();
-      case Type.u16:
-        return LLVM._LLVMInt16Type();
-      case Type.i32:
-        return LLVM._LLVMInt32Type();
-      case Type.u32:
-        return LLVM._LLVMInt32Type();
-      case Type.i64:
-        return LLVM._LLVMInt64Type();
-      case Type.u64:
-        return LLVM._LLVMInt64Type();
-      case Type.f32:
-        return LLVM._LLVMFloatType();
-      case Type.f64:
-        return LLVM._LLVMDoubleType();
-      case Type.string:
-        return LLVM._LLVMInt32Type();
-      case Type.array:
-        return LLVM._LLVMInt32Type();
-      case Type.func:
-        return LLVM._LLVMInt32Type();
-      case Type.method:
-        return LLVM._LLVMInt32Type();
-      case Type.v128:
-        return LLVM._LLVMInt128Type();
-      case Type.isize:
-        return LLVM._LLVMInt32Type();
-      case Type.usize:
-        return LLVM._LLVMInt32Type();
-      case Type.async:
-        return LLVM._LLVMInt32Type();
-      case Type.void:
-        return LLVM._LLVMVoidType();
-      case Type.tuple:
-        return null;
-      case Type.held:
-        return LLVM._LLVMInt32Type();
-      case Type.scope:
-      case Type.namespace:
-        return null;
-    }
-  }
-
-  isEqual(other: ConcreteType) {
-    return this.ty === other.ty;
-  }
-
-  get size() {
-    switch (this.ty) {
-      case Type.i8:
-      case Type.u8: {
-        return 1n;
-      }
-      case Type.i16:
-      case Type.u16: {
-        return 2n;
-      }
-      case Type.array:
-      case Type.f32:
-      case Type.func:
-      case Type.i32:
-      case Type.u32:
-      case Type.isize:
-      case Type.method:
-      case Type.string:
-      case Type.usize: {
-        return 4n;
-      }
-      case Type.f64:
-      case Type.i64:
-      case Type.u64: {
-        return 8n;
-      }
-      case Type.v128: {
-        return 16n;
-      }
-    }
-    return 0n;
-  }
-
-  isAssignableTo(other: ConcreteType) {
-    return this.isEqual(other);
-  }
-
-  abstract getName(): string;
+export interface NullType extends ConcreteType {
+  kind: ConcreteTypeKind.Null;
 }
 
-export class ConcreteFunction {
-  constructor(public funcRef: LLVMValueRef, public ty: FunctionType) {}
+export interface RawPointerType extends ConcreteType {
+  kind: ConcreteTypeKind.Pointer;
 }
 
-export interface ConcreteClassCompileParameters {
-  parameters: ExecutionContextValue[];
-  pass: CompilationPass;
-
+export interface UnresolvedFunctionType extends ConcreteType {
+  kind: ConcreteTypeKind.UnresolvedFunction;
 }
 
-export class ConcreteClass extends ConcreteType {
-  static id = 0n;
-
-  id = ++ConcreteClass.id;
-  operators = new Map<string, ConcreteFunction>();
-
-  constructor(
-    public typeParameters: Map<string, ConcreteType>,
-    public extendsClass: ConcreteClass | null,
-    public fields: Field[],
-    public element: ClassDeclaration,
-    public offset: bigint,
-    public pass: CompilationPass,
-  ) {
-    super(Type.usize, element, element.name.name);
-  }
-
-  getName(): string {
-    return getFullyQualifiedName(
-      this.element,
-      assert(this.getClassTypeParameters(), "Type parameters must exist at this point"),
-    )!;
-  }
-
-  getMethodByName(name: string): MethodClassMember | null {
-    return this.element.members.find(e => isMethodClassMember(e) && e.name.name === name) as MethodClassMember
-      ?? this.extendsClass?.getMethodByName(name) 
-      ?? null;
-  }
-
-  get isNumeric(): boolean {
-    return false;
-  }
-
-  getClassTypeParameters(): ConcreteType[] | null {
-    const ctx = new ExecutionContext(
-      this.pass,
-      assert(getScope(this.element), "The scope must exist at this point."),
-      this.typeParameters,
-    );
-    const constructorParameterTypes = [] as ConcreteType[];
-
-    for (let i = 0; i < this.element.typeParameters.length; i++) {
-      const constructorParameter = this.element.typeParameters[i];
-      const resolved = ctx.resolve(constructorParameter);
-      if (resolved) {
-        constructorParameterTypes.push(resolved);
-      } else {
-        return null;
-      }
-    }
-    return constructorParameterTypes;
-  }
-
-  override llvmType(LLVM: Module, LLVMUtil: typeof import("llvm-js")): LLVMTypeRef | null {
-    return LLVM._LLVMPointerType(LLVM._LLVMInt8Type(), 0);
-  }
-
-  constructorFunc: ConcreteFunction | null = null;
-
-  compileConstructor(pass: CompilationPass): ConcreteFunction | null {
-    if (this.constructorFunc) return this.constructorFunc;
-
-    const constructorParameterTypes = assert(this.getClassTypeParameters(), "We must be able to resolve the parameters.");
-
-    const func = assert(
-      pass.compileCallable(
-        this.element,
-        constructorParameterTypes,
-        getModule(this.element)!,
-        [],
-        this,
-        // previsit
-        ({ pass, func }) => {
-          const { LLVM, program: { LLVMUtil }, builder } = pass;
-          const offset = this.offset;
-          const intType = new IntegerType(Type.i32, null, this.node);
-          const llvmIntType = intType.llvmType(LLVM, LLVMUtil)!;
-          const offsetRefInt = LLVM._LLVMConstInt(
-            llvmIntType,
-            offset,
-            0
-          );
-          
-          const ref = LLVM._LLVMGetParam(func.funcRef, 0);
-
-          pass.ctx.self = new ExecutionVariable(
-            true,
-            "&self",
-            new RuntimeValue(ref, this),
-            this,
-          );
-          // initialize all the fields including refType and size
-
-          // Store offset at beginning of reference
-          LLVM._LLVMBuildStore(builder, offsetRefInt, ref);
-
-          // Store int type on ref at offset 4
-          const idRef = LLVM._LLVMConstInt(llvmIntType, this.id, 0);
-          const ptrPlusOffset = getPtrWithOffset(ref, 4n, pass);
-          LLVM._LLVMBuildStore(builder, idRef, ptrPlusOffset);
-          
-          for (const field of this.fields) {
-            const ptr = getPtrWithOffset(ref, CLASS_HEADER_OFFSET + field.offset, pass);
-            let value: LLVMValueRef;
-
-            if (field.initializer) {
-              pass.visit(field.initializer);
-              const stackValue = assert(pass.ctx.stack.pop(), "Value must exist on the stack at this point.");
-              const compiledValue = pass.ensureCompiled(stackValue);
-              value = compiledValue.ref;
-            } else {
-              // there's no initializer so we need to 0 out the reference
-              const intType = LLVM._LLVMIntType(Number(field.ty.size * 8n));
-              value = LLVM._LLVMConstInt(intType, 0n, 0);
-            }
-            LLVM._LLVMBuildStore(builder, value, ptr);
-          }
-        },
-        // post visit
-        ({ pass }) => {
-          const { LLVM, program: { LLVMUtil }, builder } = pass;
-          const self = assert(pass.ctx.self, "Self must be defined.");
-          const value = (self.value as RuntimeValue);
-          assert(value instanceof RuntimeValue, "Self should be a runtime value.");
-          LLVM._LLVMBuildRet(builder, value.ref);
-        }
-      ),
-      "This function must be compilable"
-    );
-
-    this.constructorFunc = func;
-    return func;
-  }
-
-  getOperatorMethod(op: string): MethodClassMember | null {
-    let method: MethodClassMember | null = null;
-    for (const member of this.element.members) {
-      const [name] = member.decorators.filter(e => e.name.name === "operator");
-      if (isMethodClassMember(member) && name && name.parameters[0] && isStringLiteral(name.parameters[0])) {
-        const { value } = name.parameters[0];
-        if (value === op) {
-          method = member;
-          break;
-        }
-      }
-    }
-    return method;
-  }
-}
-
-export class ArrayType extends ConcreteType {
-  constructor(
-    public childType: ConcreteType,
-    public initialLength: number,
-    node: AstNode,
-    name: string
-  ) {
-    super(Type.array, node, name);
-  }
-
-  override get isNumeric() {
-    return false;
-  }
-
-  override isEqual(other: ConcreteType) {
-    return (
-      other instanceof ArrayType && this.childType.isEqual(other.childType)
-    );
-  }
-
-  override getName(): string {
-    return `Array<${this.childType.name}>`;
-  }
-
-  override llvmType(LLVM: Module, LLVMUtil: typeof import("llvm-js")): LLVMTypeRef | null {
-    return LLVM._LLVMArrayType(this.childType.llvmType(LLVM, LLVMUtil)!, this.initialLength);
-  }
-}
-
-export class Parameter {
-  constructor(public name: string, public fieldType: ConcreteType) {}
-}
-
-export class FunctionType extends ConcreteType {
-  constructor(
-    public parameterTypes: ConcreteType[],
-    public parameterNames: string[],
-    public returnType: ConcreteType,
-    node: AstNode,
-    name: string
-  ) {
-    super(Type.method, node, name);
-  }
-
-  override get isNumeric() {
-    return false;
-  }
-
-  override isEqual(other: ConcreteType) {
-    return (
-      other instanceof FunctionType &&
-      this.parameterTypes.reduce(
-        (acc, param, i) => param.isEqual(other.parameterTypes[i]),
-        true
-      ) &&
-      this.returnType.isEqual(this.returnType)
-    );
-  }
-
-  override getName() {
-    const parameterNames = this.parameterTypes.map((e) => e.getName());
-    return `Function(${parameterNames.join(",")}): ${this.returnType.getName()}`;
-  }
-
-  override llvmType(
-    LLVM: Module,
-    LLVMUtil: typeof import("llvm-js")
-  ): LLVMTypeRef | null {
-    const returnType = this.returnType instanceof FunctionType
-      ? LLVM._LLVMPointerType(LLVM._LLVMVoidType(), 0)
-      : this.returnType.llvmType(LLVM, LLVMUtil)!;
-
-    const loweredParameterTypes = LLVMUtil.lowerPointerArray(
-      this.parameterTypes.map((e) => 
-        e instanceof FunctionType 
-          ? LLVM._LLVMPointerType(LLVM._LLVMVoidType(), 0)
-          : e.llvmType(LLVM, LLVMUtil)!
-      )
-    );
-    const result = LLVM._LLVMFunctionType(
-      returnType,
-      loweredParameterTypes,
-      this.parameterTypes.length,
-      0
-    );
-    LLVM._free(loweredParameterTypes);
-    return result;
-  }
-}
-
-export class MethodType extends ConcreteType {
-  constructor(
-    public thisType: ConcreteType,
-    public parameterTypes: ConcreteType[],
-    public parameterNames: string[],
-    public returnType: ConcreteType,
-    node: AstNode,
-    name: string
-  ) {
-    super(Type.method, node, name);
-  }
-
-  override get isNumeric() {
-    return false;
-  }
-
-  override isEqual(other: ConcreteType) {
-    return (
-      other instanceof FunctionType &&
-      this.parameterTypes.reduce(
-        (acc, param, i) => param.isEqual(other.parameterTypes[i]),
-        true
-      ) &&
-      this.returnType.isEqual(this.returnType)
-    );
-  }
-
-  override getName() {
-    const parameterNames = this.parameterTypes.map((e) => e.getName());
-    return `Function(${parameterNames.join(",")})`;
-  }
-
-  override llvmType(
-    LLVM: Module,
-    LLVMUtil: typeof import("llvm-js")
-  ): LLVMTypeRef | null {
-    const returnType = this.returnType instanceof FunctionType
-      ? LLVM._LLVMPointerType(LLVM._LLVMVoidType(), 0)
-      : this.returnType.llvmType(LLVM, LLVMUtil)!;
-    const parameterTypes = [this.thisType].concat(this.parameterTypes);
-    const parameterLLVMTypes = parameterTypes
-      .map((e) => 
-        e instanceof FunctionType 
-        ? LLVM._LLVMPointerType(LLVM._LLVMVoidType(), 0)
-        : e.llvmType(LLVM, LLVMUtil)!);
-
-    const loweredParameterTypes = LLVMUtil.lowerPointerArray(parameterLLVMTypes);
-    const result = LLVM._LLVMFunctionType(
-      returnType,
-      loweredParameterTypes,
-      parameterTypes.length,
-      0
-    );
-    LLVM._free(loweredParameterTypes);
-    return result;
-  }
-
-  override isAssignableTo(other: ConcreteType): boolean {
-    return other instanceof MethodType
-      && this.thisType.isAssignableTo(other.thisType)
-      && this.parameterTypes.length === other.parameterTypes.length
-      && this.parameterTypes.reduce(
-        (result, thisParameterType, i) => result && thisParameterType.isAssignableTo(other.parameterTypes[i]),
-        true 
-      )
-      && this.returnType.isAssignableTo(other.returnType);
-  }
-}
-
-export class Field {
-  constructor(
-    public name: string,
-    public initializer: Expression | null,
-    public ty: ConcreteType,
-    public offset: bigint
-  ) {}
-}
-
-export class PrototypeMethod {
-  constructor(
-    public element: AstNode,
-    public concreteTypes: Map<string, ConcreteType>
-  ) {}
-}
-
-export class NamespaceDeclarationType extends ConcreteType {
-  constructor(node: NamespaceDeclaration) {
-    super(Type.namespace, node, node.name.name);
-  }
-
-  getName(): string {
-    return "";
-  }
-
-  get isNumeric(): boolean {
-    return false;
-  }
-}
-
-export class DeclareFunctionType extends ConcreteType {
-  constructor(node: DeclareFunction) {
-    super(Type.func, node, node.name.name);
-  }
-
-  getName(): string {
-    return "";
-  }
-
-  get isNumeric(): boolean {
-    return false;
-  }
-}
-
-export class ExternType extends ConcreteType {
-  constructor(node: ExternDeclaration) {
-    super(Type.func, node, node.name.name);
-  }
-
-  getName(): string {
-    return "";
-  }
-
-  get isNumeric(): boolean {
-    return false;
-  }
-}
-
-export class FunctionReferenceType extends ConcreteType {
-  constructor(node: FunctionDeclaration) {
-    super(Type.func, node, node.name.name);
-  }
-
-  getName(): string {
-    return "";
-  }
-
-  get isNumeric(): boolean {
-    return false;
-  }
-}
-
-export class DeclareDeclarationType extends ConcreteType {
-  constructor(node: DeclareDeclaration) {
-    super(Type.namespace, node, node.name.name);
-  }
-
-  getName(): string {
-    return "";
-  }
-
-  get isNumeric(): boolean {
-    return false;
-  }
-}
-
-
-export class StringType extends ConcreteType {
-  constructor(public value: string | null = null, node: AstNode) {
-    super(Type.string, node, "");
-  }
-
-  override get isNumeric() {
-    return false;
-  }
-
-  override getName(): string {
-    return "string";
-  }
-
-  override llvmType(LLVM: Module, LLVMUtil: typeof import("llvm-js")): LLVMTypeRef | null {
-    return LLVM._LLVMPointerType(LLVM._LLVMIntType(8), 0);
-  }
-}
-
-export type IntegerEnumType =
-  | Type.i8
-  | Type.u8
-  | Type.i16
-  | Type.u16
-  | Type.i32
-  | Type.u32
-  | Type.i64
-  | Type.u64
-  | Type.isize
-  | Type.usize;
-
-export class IntegerType extends ConcreteType {
-  constructor(
-    ty: IntegerEnumType,
-    public value: bigint | null = null,
-    node: AstNode
-  ) {
-    super(ty, node, "");
-  }
-
-  override get isNumeric() {
-    return true;
-  }
-
-  override getName(): string {
-    switch (this.ty) {
-      case Type.i8:
-        return "i8";
-      case Type.u8:
-        return "u8";
-      case Type.i16:
-        return "i16";
-      case Type.u16:
-        return "u16";
-      case Type.i32:
-        return "i32";
-      case Type.u32:
-        return "u32";
-      case Type.i64:
-        return "i64";
-      case Type.u64:
-        return "u64";
-      case Type.isize:
-        return "isize";
-      case Type.usize:
-        return "usize";
-    }
-    throw new Error("Invalid number type.");
-  }
-
-  get signed() {
-    switch (this.ty) {
-      case Type.isize:
-      case Type.i8:
-      case Type.i16:
-      case Type.i32:
-      case Type.i64:
-        return true;
-    }
-    return false;
-  }
-
-  get bits() {
-    switch (this.ty) {
-      case Type.i8:
-      case Type.u8:
-        return 8;
-      case Type.i16:
-      case Type.u16:
-        return 16;
-      case Type.i32:
-      case Type.u32:
-      case Type.isize:
-      case Type.usize:
-        return 32;
-      case Type.i64:
-      case Type.u64:
-        return 64;
-    }
-    return 0;
-  }
-}
-
-export class BoolType extends ConcreteType {
-  constructor(public value: boolean | null = null, node: AstNode) {
-    super(Type.bool, node, "");
-  }
-
-  override get isNumeric() {
-    return false;
-  }
-
-  override getName(): string {
-    return "bool";
-  }
-}
-
-export class FloatType extends ConcreteType {
-  constructor(
-    ty: Type.f64 | Type.f32,
-    public value: number | null = null,
-    node: AstNode
-  ) {
-    super(ty, node, "");
-  }
-
-  override get isNumeric() {
-    return true;
-  }
-
-  override getName(): string {
-    switch (this.ty) {
-      case Type.f64:
-        return "f64";
-      case Type.f32:
-        return "f32";
-    }
-    throw new Error("Invalid number type.");
-  }
-
-  
-  get bits() {
-    switch (this.ty) {
-      case Type.f32:
-        return 32;
-      case Type.f64:
-        return 64;
-    }
-    return 0;
-  }
-}
-
-export class AsyncType extends ConcreteType {
-  constructor(public genericType: ConcreteType, node: AstNode) {
-    super(Type.async, node, "");
-  }
-
-  override get isNumeric() {
-    return false;
-  }
-
-  override getName(): string {
-    return `async<${this.genericType.getName()}>`;
-  }
-}
-
-export class TupleType extends ConcreteType {
-  constructor(public types: ConcreteType[], node: AstNode) {
-    super(Type.tuple, node, "");
-  }
-
-  override get isNumeric() {
-    return false;
-  }
-
-  override getName(): string {
-    return `(${this.types.map((e) => e.getName()).join(",")})`;
-  }
-
-  override isEqual(other: ConcreteType): boolean {
-    if (
-      other instanceof TupleType &&
-      other.types.length === this.types.length
-    ) {
-      for (let i = 0; i < other.types.length; i++) {
-        if (!this.types[i].isEqual(other.types[i])) {
-          return false;
-        }
-      }
-      return true;
-    }
-    return false;
-  }
-
-  override isAssignableTo(other: ConcreteType): boolean {
-    if (
-      other instanceof TupleType &&
-      other.types.length === this.types.length
-    ) {
-      for (let i = 0; i < other.types.length; i++) {
-        if (!this.types[i].isAssignableTo(other.types[i])) {
-          return false;
-        }
-      }
-      return true;
-    }
-    return false;
-  }
-}
-
-export class HeldType extends ConcreteType {
-  constructor(public genericType: ConcreteType, node: AstNode) {
-    super(Type.held, node, "");
-  }
-
-  override get isNumeric() {
-    return false;
-  }
-
-  override isEqual(other: ConcreteType): boolean {
-    return (
-      other instanceof HeldType && this.genericType.isEqual(other.genericType)
-    );
-  }
-
-  override getName(): string {
-    return `held<${this.genericType.getName()}>`;
-  }
-}
+export const theNullType: NullType = {
+  id: idCounter.value++,
+  kind: ConcreteTypeKind.Null,
+  llvmType: null,
+};
+
+export const theInvalidType: InvalidType = {
+  id: idCounter.value++,
+  kind: ConcreteTypeKind.Invalid,
+  llvmType: null,
+};
+
+export const theUnresolvedFunctionType: UnresolvedFunctionType = {
+  id: idCounter.value++,
+  kind: ConcreteTypeKind.UnresolvedFunction,
+  llvmType: null,
+};
 
 export function simdOf(type: ConcreteType) {
-  switch (type.ty) {
-    case Type.i8:  return new i8x16Type(type.node);
-    case Type.u8:  return new u8x16Type(type.node);
-    case Type.i16: return new i16x8Type(type.node);
-    case Type.u16: return new u16x8Type(type.node);
-    case Type.i32: return new i32x4Type(type.node);
-    case Type.u32: return new u32x4Type(type.node);
-    case Type.f32: return new f32x4Type(type.node);
-    case Type.i64: return new i64x2Type(type.node);
-    case Type.u64: return new u64x2Type(type.node);
-    case Type.f64: return new f64x2Type(type.node);
+  switch (type.kind) {
+    case ConcreteTypeKind.Integer: {
+      switch ((type as IntegerType).integerKind) {
+        case IntegerKind.Bool:
+        case IntegerKind.I8:
+          return getV128Type(V128Kind.I8x16);
+        case IntegerKind.U8:
+          return getV128Type(V128Kind.U8x16);
+        case IntegerKind.I16:
+          return getV128Type(V128Kind.I16x8);
+        case IntegerKind.U16:
+          return getV128Type(V128Kind.U16x8);
+        case IntegerKind.ISize:
+        case IntegerKind.I32:
+          return getV128Type(V128Kind.I32x4);
+        case IntegerKind.USize:
+        case IntegerKind.U32:
+          return getV128Type(V128Kind.U32x4);
+        case IntegerKind.I64:
+          return getV128Type(V128Kind.I64x2);
+        case IntegerKind.U64:
+          return getV128Type(V128Kind.U64x2);
+      }
+      UNREACHABLE("Impossible things are happening everyday.");
+    }
+    case ConcreteTypeKind.Float: {
+      switch ((type as FloatType).floatKind) {
+        case FloatKind.F32:
+          return getV128Type(V128Kind.F32x4);
+        case FloatKind.F64:
+          return getV128Type(V128Kind.F64x2);
+      }
+      UNREACHABLE("Impossible things are happening everyday.");
+    }
+    default:
+      return theInvalidType;
   }
-  return new InvalidType(type.node);
 }
 
-export class VectorType extends ConcreteType {
-  constructor(public numberType: ConcreteType, node: AstNode) {
-    super(Type.v128, node, "");
+export function isSignedIntegerKind(kind: IntegerKind): boolean {
+  switch (kind) {
+    case IntegerKind.Bool:
+    case IntegerKind.U8:
+    case IntegerKind.U16:
+    case IntegerKind.U32:
+    case IntegerKind.U64:
+    case IntegerKind.USize:
+      return false;
+
+    case IntegerKind.I8:
+    case IntegerKind.I16:
+    case IntegerKind.I32:
+    case IntegerKind.I64:
+    case IntegerKind.ISize:
+      return true;
+  }
+}
+
+export function isSignedV128Kind(kind: V128Kind): boolean {
+  switch (kind) {
+    case V128Kind.U8x16:
+    case V128Kind.U16x8:
+    case V128Kind.U32x4:
+    case V128Kind.U64x2:
+      return false;
+
+    case V128Kind.F32x4:
+    case V128Kind.F64x2:
+    case V128Kind.I8x16:
+    case V128Kind.I16x8:
+    case V128Kind.I32x4:
+    case V128Kind.I64x2:
+      return true;
+  }
+}
+
+export function isFloatV128Kind(kind: V128Kind): boolean {
+  return kind === V128Kind.F32x4 || kind === V128Kind.F64x2;
+}
+
+export function getLaneCount(kind: V128Kind): 2 | 4 | 8 | 16 {
+  switch (kind) {
+    case V128Kind.I8x16:
+    case V128Kind.U8x16:
+      return 16;
+    case V128Kind.I16x8:
+    case V128Kind.U16x8:
+      return 8;
+    case V128Kind.I32x4:
+    case V128Kind.U32x4:
+    case V128Kind.F32x4:
+      return 4;
+    case V128Kind.I64x2:
+    case V128Kind.U64x2:
+    case V128Kind.F64x2:
+      return 2;
+  }
+}
+
+export function getIntegerBitCount(kind: IntegerKind): 1 | 8 | 16 | 32 | 64 {
+  switch (kind) {
+    case IntegerKind.Bool:
+      return 1;
+    case IntegerKind.I8:
+    case IntegerKind.U8:
+      return 8;
+    case IntegerKind.I16:
+    case IntegerKind.U16:
+      return 16;
+    case IntegerKind.I32:
+    case IntegerKind.U32:
+    case IntegerKind.ISize:
+    case IntegerKind.USize:
+      return 32;
+    case IntegerKind.I64:
+    case IntegerKind.U64:
+      return 64;
+  }
+}
+
+export function getSize(ty: ConcreteType): 1 | 2 | 4 | 8 | 16 {
+  switch (ty.kind) {
+    case ConcreteTypeKind.Array:
+    case ConcreteTypeKind.Nullable:
+    case ConcreteTypeKind.Class:
+    case ConcreteTypeKind.Function:
+    case ConcreteTypeKind.Method: {
+      return 4;
+    }
+    case ConcreteTypeKind.Integer: {
+      const { integerKind } = ty as IntegerType;
+      if (integerKind === IntegerKind.Bool) return 1;
+      else return getIntegerBitCount(integerKind) as 1 | 2 | 4 | 8;
+    }
+    case ConcreteTypeKind.Float: {
+      switch ((ty as FloatType).floatKind) {
+        case FloatKind.F32:
+          return 4;
+        case FloatKind.F64:
+          return 8;
+        default:
+          return assert(false, "Unknown float kind") as never;
+      }
+    }
+    case ConcreteTypeKind.V128: {
+      return 16;
+    }
+    default: {
+      return assert(false, "Unknown type kind") as never;
+    }
+  }
+}
+
+export interface V128Type extends ConcreteType {
+  kind: ConcreteTypeKind.V128;
+  v128Kind: V128Kind;
+}
+
+export interface IntegerType extends ConcreteType {
+  kind: ConcreteTypeKind.Integer | ConcreteTypeKind.Enum;
+  integerKind: IntegerKind;
+}
+
+export interface EnumType extends IntegerType {
+  kind: ConcreteTypeKind.Enum;
+  node: EnumDeclaration;
+  integerKind: IntegerKind.I64;
+  name: string;
+}
+
+export interface FloatType extends ConcreteType {
+  kind: ConcreteTypeKind.Float;
+  floatKind: FloatKind;
+}
+
+export interface ArrayType extends ConcreteType {
+  childType: ConcreteType;
+}
+
+export function getFloatType(kind: FloatKind): FloatType {
+  // TODO: Cache this?
+  return {
+    id: idCounter.value++,
+    kind: ConcreteTypeKind.Float,
+    floatKind: kind,
+    llvmType: null,
+  };
+}
+
+export function getIntegerType(kind: IntegerKind): IntegerType {
+  // TODO: Cache this?
+  return {
+    id: idCounter.value++,
+    kind: ConcreteTypeKind.Integer,
+    integerKind: kind,
+    llvmType: null,
+  };
+}
+
+export function getV128Type(kind: V128Kind): V128Type {
+  // TODO: Cache this?
+  return {
+    id: idCounter.value++,
+    kind: ConcreteTypeKind.V128,
+    v128Kind: kind,
+    llvmType: null,
+  };
+}
+
+export type TypeMap = Map<string, ConcreteType>;
+
+export function resolveTypeDeclaration(
+  program: WhackoProgram,
+  module: WhackoModule,
+  scopeElement: ScopeElement,
+  scope: Scope,
+  typeParameters: ConcreteType[],
+  typeMap: TypeMap,
+): ConcreteType | null {
+  const node = scopeElement.node as TypeDeclaration;
+  assert(
+    isTypeDeclaration(node) || isTypeDeclarationStatement(node),
+    "Node must be a type declaration.",
+  );
+
+  if (node.typeParameters.length !== typeParameters.length) {
+    reportErrorDiagnostic(
+      program,
+      module,
+      "type",
+      node.name,
+      `Type parameters do not match type declaration signature length.`,
+    );
+    return null;
   }
 
-  override get isNumeric() {
-    return false;
+  const declarationScope = assert(
+    getScope(node),
+    "The scope must exist for the type declaration.",
+  );
+
+  return resolveType(program, module, node.type, declarationScope, typeMap);
+}
+
+export function resolveBuiltinType(
+  program: WhackoProgram,
+  module: WhackoModule,
+  scopeElement: ScopeElement,
+  scope: Scope,
+  typeParameters: ConcreteType[],
+): ConcreteType | null {
+  assert(
+    scopeElement.type === ScopeElementType.BuiltinType,
+    "The scope element must be a builtin type.",
+  );
+  const node = scopeElement.node as BuiltinTypeDeclaration;
+  assert(
+    isBuiltinTypeDeclaration(node),
+    "The node of the scope element must be a builtin type declaration.",
+  );
+
+  if (typeParameters.length !== node.typeParameters.length) {
+    reportErrorDiagnostic(
+      program,
+      module,
+      "type",
+      node,
+      `Type parameter count does not match builtintype type parameter signature.`,
+    );
+    return null;
   }
 
-  override llvmType(LLVM: Module, LLVMUtil: typeof import("llvm-js")): LLVMTypeRef | null {
-    const bits = (this.numberType as FloatType | IntegerType).bits;
-    const laneCount = 16n / this.numberType.size;
-    return LLVM._LLVMVectorType(LLVM._LLVMIntType(bits), Number(laneCount));
+  const builtinName = getNameDecoratorValue(node) ?? node.name.name;
+
+  const builtinTypeFunction = assert(
+    program.builtinTypeFunctions.get(builtinName),
+    `The builtin type definition ${builtinName} for ${getNodeName(
+      node,
+    )} does not exist.`,
+  );
+  return builtinTypeFunction({ program, module, scope, typeParameters, node });
+}
+
+export function resolveEnumType(
+  program: WhackoProgram,
+  module: WhackoModule,
+  scopeElement: ScopeElement,
+): EnumType | null {
+  const node = scopeElement.node as EnumDeclaration;
+  assert(isEnumDeclaration(node), "Node must be an enum declaration.");
+
+  const name = getNodeName(node);
+
+  if (program.enums.has(name)) return program.enums.get(name)!;
+
+  // TODO: Ensure enum members are not duplicated
+  // TODO: Add enum member values to the EnumType
+
+  const enumType: EnumType = {
+    id: idCounter.value++,
+    kind: ConcreteTypeKind.Enum,
+    node,
+    name,
+    integerKind: IntegerKind.I64,
+    llvmType: null,
+  };
+
+  program.enums.set(name, enumType);
+  return enumType;
+}
+
+export function resolveClass(
+  program: WhackoProgram,
+  module: WhackoModule,
+  classElement: ScopeElement,
+  typeParameters: ConcreteType[],
+): ClassType | null {
+  const node = classElement.node as ClassDeclaration;
+  const name = getFullyQualifiedClassName(node, typeParameters);
+
+  if (program.classes.has(name)) return program.classes.get(name)!;
+
+  assert(
+    isClassDeclaration(node),
+    "Scope element must have a class declaration inside it.",
+  );
+  const nodeScope = assert(
+    getScope(node),
+    "Class must have a scope at this point.",
+  );
+
+  if (typeParameters.length !== node.typeParameters.length) {
+    reportErrorDiagnostic(
+      program,
+      module,
+      "type",
+      node,
+      "Number of type parameters given does not match the declaration.",
+    );
+    return null;
   }
 
-  getName() {
-    const bits = (this.numberType as FloatType | IntegerType).bits;
-    const laneCount = 16n / this.numberType.size;
-    
-    if (this.numberType instanceof FloatType) {
-      return `f${bits}x${laneCount}`;
-    } else {
-      return `${(this.numberType as IntegerType).signed ? "i" : "u"}${bits}x${laneCount}`;
+  const newTypeMap: TypeMap = new Map();
+  for (let i = 0; i < typeParameters.length; i++) {
+    newTypeMap.set(node.typeParameters[i].name, typeParameters[i]);
+  }
+
+  const fields = new Map<string, ConcreteField>();
+
+  for (const member of node.members) {
+    if (!isFieldClassMember(member)) continue;
+
+    const field: FieldClassMember = member;
+
+    const type = field.type;
+    if (!type) {
+      reportErrorDiagnostic(
+        program,
+        module,
+        "type",
+        field,
+        "TODO: Field types are mandatory for now.",
+      );
+      return null;
+    }
+
+    const concreteFieldType = resolveType(
+      program,
+      module,
+      type,
+      nodeScope,
+      newTypeMap,
+    );
+
+    if (!concreteFieldType) {
+      reportErrorDiagnostic(
+        program,
+        module,
+        "type",
+        field,
+        "Field type failed to resolve.",
+      );
+      return null;
+    }
+
+    fields.set(field.name.name, {
+      name: field.name.name,
+      node: field,
+      type: concreteFieldType,
+    });
+  }
+
+  const interfaces = new Map();
+  const result: ClassType = {
+    classConstructor: null,
+    fields,
+    id: program.classId++,
+    implements: interfaces,
+    kind: ConcreteTypeKind.Class,
+    llvmStructType: null,
+    llvmType: null,
+    methods: new Map(),
+    node,
+    resolvedTypes: newTypeMap,
+    typeParameters,
+  };
+
+  program.classes.set(name, result);
+
+  // 0. Type params, type maps, fields, basically everything above us.
+  // 1. Ensure the interface is compiled
+  // 2. Add the class to each interface's array of implementors
+  // 3. Validate field existence/types and method existence/signatures
+  // 4. WHEN A METHOD IS ACCESSED FROM THE INTERFACE: ensure all the implementors' methods are compiled
+
+  for (const implement of node.implements) {
+    const type = resolveType(program, module, implement, nodeScope, newTypeMap);
+    if (!type) {
+      reportErrorDiagnostic(
+        program,
+        module,
+        "type",
+        implement,
+        "The implemented interface type could not be resolved.",
+      );
+      continue;
+    }
+
+    if (type.kind !== ConcreteTypeKind.Interface) {
+      reportErrorDiagnostic(
+        program,
+        module,
+        "type",
+        implement,
+        "The implemented interface type wasn't even an interface! Are you gaslighting me?",
+      );
+      continue;
+    }
+
+    const interfaceType = type as InterfaceType;
+    interfaces.set(interfaceType, implement);
+
+    for (const [name, field] of interfaceType.fields) {
+      const concreteField = fields.get(name);
+      if (!concreteField) {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          implement,
+          `The field '${name}' is not implemented by this class.`,
+        );
+        continue;
+      }
+
+      // We check for equality because someone could cast the class to its parent
+      // interface and modify the field there. That would be inherently type
+      // type unsafe, because an object could be assignable to the parent's type
+      // but not the child's. Once a child's method implementation runs with that
+      // modified child, all bets are off.
+      if (!typesEqual(field.type, concreteField.type)) {
+        // `implement` is intentionally used instead of `concreteField.node.type`.
+        // Otherwise, we would need to indicate which interface was the issue
+        // somehow. That means stringifying a ConcreteType, which isn't worth the
+        // effort. Just point at the referenced interface in "implements Foo"
+        // instead.
+
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          implement,
+          `The field '${name}' is not compatible with the given interface.`,
+        );
+        continue;
+      }
+
+      // Everything is fine and dandy, field-wise.
     }
   }
 
-  override isAssignableTo(other: ConcreteType): boolean {
-    return other instanceof VectorType;
+  for (const interfaceType of interfaces.keys()) {
+    interfaceType.implementers.add(result);
+  }
+
+  return result;
+}
+
+// Note: For now, these are separate. If nothing changes for a while, we could
+//       possibly merge resolveInterface() and resolveClass() together.
+export function resolveInterface(
+  program: WhackoProgram,
+  module: WhackoModule,
+  interfaceElement: ScopeElement,
+  typeParameters: ConcreteType[],
+): InterfaceType | null {
+  const node = interfaceElement.node as InterfaceDeclaration;
+
+  const name = getFullyQualifiedInterfaceName(node, typeParameters);
+  if (program.interfaces.has(name)) return program.interfaces.get(name)!;
+
+  assert(
+    isInterfaceDeclaration(node),
+    "Scope element must have an interface declaration inside it.",
+  );
+
+  const nodeScope = assert(
+    getScope(node),
+    "Interface must have a scope at this point.",
+  );
+
+  if (typeParameters.length !== node.typeParameters.length) {
+    reportErrorDiagnostic(
+      program,
+      module,
+      "type",
+      node,
+      "Number of type parameters given does not match the declaration.",
+    );
+    return null;
+  }
+
+  const newTypeMap: TypeMap = new Map();
+  for (let i = 0; i < typeParameters.length; i++) {
+    newTypeMap.set(node.typeParameters[i].name, typeParameters[i]);
+  }
+
+  const fields = new Map<string, ConcreteField>();
+
+  for (const member of node.members) {
+    if (!isInterfaceFieldDeclaration(member)) continue;
+
+    const field: InterfaceFieldDeclaration = member;
+
+    const type = field.type;
+    if (!type) {
+      reportErrorDiagnostic(
+        program,
+        module,
+        "type",
+        field,
+        "TODO: Field types are mandatory for now.",
+      );
+      return null;
+    }
+
+    const interfaceFieldType = resolveType(
+      program,
+      module,
+      type,
+      nodeScope,
+      newTypeMap,
+    );
+
+    if (!interfaceFieldType) {
+      reportErrorDiagnostic(
+        program,
+        module,
+        "type",
+        field,
+        "Field type failed to resolve.",
+      );
+      return null;
+    }
+
+    fields.set(field.name.name, {
+      name: field.name.name,
+      node: field,
+      type: interfaceFieldType,
+    });
+  }
+
+  const result = {
+    id: idCounter.value++,
+    node,
+    implementers: new Set(),
+    methods: new Set(),
+    fields,
+    kind: ConcreteTypeKind.Interface,
+    resolvedTypes: newTypeMap,
+    typeParameters,
+    llvmType: null,
+  } as InterfaceType;
+  program.interfaces.set(name, result);
+  return result as InterfaceType;
+}
+
+export function resolveNamedTypeScopeElement(
+  program: WhackoProgram,
+  module: WhackoModule,
+  scopeElement: ScopeElement,
+  scope: Scope,
+  typeParameters: TypeExpression[],
+  typeMap: TypeMap,
+): ConcreteType | null {
+  const concreteTypeParameters: ConcreteType[] = [];
+
+  for (const parameterExpression of typeParameters) {
+    const concreteTypeParameter = resolveType(
+      program,
+      module,
+      parameterExpression,
+      scope,
+      typeMap,
+    );
+    if (!concreteTypeParameter) {
+      // There should already be an emitted diagnostic
+      reportErrorDiagnostic(
+        program,
+        module,
+        "type",
+        parameterExpression,
+        "Type parameter could not be resolved.",
+      );
+      return null;
+    }
+    concreteTypeParameters.push(concreteTypeParameter);
+  }
+
+  switch (scopeElement.type) {
+    case ScopeElementType.BuiltinType: {
+      return resolveBuiltinType(
+        program,
+        module,
+        scopeElement,
+        scope,
+        concreteTypeParameters,
+      );
+    }
+    case ScopeElementType.Interface: {
+      return resolveInterface(
+        program,
+        module,
+        scopeElement,
+        concreteTypeParameters,
+      );
+    }
+    case ScopeElementType.Class: {
+      return resolveClass(
+        program,
+        module,
+        scopeElement,
+        concreteTypeParameters,
+      );
+    }
+    case ScopeElementType.Enum: {
+      return resolveEnumType(program, module, scopeElement);
+    }
+    case ScopeElementType.TypeDeclaration: {
+      return resolveTypeDeclaration(
+        program,
+        module,
+        scopeElement,
+        scope,
+        concreteTypeParameters,
+        typeMap,
+      );
+    }
+    default: {
+      reportErrorDiagnostic(
+        program,
+        module,
+        "type",
+        scopeElement.node,
+        "Referenced element does not refer to a type",
+      );
+      return null;
+    }
   }
 }
 
-export class i8x16Type extends VectorType {
-  constructor(node: AstNode) {
-    super(new IntegerType(Type.i8, 0n, node), node);
-  }
-}
-export class u8x16Type extends VectorType {
-  constructor(node: AstNode) {
-    super(new IntegerType(Type.u8, 0n, node), node);
+export function resolveType(
+  program: WhackoProgram,
+  module: WhackoModule,
+  typeExpression: TypeExpression,
+  scope: Scope,
+  typeMap: TypeMap,
+): ConcreteType | null {
+  switch (typeExpression.$type) {
+    case "TypeID": {
+      const node = typeExpression as TypeID;
+
+      if (!typeExpression.typeParameters.length) {
+        switch (node.name) {
+          case "i8":
+            return getIntegerType(IntegerKind.I8);
+          case "u8":
+            return getIntegerType(IntegerKind.U8);
+          case "i16":
+            return getIntegerType(IntegerKind.I16);
+          case "u16":
+            return getIntegerType(IntegerKind.U16);
+          case "i32":
+            return getIntegerType(IntegerKind.I32);
+          case "u32":
+            return getIntegerType(IntegerKind.U32);
+          case "i64":
+            return getIntegerType(IntegerKind.I64);
+          case "u64":
+            return getIntegerType(IntegerKind.U64);
+          case "isize":
+            return getIntegerType(IntegerKind.ISize);
+          case "usize":
+            return getIntegerType(IntegerKind.USize);
+          case "f32":
+            return getFloatType(FloatKind.F32);
+          case "f64":
+            return getFloatType(FloatKind.F64);
+          case "i8x16":
+            return getV128Type(V128Kind.I8x16);
+          case "u8x16":
+            return getV128Type(V128Kind.U8x16);
+          case "i16x8":
+            return getV128Type(V128Kind.I16x8);
+          case "u16x8":
+            return getV128Type(V128Kind.U16x8);
+          case "i32x4":
+            return getV128Type(V128Kind.I32x4);
+          case "u32x4":
+            return getV128Type(V128Kind.U32x4);
+          case "f32x4":
+            return getV128Type(V128Kind.F32x4);
+          case "i64x2":
+            return getV128Type(V128Kind.I64x2);
+          case "u64x2":
+            return getV128Type(V128Kind.U64x2);
+          case "f64x2":
+            return getV128Type(V128Kind.F64x2);
+          case "void":
+            return program.voidType;
+        }
+
+        if (typeMap.has(node.name)) return typeMap.get(node.name)!;
+
+        const scopeElement = getElementInScope(scope, node.name);
+        if (scopeElement) {
+          return resolveNamedTypeScopeElement(
+            program,
+            module,
+            scopeElement,
+            scope,
+            node.typeParameters,
+            typeMap,
+          );
+        } else {
+          reportErrorDiagnostic(
+            program,
+            module,
+            "type",
+            node,
+            "Named type could not be resolved",
+          );
+          return null;
+        }
+      }
+
+      const relevantScopeElement = getElementInScope(scope, node.name);
+
+      if (!relevantScopeElement) return null;
+
+      return resolveNamedTypeScopeElement(
+        program,
+        module,
+        relevantScopeElement,
+        scope,
+        node.typeParameters,
+        typeMap,
+      );
+    }
+    case "NamedTypeExpression": {
+      const node = typeExpression as NamedTypeExpression;
+      const relevantScopeElement = traverseScopePath(
+        program,
+        module,
+        scope,
+        node.path,
+      );
+
+      if (!relevantScopeElement) return null;
+
+      return resolveNamedTypeScopeElement(
+        program,
+        module,
+        relevantScopeElement,
+        scope,
+        node.typeParameters,
+        typeMap,
+      );
+    }
+    case "TupleTypeExpression": {
+      reportErrorDiagnostic(
+        program,
+        module,
+        "type",
+        typeExpression,
+        "TODO: Tuple types are not supported yet.",
+      );
+      return null;
+    }
+    case "FunctionTypeExpression": {
+      const functionTypeExpression = typeExpression as FunctionTypeExpression;
+      const parameterTypes: ConcreteType[] = [];
+      for (const parameter of functionTypeExpression.parameters) {
+        const parameterType = resolveType(
+          program,
+          module,
+          parameter,
+          scope,
+          typeMap,
+        );
+        if (!parameterType) {
+          reportErrorDiagnostic(
+            program,
+            module,
+            "type",
+            parameter,
+            "Parameter type could not be resolved.",
+          );
+          return null;
+        }
+        parameterTypes.push(parameterType);
+      }
+
+      const returnType = resolveType(
+        program,
+        module,
+        functionTypeExpression.returnType,
+        scope,
+        typeMap,
+      );
+
+      if (!returnType) {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          functionTypeExpression.returnType,
+          "Return type could not be resolved.",
+        );
+        return null;
+      }
+
+      const result: FunctionType = {
+        id: idCounter.value++,
+        kind: ConcreteTypeKind.Function,
+        llvmType: null,
+        parameterTypes,
+        returnType,
+      };
+      return result;
+    }
   }
 }
 
-export class i16x8Type extends VectorType {
-  constructor(node: AstNode) {
-    super(new IntegerType(Type.i16, 0n, node), node);
+export function getParameterTypes(
+  program: WhackoProgram,
+  module: WhackoModule,
+  parameters: Parameter[],
+  scope: Scope,
+  typeMap: TypeMap,
+): ConcreteType[] | null {
+  const parameterTypes = [] as ConcreteType[];
+  for (const parameter of parameters) {
+    const parameterType = resolveType(
+      program,
+      module,
+      parameter.type,
+      scope,
+      typeMap,
+    );
+    if (!parameterType) {
+      reportErrorDiagnostic(
+        program,
+        module,
+        "type",
+        parameter.type,
+        "Could not resolve parameter",
+      );
+      return null;
+    }
+    parameterTypes.push(parameterType);
   }
+  return parameterTypes;
 }
-export class u16x8Type extends VectorType {
-  constructor(node: AstNode) {
-    super(new IntegerType(Type.u16, 0n, node), node);
+
+export function getCallableType(
+  program: WhackoProgram,
+  module: WhackoModule,
+  node:
+    | MethodClassMember
+    | FunctionDeclaration
+    | BuiltinDeclaration
+    | DeclareFunction
+    | ExternDeclaration
+    | InterfaceMethodDeclaration,
+  thisType: ClassType | InterfaceType | null,
+  typeParameters: ConcreteType[],
+): FunctionType | null {
+  const scope = assert(
+    getScope(node),
+    "The scope for this node must exist at this point.",
+  );
+
+  const typeMap: TypeMap = thisType?.resolvedTypes ?? new Map();
+
+  const nodeTypeParameters =
+    isDeclareFunction(node) || isExternDeclaration(node)
+      ? []
+      : node.typeParameters;
+
+  if (typeParameters.length !== nodeTypeParameters.length) {
+    reportErrorDiagnostic(
+      program,
+      module,
+      "type",
+      node,
+      "Number of type parameters does not match function/method signature.",
+    );
+    return null;
+  }
+
+  for (let i = 0; i < nodeTypeParameters.length; i++) {
+    typeMap.set(nodeTypeParameters[i].name, typeParameters[i]);
+  }
+
+  const parameterTypes = getParameterTypes(
+    program,
+    module,
+    node.parameters,
+    scope,
+    typeMap,
+  );
+  if (!parameterTypes) return null;
+
+  let returnType: ConcreteType;
+
+  const maybeReturnType = resolveType(
+    program,
+    module,
+    node.returnType,
+    scope,
+    typeMap,
+  );
+
+  if (!maybeReturnType) {
+    reportErrorDiagnostic(
+      program,
+      module,
+      "type",
+      node.returnType,
+      "Could not resolve return type of function/method",
+    );
+    return null;
+  }
+
+  returnType = maybeReturnType;
+
+  if (isMethodClassMember(node) || isInterfaceMethodDeclaration(node)) {
+    // We have an extra branch here in case we forget to initialize MethodType properties
+    const result: MethodType = {
+      id: idCounter.value++,
+      kind: ConcreteTypeKind.Method,
+      llvmType: null,
+      parameterTypes,
+      returnType,
+      thisType: assert(thisType),
+    };
+    return result;
+  }
+
+  return {
+    id: idCounter.value++,
+    kind: ConcreteTypeKind.Function,
+    llvmType: null,
+    parameterTypes,
+    returnType,
+  };
+}
+
+export function getConstructorType(
+  program: WhackoProgram,
+  module: WhackoModule,
+  thisType: ClassType,
+  constructor: ConstructorClassMember | null,
+): MethodType | null {
+  let parameterTypes: ConcreteType[] = [];
+
+  if (constructor) {
+    const scope = assert(getScope(thisType.node));
+    const result = getParameterTypes(
+      program,
+      module,
+      constructor.parameters,
+      scope,
+      thisType.resolvedTypes,
+    );
+    if (!result) return null;
+    parameterTypes = result;
+  }
+
+  return {
+    id: idCounter.value++,
+    kind: ConcreteTypeKind.Method,
+    llvmType: null,
+    parameterTypes,
+    returnType: program.voidType,
+    thisType,
+  };
+}
+
+export function typesEqual(left: ConcreteType, right: ConcreteType): boolean {
+  if (left === right) return true;
+  if (left.kind !== right.kind) return false;
+
+  switch (left.kind) {
+    case ConcreteTypeKind.Integer:
+      return (
+        (left as IntegerType).integerKind === (right as IntegerType).integerKind
+      );
+    case ConcreteTypeKind.Float:
+      return (left as FloatType).floatKind === (right as FloatType).floatKind;
+    case ConcreteTypeKind.V128:
+      return (left as V128Type).v128Kind === (right as V128Type).v128Kind;
+    case ConcreteTypeKind.Array:
+      return typesEqual(
+        (left as ArrayType).childType,
+        (right as ArrayType).childType,
+      );
+
+    case ConcreteTypeKind.Nullable: {
+      return typesEqual(
+        (left as NullableType).child,
+        (right as NullableType).child,
+      );
+    }
+    case ConcreteTypeKind.UnresolvedFunction:
+    case ConcreteTypeKind.Pointer:
+    case ConcreteTypeKind.Void:
+    case ConcreteTypeKind.Never:
+    case ConcreteTypeKind.Null:
+      return true;
+    case ConcreteTypeKind.Invalid:
+    case ConcreteTypeKind.Function:
+    case ConcreteTypeKind.Class:
+    case ConcreteTypeKind.Interface:
+    case ConcreteTypeKind.Enum:
+    case ConcreteTypeKind.Method:
+      return false; // cached
   }
 }
 
-export class i32x4Type extends VectorType {
-  constructor(node: AstNode) {
-    super(new IntegerType(Type.i32, 0n, node), node);
+export function getStringType(
+  program: WhackoProgram,
+  module: WhackoModule,
+): ClassType {
+  if (program.stringType) {
+    return program.stringType!;
   }
-}
-export class u32x4Type extends VectorType {
-  constructor(node: AstNode) {
-    super(new IntegerType(Type.u32, 0n, node), node);
-  }
-}
-export class f32x4Type extends VectorType {
-  constructor(node: AstNode) {
-    super(new FloatType(Type.f32, 0, node), node);
-  }
-}
-
-export class i64x2Type extends VectorType {
-  constructor(node: AstNode) {
-    super(new IntegerType(Type.i32, 0n, node), node);
-  }
-}
-export class u64x2Type extends VectorType {
-  constructor(node: AstNode) {
-    super(new IntegerType(Type.u64, 0n, node), node);
-  }
-}
-export class f64x2Type extends VectorType {
-  constructor(node: AstNode) {
-    super(new FloatType(Type.f64, 0, node), node);
-  }
+  const stringScopeElement = getElementInScope(program.globalScope, "String");
+  assert(stringScopeElement, "str must be defined in the global scope!");
+  assert(
+    isClassDeclaration(stringScopeElement!.node),
+    "String must be a class!",
+  );
+  program.stringType = resolveClass(program, module, stringScopeElement!, []);
+  assert(
+    program.stringType,
+    "Somehow, the String class could not be resolved!",
+  );
+  return program.stringType!;
 }
 
-export class SIMDType extends ConcreteType {
-  constructor(public laneType: ConcreteType, node: AstNode) {
-    super(Type.v128, node, "");
+export function getOperatorOverloadMethod(
+  program: WhackoProgram,
+  module: WhackoModule,
+  lhsType: ConcreteType,
+  rhsType: ConcreteType | null,
+  op: string,
+  operatorNode: AstNode,
+): WhackoMethodContext | null {
+  if (lhsType.kind !== ConcreteTypeKind.Class) return null;
+
+  const members = (lhsType as ClassType).node.members;
+
+  let methodAst: MethodClassMember | null = null;
+  let reportFirstDuplicate = true;
+  for (const member of members) {
+    if (isMethodClassMember(member)) {
+      if (member.typeParameters.length !== 0) {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          member.name,
+          `TODO: Support generic operator methods.`,
+        );
+        continue;
+      }
+
+      const decorator = member.decorators.find(
+        (e) => e.name.name === "operator",
+      );
+      if (!decorator) continue;
+      if (
+        decorator.parameters.length !== 1 &&
+        isStringLiteral(decorator.parameters[0])
+      ) {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          decorator,
+          `The operator decorator must have a single string parameter.`,
+        );
+      }
+
+      const operator = (decorator.parameters[0] as StringLiteral).value;
+
+      // Do nothing here, this isn't the overload we're looking for
+      if (operator !== op) continue;
+
+      if (methodAst) {
+        if (reportFirstDuplicate) {
+          reportFirstDuplicate = false;
+          reportErrorDiagnostic(
+            program,
+            module,
+            "type",
+            methodAst.name,
+            `Found duplicate operator method for operator ${op}`,
+          );
+        }
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          member.name,
+          `Found duplicate operator method for operator ${op}`,
+        );
+        continue;
+      }
+
+      const typeMap = (lhsType as ClassType).resolvedTypes;
+      const scope = assert(
+        getScope(member),
+        "The scope for this member must exist at this point.",
+      );
+
+      const hasParameter = isBinaryExpression(operatorNode);
+
+      // Expected length: 1 for binary overloads, 0 for unary overloads
+      if (member.parameters.length !== Number(hasParameter)) {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          operatorNode,
+          hasParameter
+            ? "Binary operator overloads must have one parameter."
+            : "Unary operator overloads must have zero parameters.",
+        );
+        continue;
+      }
+
+      const returnType = resolveType(
+        program,
+        module,
+        member.returnType,
+        scope,
+        typeMap,
+      );
+
+      if (!returnType) {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          operatorNode,
+          "Return type of operator overload could not be resolved.",
+        );
+        continue;
+      }
+
+      if (typesEqual(returnType, program.voidType)) {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          operatorNode,
+          "Return type of operator overload must not be void.",
+        );
+      }
+
+      // Binary expressions only
+      if (hasParameter) {
+        const parameterType = resolveType(
+          program,
+          module,
+          member.parameters[0].type,
+          scope,
+          typeMap,
+        );
+
+        if (!parameterType) {
+          reportErrorDiagnostic(
+            program,
+            module,
+            "type",
+            member.parameters[0].type,
+            `Parameter type of operator ${op} overload could not be resolved.`,
+          );
+          continue;
+        }
+
+        // Do nothing here, this isn't the overload we're looking for
+        if (!isAssignable(parameterType, assert(rhsType))) continue;
+      }
+
+      methodAst = member;
+    }
   }
 
-  override get isNumeric() {
+  if (!methodAst) {
+    reportErrorDiagnostic(
+      program,
+      module,
+      "type",
+      operatorNode,
+      `Could not find valid operator ${op} overload.`,
+    );
+    return null;
+  }
+
+  const result = ensureCallableCompiled(
+    program,
+    module,
+    methodAst,
+    lhsType as ClassType,
+    [],
+    (lhsType as ClassType).resolvedTypes,
+  ) as WhackoMethodContext | null;
+
+  assert(
+    !result || result.thisType,
+    "ensureCallableCompiled did not return a MethodContext",
+  );
+  return result;
+}
+
+export function isFunctionTypeAssignable(
+  superType: FunctionType,
+  subType: FunctionType,
+): boolean {
+  if (!isAssignable(superType.returnType, subType.returnType)) return false;
+  if (superType.parameterTypes.length !== subType.parameterTypes.length)
     return false;
+
+  for (let i = 0; i < superType.parameterTypes.length; i++) {
+    if (!isAssignable(superType.parameterTypes[i], subType.parameterTypes[i]))
+      return false;
   }
 
-  override getName(): string {
-    return `v128<${this.laneType.getName()}>`;
-  }
-
-  override llvmType(LLVM: Module, LLVMUtil: typeof import("llvm-js")): LLVMTypeRef | null {
-    return LLVM._LLVMVectorType(this.laneType.llvmType(LLVM, LLVMUtil)!, Number(16n / this.laneType.size));
-  }
+  return true;
 }
 
-export class InvalidType extends ConcreteType {
-  constructor(node: AstNode) {
-    super(Type.void, node, "");
-  }
+export function isAssignable(
+  superType: ConcreteType,
+  subType: ConcreteType,
+): boolean {
+  if (
+    superType.kind === ConcreteTypeKind.Function &&
+    subType.kind === ConcreteTypeKind.Function
+  )
+    return isFunctionTypeAssignable(
+      superType as FunctionType,
+      subType as FunctionType,
+    );
 
-  override get isNumeric() {
-    return false;
-  }
-
-  override isEqual(_: ConcreteType): boolean {
-    return false;
-  }
-
-  override isAssignableTo(_: ConcreteType): boolean {
-    return false;
-  }
-
-  override getName(): string {
-    return "invalid";
-  }
-}
-
-export function consumeDecorator(
-  name: string,
-  decorators: Decorator[]
-): Decorator | null {
-  const index = decorators.findIndex((e) => e.name.name === name);
-  if (index === -1) return null;
-  const [decorator] = decorators.splice(index, 1);
-
-  // indexes need to be updated
-  for (let i = 0; i < decorators.length; i++) {
-    // @ts-ignore: $containerIndex is readonly, but this is fine
-    decorators[i].$containerIndex = i;
-  }
-  return decorator;
-}
-
-export class VoidType extends ConcreteType {
-  constructor(node: AstNode) {
-    super(Type.void, node, "");
-  }
-
-  override get isNumeric() {
-    return false;
-  }
-
-  override getName(): string {
-    return "void";
-  }
-}
-
-export class PointerType extends ConcreteType {
-  constructor(public pointingToType: ConcreteType, node: AstNode) {
-    super(Type.usize, node, "pointer");
-  }
-
-  get isNumeric(): boolean {
-    return true;
-  }
-
-  getName(): string {
-    return "Pointer<" + this.pointingToType.name + ">";
-  }
-
-  override llvmType(LLVM: Module, LLVMUtil: typeof import("llvm-js")): LLVMTypeRef | null {
-    return LLVM._LLVMPointerType(LLVM._LLVMVoidType(), 0);
-  }
-}
-
-export class CompileTimeFieldReference extends CompileTimeValue<Field> {
-  constructor(field: Field, public ref: LLVMValueRef) {
-    super(field, field.ty);
-  }
-}
-
-export class CompileTimeMethodReference extends CompileTimeValue<MethodClassMember> {
-  constructor(method: MethodClassMember, ty: ConcreteClass, public ref: LLVMValueRef) {
-    super(method, ty);
-  }
-}
-
-export class CompileTimeVariableReference extends CompileTimeValue<ExecutionVariable> {
-  constructor(variable: ExecutionVariable) {
-    super(variable, assert(variable.ty, "Variable type must be set at this point."));
-  }
-}
-
-export class CompileTimeSuperReference extends CompileTimeValue<ConcreteClass> {
-  constructor(ty: ConcreteClass) {
-    super(ty, ty);
-  }
-}
-
-export class CompileTimeArrayAccessReference extends CompileTimeValue<RuntimeValue> {
-  constructor(ty: ConcreteClass, public root: RuntimeValue, value: RuntimeValue) {
-    super(value, ty)
-  }
-}
-
-export class EnumType extends IntegerType {
-  constructor(
-    node: EnumDeclaration,
-    public values: Map<string, bigint>,
+  if (
+    superType.kind === ConcreteTypeKind.Method &&
+    subType.kind === ConcreteTypeKind.Method
   ) {
-    super(Type.i32, null, node);
+    const castedSuper = superType as MethodType;
+    const castedSub = subType as MethodType;
+    return (
+      isAssignable(castedSuper.thisType, castedSub.thisType) &&
+      isFunctionTypeAssignable(castedSuper, castedSub)
+    );
   }
+
+  // TODO: (... || subType.kind === ConcreteTypeKind.Interface)
+  //       when interfaces can extend one another.
+  if (isInterfaceType(superType) && isClassType(subType)) {
+    return superType.implementers.has(subType);
+  }
+  return typesEqual(superType, subType);
+}
+
+export function isNumeric(type: ConcreteType): type is FloatType | IntegerType {
+  return (
+    type.kind === ConcreteTypeKind.Float ||
+    type.kind === ConcreteTypeKind.Integer
+  );
+}
+
+export function isClassType(type: ConcreteType): type is ClassType {
+  return type.kind === ConcreteTypeKind.Class;
+}
+
+export function isInterfaceType(type: ConcreteType): type is InterfaceType {
+  return type.kind === ConcreteTypeKind.Interface;
+}
+
+export function isNullableType(type: ConcreteType): type is NullableType {
+  return type.kind === ConcreteTypeKind.Nullable;
+}
+
+export function isReferenceType(
+  type: ConcreteType,
+): type is ClassType | IntegerType | NullableType {
+  return isClassType(type) || isInterfaceType(type) || isNullableType(type);
 }

@@ -1,0 +1,36 @@
+program:
+  callable:[std/builtins.wo]gc.initialize;functionType:()=>voidType
+(extern function)
+  callable:[std/builtins.wo]gc.alloc;functionType:(u32Type,usizeType)=>ptrType
+(extern function)
+  callable:[std/builtins.wo]gc.store_field_ptr;functionType:(i32Type,ptrType,ptrType,ptrType)=>voidType
+(extern function)
+  callable:[test/programs/while.wo]_start;functionType:()=>voidType
+    block: entry~16
+      br to condition~18
+    block: condition~18
+      20~inst = load: (variable const cond)
+      br to body~21 if (runtime boolType 20~inst); else to next~22
+    block: body~21
+      br to condition~25
+    block: next~22
+      return (void)
+    block: condition~25
+      27~inst = load: (variable a)
+      29~inst = (i64 10)
+      30~inst = 27~inst < 29~inst
+      br to body~31 if (runtime i64Type 30~inst); else to next~32
+    block: body~31
+      34~inst = load: (variable a)
+      35~inst = load: (variable a)
+      36~inst = (i64 1)
+      37~inst = 35~inst + 36~inst
+      38~inst = store: (variable a) = (runtime i64Type 37~inst)
+      br to condition~25
+    block: next~32
+      br to next~22
+    block: unused~39
+      br to condition~25
+    block: unused~42
+      br to condition~18
+

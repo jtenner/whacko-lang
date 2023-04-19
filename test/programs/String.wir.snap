@@ -1,0 +1,18 @@
+program:
+  callable:[std/builtins.wo]gc.initialize;functionType:()=>voidType
+(extern function)
+  callable:[std/builtins.wo]gc.alloc;functionType:(u32Type,usizeType)=>ptrType
+(extern function)
+  callable:[std/builtins.wo]gc.store_field_ptr;functionType:(i32Type,ptrType,ptrType,ptrType)=>voidType
+(extern function)
+  callable:[test/programs/String.wo]_start;functionType:()=>voidType
+    block: entry~500
+      501~inst = (str "Hello world")
+      502~inst = store: (variable a) = (runtime classType:[std/String.wo]String<> 501~inst)
+      503~inst = load: (variable a)
+      504~inst = store: (gcroot) = (runtime classType:[std/String.wo]String<> 503~inst)
+      507~inst = call: callable:[std/console.wo]console.log;functionType:(classType:[std/String.wo]String<>)=>voidType with (runtime classType:[std/String.wo]String<> 503~inst)
+      return (void)
+
+  callable:[std/console.wo]console.log;functionType:(classType:[std/String.wo]String<>)=>voidType
+(extern function)

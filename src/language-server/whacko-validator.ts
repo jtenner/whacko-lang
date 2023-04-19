@@ -39,7 +39,7 @@ const assignmentnOperators = new Set<string>([
 export class WhackoValidator {
   checkBinaryExpression(
     path: AST.BinaryExpression,
-    accept: ValidationAcceptor
+    accept: ValidationAcceptor,
   ): void {
     if (assignmentnOperators.has(path.op)) {
       let lhs = path.lhs;
@@ -51,7 +51,7 @@ export class WhackoValidator {
           {
             node: path,
             property: "lhs",
-          }
+          },
         );
       }
     }

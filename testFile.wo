@@ -1,6 +1,0 @@
-
-export fn _start(): void {
-  let a = new ForwardIterableRange<i64>(0, 10);
-  let b = new Box<i64>();
-  a.next(b);
-}

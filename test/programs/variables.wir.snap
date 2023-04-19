@@ -1,0 +1,14 @@
+program:
+  callable:[std/builtins.wo]gc.initialize;functionType:()=>voidType
+(extern function)
+  callable:[std/builtins.wo]gc.alloc;functionType:(u32Type,usizeType)=>ptrType
+(extern function)
+  callable:[std/builtins.wo]gc.store_field_ptr;functionType:(i32Type,ptrType,ptrType,ptrType)=>voidType
+(extern function)
+  callable:[test/programs/variables.wo]_start;functionType:()=>voidType
+    block: entry~62
+      64~inst = load: (variable a)
+      66~inst = (i64 10)
+      67~inst = store: (variable a) = (runtime i64Type 66~inst)
+      return (void)
+
