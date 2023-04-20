@@ -1,0 +1,11 @@
+class Foo {
+    bar: i32;
+    constructor() {
+        this.bar = i32(123);
+    }
+}
+
+export fn _start(): void {
+    let baz = new Foo();
+    assert(baz.bar == i32(123));
+}

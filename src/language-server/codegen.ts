@@ -1,48 +1,102 @@
 import {
-  InstructionKind,
-  WhackoFunctionContext,
-  WhackoMethodContext,
-  LoadInstruction,
-  FloatCastInstruction,
-  BlockInstruction,
-  TypedValue,
-  NewInstruction,
-  CallInstruction,
-  StoreInstruction,
-  LogicalNotInstruction,
-  BitwiseNotInstruction,
-  NegateInstruction,
+  LLVMBasicBlockRef,
+  LLVMBool,
+  LLVMBuilderRef,
+  LLVMCodeGenFileType,
+  LLVMErrorRef,
+  LLVMStringRef,
+  LLVMTargetRef,
+  LLVMTypeRef,
+  LLVMValueRef,
+  LLVMVerifierFailureAction,
+  Module as LLVM,
+  Pointer,
+} from "llvm-js";
+
+import { reportErrorDiagnostic } from "./diagnostic";
+import {
+  isClassDeclaration,
+  isParameter,
+  isVariableDeclarator,
+} from "./generated/ast";
+import {
   AllocaInstruction,
-  BrInstruction,
   BinaryInstruction,
   BinaryOperator,
-  ReturnInstruction,
-  printBlockToString,
-  ConstInstruction,
+  BitwiseNotInstruction,
+  BlockInstruction,
   BrIfInstruction,
-  ValueKind,
+  BrInstruction,
+  CallableKind,
+  CallInstruction,
+  ConstFloatValue,
+  ConstInstruction,
   ConstIntegerValue,
   ConstStringValue,
-  VariableReferenceValue,
   FieldReferenceValue,
-  ConstFloatValue,
-  RuntimeValue,
-  UndefinedInstruction,
-  InsertElementInstruction,
+  FloatCastInstruction,
   FreeInstruction,
-  IntToPtrInstruction,
-  CallableKind,
-  isWhackoMethod,
-  isWhackoFunction,
-  printInstructionToString,
-  MallocInstruction,
-  PtrToIntInstruction,
-  TrampolineFunctionContext,
+  InsertElementInstruction,
+  InstructionKind,
   IntegerCastInstruction,
-  isVoidValue,
+  IntToPtrInstruction,
   isFieldValue,
-  GCRootReferenceValue,
+  isRuntimeValue,
+  isVariableValue,
+  isVoidValue,
+  isWhackoFunction,
+  isWhackoMethod,
+  LoadInstruction,
+  LogicalNotInstruction,
+  MallocInstruction,
+  NegateInstruction,
+  NewInstruction,
+  printBlockToString,
+  printInstructionToString,
+  PtrToIntInstruction,
+  ReturnInstruction,
+  RuntimeValue,
+  StoreInstruction,
+  TrampolineFunctionContext,
+  TypedValue,
+  UndefinedInstruction,
+  ValueKind,
+  VariableReferenceValue,
+  WhackoFunctionContext,
+  WhackoMethodContext,
 } from "./ir";
+import {
+  buildExternFunction,
+  LLVMFieldTrampolineDefinition,
+  WhackoProgram,
+} from "./program";
+import {
+  ClassType,
+  ConcreteField,
+  ConcreteType,
+  ConcreteTypeKind,
+  FloatKind,
+  FloatType,
+  FunctionType,
+  getIntegerType,
+  IntegerKind,
+  IntegerType,
+  InterfaceType,
+  isClassType,
+  isFloatV128Kind,
+  isInterfaceType,
+  isNullableType,
+  isNumeric,
+  isReferenceType,
+  isSignedIntegerKind,
+  isSignedV128Kind,
+  MethodType,
+  NullableType,
+  resolveBuiltinType,
+  resolveClass,
+  V128Kind,
+  V128Type,
+} from "./types";
 import {
   assert,
   getFullyQualifiedInterfaceName,
@@ -53,58 +107,6 @@ import {
   logNode,
   UNREACHABLE,
 } from "./util";
-import {
-  LLVMFieldTrampolineDefinition,
-  WhackoProgram,
-  buildExternFunction,
-} from "./program";
-import {
-  LLVMValueRef,
-  LLVMTypeRef,
-  Module as LLVM,
-  LLVMBool,
-  LLVMCodeGenFileType,
-  LLVMBuilderRef,
-  LLVMStringRef,
-  LLVMVerifierFailureAction,
-  Pointer,
-  LLVMTargetRef,
-  LLVMErrorRef,
-  LLVMBasicBlockRef,
-} from "llvm-js";
-import {
-  ConcreteType,
-  ConcreteTypeKind,
-  NullableType,
-  ClassType,
-  FunctionType,
-  MethodType,
-  IntegerType,
-  IntegerKind,
-  FloatType,
-  FloatKind,
-  V128Type,
-  V128Kind,
-  isNumeric,
-  resolveBuiltinType,
-  isSignedIntegerKind,
-  isSignedV128Kind,
-  isFloatV128Kind,
-  InterfaceType,
-  getIntegerType,
-  ConcreteField,
-  isClassType,
-  isInterfaceType,
-  resolveClass,
-  isNullableType,
-  isReferenceType,
-} from "./types";
-import {
-  isClassDeclaration,
-  isParameter,
-  isVariableDeclarator,
-} from "./generated/ast";
-import { reportErrorDiagnostic } from "./diagnostic";
 
 export type LLVMUtil = typeof import("llvm-js");
 
@@ -358,7 +360,8 @@ export function codegen(program: WhackoProgram): CodegenResult {
 
   LLVM._free(loweredEntryName);
 
-  // then we can generate instructions because all the function llvm references now exist
+  // then we can generate instructions because all the function llvm references
+  // now exist
   for (const func of program.functions.values()) {
     if (isWhackoFunction(func))
       codegenFunction(program, LLVM, LLVMUtil, func as WhackoFunctionContext);
@@ -929,10 +932,6 @@ export function getLLVMValue(
   value: TypedValue,
 ): LLVMValueRef {
   switch (value.kind) {
-    case ValueKind.GCRoot: {
-      const casted = value as GCRootReferenceValue;
-      return assert(casted.root.ref);
-    }
     case ValueKind.Invalid:
       UNREACHABLE("Invalid values should never be reached in codegen.");
     case ValueKind.Void:
@@ -987,8 +986,9 @@ export function getLLVMValue(
         LLVM._free(lowered);
       }
 
-      // Now that the bytes are lowered, let's get the size of the string reference.
-      // String reference memory layout is [CommonObjectHeader] [...bytesInUtf8]
+      // Now that the bytes are lowered, let's get the size of the string
+      // reference. String reference memory layout is [CommonObjectHeader]
+      // [...bytesInUtf8]
       const commonObjectType = getLLVMCommonObjectType(LLVM, LLVMUtil);
       const rawSizeOfCommonObjectType = LLVM._LLVMSizeOf(commonObjectType);
       const sizeOfCommonObjectTypeName = LLVMUtil.lower(
@@ -1126,7 +1126,6 @@ export function getLLVMValue(
 
       if (thisValue.type.kind === ConcreteTypeKind.Class) {
         const thisType = thisValue.type as ClassType;
-
         const structType = getLLVMStructType(LLVM, LLVMUtil, thisType);
 
         const index = Array.from(thisType.fields.values()).indexOf(
@@ -1139,15 +1138,25 @@ export function getLLVMValue(
 
         const name = LLVMUtil.lower(`gep~${idCounter.value++}`);
         const lowered = LLVMUtil.lowerPointerArray([
+          LLVM._LLVMConstInt(LLVM._LLVMInt32Type(), 0n, 0),
           LLVM._LLVMConstInt(LLVM._LLVMInt32Type(), BigInt(index + 4), 0),
         ]);
 
+        // What could possible be wrong if everything's runtime
+        // and it's just returning the ref?
+        // how about we try something else...
+        assert(isRuntimeValue(thisValue), "temporary");
+        console.log(
+          printInstructionToString(
+            func.instructions.get(thisValue.instruction)!,
+          ),
+        );
         const result = LLVM._LLVMBuildGEP2(
           builder,
           structType,
           getLLVMValue(program, func, builder, LLVM, LLVMUtil, thisValue),
           lowered,
-          1,
+          2,
           name,
         );
 
@@ -1831,7 +1840,7 @@ function appendLLVMInstruction(
     case InstructionKind.Load: {
       const casted = instruction as LoadInstruction;
 
-      const pointer: LLVMValueRef = getLLVMValue(
+      const pointer = getLLVMValue(
         program,
         func,
         builder,
@@ -1839,7 +1848,6 @@ function appendLLVMInstruction(
         LLVMUtil,
         casted.source,
       );
-
       const name = LLVMUtil.lower(casted.name);
       const result = LLVM._LLVMBuildLoad2(
         builder,
@@ -1852,11 +1860,13 @@ function appendLLVMInstruction(
     }
     case InstructionKind.Store: {
       const casted = instruction as StoreInstruction;
-      if (
-        (isClassType(casted.target.type) ||
-          isInterfaceType(casted.target.type)) &&
-        isFieldValue(casted.target)
-      ) {
+      // Use the write barrier function for storing references into objects.
+      if (isFieldValue(casted.target) && isReferenceType(casted.value.type)) {
+        assert(
+          isClassType(casted.target.type) ||
+            isInterfaceType(casted.target.type),
+          "Field targets must be classes or interfaces.",
+        );
         const storeFieldPtrFunc = assert(
           program.functions.get("__whacko_gc_store_field_ptr"),
           "The garbage collector needs this function to be compiled.",
@@ -1867,7 +1877,8 @@ function appendLLVMInstruction(
           "The funcRef for the gc store function must exist already.",
         );
 
-        // store_field_ptr(forward: i32, parent: types.RawPointer, child: types.RawPointer, field_location: types.RawPointer): void
+        // store_field_ptr(forward: i32, parent: types.RawPointer, child:
+        // types.RawPointer, field_location: types.RawPointer): void
         const loweredArgs = LLVMUtil.lowerPointerArray([
           LLVM._LLVMConstInt(
             LLVM._LLVMInt32Type(),
@@ -1907,6 +1918,7 @@ function appendLLVMInstruction(
         LLVMUtil,
         casted.value,
       );
+
       const target = getLLVMValue(
         program,
         func,
@@ -2027,9 +2039,11 @@ export function codegenFunction(
 
   let allocaId = 0;
   for (const [node, site] of func.stackAllocationSites) {
-    const name = LLVMUtil.lower(`alloca~${allocaId++}`);
+    const prefix = isVariableDeclarator(node)
+      ? "variable-" + node.name.name
+      : "generated";
+    const name = LLVMUtil.lower(`${prefix}-alloca~${allocaId++}`);
     const allocaType = getLLVMType(LLVM, LLVMUtil, site.type);
-
     site.ref = LLVM._LLVMBuildAlloca(builder, allocaType, name);
     LLVM._free(name);
 
@@ -2174,7 +2188,8 @@ function getMemCopyFuncType(LLVM: LLVM, LLVMUtil: LLVMUtil) {
     LLVM._LLVMInt32Type(),
     LLVM._LLVMInt1Type(),
   ]);
-  // call void @llvm.memcpy.p0.p0.i32(ptr %"gep~488", ptr @"Hello world~484", i32 11, i1 false)
+  // call void @llvm.memcpy.p0.p0.i32(ptr %"gep~488", ptr @"Hello world~484",
+  // i32 11, i1 false)
   const memCopyFuncType = LLVM._LLVMFunctionType(
     LLVM._LLVMVoidType(),
     paramTypes,

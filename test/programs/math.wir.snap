@@ -6,32 +6,34 @@ program:
   callable:[std/builtins.wo]gc.store_field_ptr;functionType:(i32Type,ptrType,ptrType,ptrType)=>voidType
 (extern function)
   callable:[test/programs/math.wo]_start;functionType:()=>voidType
-    block: entry~263
-      267~inst = new: classType:[test/programs/math.wo]Foo<>
-      268~inst = call: callable:[test/programs/math.wo]Foo.constructor;methodType:classType:[test/programs/math.wo]Foo<>#()=>voidType with (runtime classType:[test/programs/math.wo]Foo<> 267~inst)
-      269~inst = store: (variable foo) = (runtime classType:[test/programs/math.wo]Foo<> 267~inst)
-      277~inst = (f32 1)
-      279~inst = call: callable:[std/builtins.wo]math.asinf;functionType:(f32Type)=>f32Type with (runtime f32Type 277~inst)
-      283~inst = call: callable:[test/programs/math.wo]bar;functionType:()=>f64Type with 
-      285~inst = (f64 1)
-      286~inst = 283~inst - 285~inst
-      291~inst = call: callable:[std/builtins.wo]math.asin;functionType:(f64Type)=>f64Type with (runtime f64Type 286~inst)
-      292~inst = load: (variable foo)
-      293~inst = store: (gcroot) = (runtime classType:[test/programs/math.wo]Foo<> 292~inst)
-      free: (runtime classType:[test/programs/math.wo]Foo<> 292~inst)
+    block: entry~267
+      271~inst = new: classType:[test/programs/math.wo]Foo<>
+      272~inst = store: (variable compiler-generated) = (runtime classType:[test/programs/math.wo]Foo<> 271~inst)
+      273~inst = call: callable:[test/programs/math.wo]Foo.constructor;methodType:classType:[test/programs/math.wo]Foo<>#()=>voidType with (runtime classType:[test/programs/math.wo]Foo<> 271~inst)
+      274~inst = store: (variable foo) = (runtime classType:[test/programs/math.wo]Foo<> 271~inst)
+      282~inst = (f32 1)
+      284~inst = call: callable:[std/builtins.wo]math.asinf;functionType:(f32Type)=>f32Type with (runtime f32Type 282~inst)
+      288~inst = call: callable:[test/programs/math.wo]bar;functionType:()=>f64Type with 
+      290~inst = (f64 1)
+      291~inst = 288~inst - 290~inst
+      296~inst = call: callable:[std/builtins.wo]math.asin;functionType:(f64Type)=>f64Type with (runtime f64Type 291~inst)
+      297~inst = load: (variable foo)
+      298~inst = store: (variable compiler-generated) = (runtime classType:[test/programs/math.wo]Foo<> 297~inst)
+      free: (runtime classType:[test/programs/math.wo]Foo<> 297~inst)
       return (void)
 
   callable:[test/programs/math.wo]Foo.constructor;methodType:classType:[test/programs/math.wo]Foo<>#()=>voidType
-    block: entry~300
-      301~inst = load: (field classType:[test/programs/math.wo]Foo<>#someField)
-      306~inst = (i32 0)
-      307~inst = store: (field classType:[test/programs/math.wo]Foo<>#someField) = (runtime i32Type 306~inst)
+    block: entry~305
+      306~inst = load: (variable const compiler-generated)
+      307~inst = load: (field classType:[test/programs/math.wo]Foo<>#someField of (runtime classType:[test/programs/math.wo]Foo<> 306~inst))
+      312~inst = (i32 0)
+      313~inst = store: (field classType:[test/programs/math.wo]Foo<>#someField of (runtime classType:[test/programs/math.wo]Foo<> 306~inst)) = (runtime i32Type 312~inst)
       return (void)
 
   callable:[std/builtins.wo]math.asinf;functionType:(f32Type)=>f32Type
 (extern function)
   callable:[test/programs/math.wo]bar;functionType:()=>f64Type
-    block: entry~297
+    block: entry~302
       return (f64 2)
 
   callable:[std/builtins.wo]math.asin;functionType:(f64Type)=>f64Type

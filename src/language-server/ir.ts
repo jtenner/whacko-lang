@@ -1,5 +1,6 @@
 import { AstNode } from "langium";
 import { LLVMBasicBlockRef, LLVMValueRef, Module } from "llvm-js";
+
 import { reportErrorDiagnostic } from "./diagnostic";
 import {
   ConstructorClassMember,
@@ -9,11 +10,11 @@ import {
   FunctionDeclaration,
   ID,
   InterfaceMethodDeclaration,
-  MethodClassMember,
   isFunctionDeclaration,
   isParameter,
   isThisLiteral,
   isVariableDeclarator,
+  MethodClassMember,
 } from "./generated/ast";
 import { WhackoModule, WhackoProgram } from "./program";
 import {
@@ -24,43 +25,43 @@ import {
 } from "./scope";
 import {
   ClassType,
+  ConcreteField,
   ConcreteType,
   ConcreteTypeKind,
   FloatKind,
   FloatType,
-  InvalidType,
   FunctionType,
   getFloatType,
+  getIntegerBitCount,
   getIntegerType,
+  getStringType,
   IntegerKind,
   IntegerType,
+  InterfaceType,
+  InvalidType,
+  isNumeric,
   isSignedIntegerKind,
   MethodType,
-  theInvalidType,
-  TypeMap,
-  ConcreteField,
-  getIntegerBitCount,
   NullType,
-  theNullType,
-  isNumeric,
-  V128Type,
   RawPointerType,
+  theInvalidType,
+  theNullType,
   theUnresolvedFunctionType,
+  TypeMap,
   UnresolvedFunctionType,
-  getStringType,
-  InterfaceType,
+  V128Type,
   VoidType,
 } from "./types";
 import {
   assert,
+  getBinaryOperatorString,
+  getElementName,
   getFullyQualifiedCallableName,
   getFullyQualifiedTypeName,
   getNameDecoratorValue,
   idCounter,
   logNode,
   UNREACHABLE,
-  getElementName,
-  getBinaryOperatorString,
 } from "./util";
 
 export const enum ComptimeConditional {
@@ -127,7 +128,6 @@ export const enum ValueKind {
   ConcreteFunction,
   Variable, // includes parameters
   Runtime,
-  GCRoot,
 }
 
 export function isVariableValue(value: Value): value is VariableReferenceValue {
@@ -136,6 +136,10 @@ export function isVariableValue(value: Value): value is VariableReferenceValue {
 
 export function isFieldValue(value: Value): value is FieldReferenceValue {
   return value.kind === ValueKind.Field;
+}
+
+export function isRuntimeValue(value: Value): value is RuntimeValue {
+  return value.kind === ValueKind.Runtime;
 }
 
 export interface Value {
@@ -241,7 +245,10 @@ export interface TrampolineFunctionContext extends CallableFunctionContext {
   /** The method type for this trampoline method. */
   type: MethodType;
 
-  /** The type parameters for this trampoline method (for compiling the implementer methods). */
+  /**
+   * The type parameters for this trampoline method (for compiling the
+   * implementer methods).
+   */
   typeParameters: ConcreteType[];
 
   /** The interface type for this trampoline method. */
@@ -264,7 +271,10 @@ export interface BlockContext {
   name: string;
   /** An array of all the instructions for this label. */
   instructions: BlockInstruction[];
-  /** All of the labels that must be created for the instructions to generate codegen. */
+  /**
+   * All of the labels that must be created for the instructions to generate
+   * codegen.
+   */
   children: BlockContext[];
   /** Label terminator. */
   terminator: BlockInstruction | null;
@@ -661,7 +671,7 @@ export const enum GCBarrierKind {
 export interface StoreInstruction extends UntypedBlockInstruction {
   gcBarrierKind: GCBarrierKind;
   kind: InstructionKind.Store;
-  target: FieldReferenceValue | VariableReferenceValue | GCRootReferenceValue;
+  target: FieldReferenceValue | VariableReferenceValue;
   value: RuntimeValue;
 }
 
@@ -783,13 +793,13 @@ export function createMethodReference(
 
 export interface FieldReferenceValue extends TypedValue {
   kind: ValueKind.Field;
-  thisValue: TypedValue;
+  thisValue: RuntimeValue;
   field: ConcreteField;
   node: AstNode;
 }
 
 export function createFieldReference(
-  thisValue: TypedValue,
+  thisValue: RuntimeValue,
   field: ConcreteField,
   node: AstNode,
 ): FieldReferenceValue {
@@ -814,21 +824,6 @@ export function createVariableReference(
     kind: ValueKind.Variable,
     type: variable.type,
     variable,
-  };
-}
-
-export interface GCRootReferenceValue extends TypedValue {
-  kind: ValueKind.GCRoot;
-  root: StackAllocationSite;
-}
-
-export function createGCRootReference(
-  gcRoot: StackAllocationSite,
-): GCRootReferenceValue {
-  return {
-    kind: ValueKind.GCRoot,
-    type: gcRoot.type,
-    root: gcRoot,
   };
 }
 
@@ -914,10 +909,6 @@ export function createRuntimeValue(
 
 export function asComptimeConditional(value: Value): ComptimeConditional {
   switch (value.kind) {
-    case ValueKind.GCRoot:
-      UNREACHABLE(
-        "A GC root is never accessed. Did you accentally make a value from it?",
-      );
     case ValueKind.Void:
       UNREACHABLE(
         "Void cannot be a comptime conditional. Did you mess up somewhere?",
@@ -1289,9 +1280,6 @@ export function getValueString(value: Value): string {
       const strValue = value as ConstStringValue;
       return `(str "${strValue.value}")`;
     }
-    case ValueKind.GCRoot: {
-      return `(gcroot)`;
-    }
     // can be used as callbacks and in variables
     // case ValueKind.ConcreteFunction: {
     case ValueKind.ScopeElement:
@@ -1303,7 +1291,7 @@ export function getValueString(value: Value): string {
       const fieldValue = value as FieldReferenceValue;
       return `(field ${getFullyQualifiedTypeName(
         assert(fieldValue.thisValue.type),
-      )}#${fieldValue.field.name})`;
+      )}#${fieldValue.field.name} of ${getValueString(fieldValue.thisValue)})`;
     }
     case ValueKind.Variable: {
       const variableValue = value as VariableReferenceValue;
@@ -1314,7 +1302,7 @@ export function getValueString(value: Value): string {
       if (isThisLiteral(node)) variableName = "this";
       else if (isParameter(node)) variableName = node.name.name;
       else if (isVariableDeclarator(node)) variableName = node.name.name;
-      else UNREACHABLE("what in the world did you mess up here");
+      else variableName = "compiler-generated";
 
       return `(variable${
         variableValue.variable.immutable ? " const" : ""
@@ -1451,9 +1439,6 @@ export function ensureDereferenced(
   value: Value,
 ): Value {
   switch (value.kind) {
-    case ValueKind.GCRoot: {
-      UNREACHABLE("GCRoots are never dereferenced. What happened?");
-    }
     case ValueKind.Field: {
       return createRuntimeValue(
         buildLoadInstruction(ctx, currentBlock, value as FieldReferenceValue),

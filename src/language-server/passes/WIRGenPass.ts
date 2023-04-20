@@ -62,7 +62,7 @@ import {
   WhackoMethodContext,
   InstructionKind,
   createIntegerValue,
-  createScopeElementValue as createScopeElementValue,
+  createScopeElementValue,
   isCompileTimeValue,
   buildCallInstruction,
   buildBasicBlock,
@@ -108,7 +108,8 @@ import {
   GCBarrierKind,
   isFieldValue,
   isVariableValue,
-  createGCRootReference,
+  printInstructionToString,
+  getValueString,
 } from "../ir";
 import {
   buildExternFunction,
@@ -700,6 +701,39 @@ export function getThis(ctx: WhackoMethodContext): VariableReferenceValue {
   );
 }
 
+export function ensureGCRoot(
+  ctx: WhackoFunctionContext,
+  currentBlock: BlockContext,
+  value: Value,
+  node: AstNode,
+  force: boolean,
+) {
+  const $container = node.$container;
+
+  const isAssignment =
+    isVariableDeclarator($container) ||
+    (isBinaryExpression($container) && isAssignmentOperator($container));
+
+  if (force || (value.type && isReferenceType(value.type) && !isAssignment)) {
+    const rootSite = {
+      immutable: false,
+      node,
+      ref: null,
+      type: value.type,
+      value: null,
+    } as StackAllocationSite;
+    ctx.stackAllocationSites.set(node, rootSite);
+
+    buildStoreInstruction(
+      ctx,
+      currentBlock,
+      createVariableReference(rootSite),
+      ensureRuntime(ctx, currentBlock, value),
+      GCBarrierKind.Unset,
+    );
+  }
+}
+
 export interface LoopContext {
   name: string;
   nextBlock: BlockContext;
@@ -876,7 +910,7 @@ export class WIRGenPass extends WhackoVisitor {
         ensureRuntime(this.ctx, this.currentBlock, derefLHS),
         ensureRuntime(this.ctx, this.currentBlock, derefRHS),
       ));
-      this.ensureGCRoot(value, node);
+      ensureGCRoot(this.ctx, this.currentBlock, value, node, false);
       return;
     }
 
@@ -892,6 +926,14 @@ export class WIRGenPass extends WhackoVisitor {
           "type",
           node.lhs,
           "LHS of assignment operator must be a field or variable reference",
+        );
+      } else if (!isAssignable(lhs.type, derefRHS.type)) {
+        reportErrorDiagnostic(
+          this.program,
+          this.module,
+          "type",
+          node.lhs,
+          "RHS of assignment operator must be assignable to the RHS",
         );
       } else {
         buildStoreInstruction(
@@ -1190,7 +1232,6 @@ export class WIRGenPass extends WhackoVisitor {
 
     if (isAssignmentOperator(node)) {
       if (!isFieldValue(lhs) && !isVariableValue(lhs)) {
-        console.log("We hit this?");
         reportErrorDiagnostic(
           this.program,
           this.module,
@@ -1212,34 +1253,7 @@ export class WIRGenPass extends WhackoVisitor {
     }
 
     this.value = resultValue;
-    this.ensureGCRoot(resultValue, node);
-  }
-
-  private ensureGCRoot(value: Value, node: AstNode) {
-    const $container = node.$container;
-
-    const isAssignment =
-      isVariableDeclarator($container) ||
-      (isBinaryExpression($container) && isAssignmentOperator($container));
-
-    if (value.type && isReferenceType(value.type) && !isAssignment) {
-      const rootSite = {
-        immutable: false,
-        node,
-        ref: null,
-        type: value.type,
-        value: null,
-      } as StackAllocationSite;
-      this.ctx.stackAllocationSites.set(node, rootSite);
-
-      buildStoreInstruction(
-        this.ctx,
-        this.currentBlock,
-        createGCRootReference(rootSite),
-        ensureRuntime(this.ctx, this.currentBlock, value),
-        GCBarrierKind.Unset,
-      );
-    }
+    ensureGCRoot(this.ctx, this.currentBlock, resultValue, node, false);
   }
 
   override visitStringLiteral(expression: StringLiteral): void {
@@ -1251,7 +1265,7 @@ export class WIRGenPass extends WhackoVisitor {
     );
 
     this.value = createRuntimeValue(newInst, theStrType);
-    this.ensureGCRoot(this.value, expression);
+    ensureGCRoot(this.ctx, this.currentBlock, this.value, expression, false);
     return;
   }
 
@@ -1398,6 +1412,8 @@ export class WIRGenPass extends WhackoVisitor {
       buildNewInstruction(this.ctx, this.currentBlock, concreteClass),
     );
 
+    ensureGCRoot(this.ctx, this.currentBlock, result, node, true);
+
     argumentValues.unshift(result);
     buildCallInstruction(
       this.ctx,
@@ -1407,7 +1423,6 @@ export class WIRGenPass extends WhackoVisitor {
     );
 
     this.value = result;
-    this.ensureGCRoot(this.value, node);
   }
 
   override visitFloatLiteral(expression: FloatLiteral): void {
@@ -1523,7 +1538,13 @@ export class WIRGenPass extends WhackoVisitor {
                 });
               }
               this.value = createFieldReference(rootValue, field, node);
-              this.ensureGCRoot(this.value, node);
+              ensureGCRoot(
+                this.ctx,
+                this.currentBlock,
+                this.value,
+                node,
+                false,
+              );
               return;
             }
             const members = classType.node.members as AstNode[];
@@ -1628,8 +1649,12 @@ export class WIRGenPass extends WhackoVisitor {
       const field = thisType.fields.get(memberName);
 
       if (field) {
-        this.value = createFieldReference(root as TypedValue, field, node);
-        this.ensureGCRoot(this.value, node);
+        this.value = createFieldReference(
+          ensureRuntime(this.ctx, this.currentBlock, root),
+          field,
+          node,
+        );
+        ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
         return;
       }
 
@@ -1710,7 +1735,7 @@ export class WIRGenPass extends WhackoVisitor {
         this.currentBlock,
         argumentValue,
       );
-      this.ensureGCRoot(parameterValue, node);
+      ensureGCRoot(this.ctx, this.currentBlock, parameterValue, node, false);
       argumentValues.push(parameterValue);
     }
 
@@ -1777,7 +1802,7 @@ export class WIRGenPass extends WhackoVisitor {
                 compiledArguments,
               ),
             );
-            this.ensureGCRoot(this.value, node);
+            ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
             return;
           }
           case ScopeElementType.Builtin: {
@@ -1854,7 +1879,7 @@ export class WIRGenPass extends WhackoVisitor {
                 this.currentBlock = block;
               },
             });
-            this.ensureGCRoot(this.value, node);
+            ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
             return;
           }
           case ScopeElementType.DeclareFunction: {
@@ -1916,7 +1941,7 @@ export class WIRGenPass extends WhackoVisitor {
                 compiledArgumentValues,
               ),
             );
-            this.ensureGCRoot(this.value, node);
+            ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
             return;
           }
           case ScopeElementType.Extern: {
@@ -1981,7 +2006,7 @@ export class WIRGenPass extends WhackoVisitor {
                 compiledArgumentValues,
               ),
             );
-            this.ensureGCRoot(this.value, node);
+            ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
             return;
           }
           default: {
@@ -2072,7 +2097,7 @@ export class WIRGenPass extends WhackoVisitor {
             compiledArguments,
           ),
         );
-        this.ensureGCRoot(this.value, node);
+        ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
         return;
       }
       case ValueKind.ConcreteFunction:
@@ -2171,7 +2196,7 @@ export class WIRGenPass extends WhackoVisitor {
         overload,
         ensureRuntime(this.ctx, this.currentBlock, operandDereferenced),
       );
-      this.ensureGCRoot(this.value, node);
+      ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
       return;
     }
 
@@ -2201,7 +2226,7 @@ export class WIRGenPass extends WhackoVisitor {
             this.currentBlock = block;
           },
         });
-        this.ensureGCRoot(this.value, node);
+        ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
         return;
       }
       // do we support prefix increment/decrement? it's fine either way
@@ -2320,7 +2345,7 @@ export class WIRGenPass extends WhackoVisitor {
         overload,
         ensureRuntime(this.ctx, this.currentBlock, operand),
       );
-      this.ensureGCRoot(this.value, node);
+      ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
       return;
     }
 

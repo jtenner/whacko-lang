@@ -11,9 +11,9 @@ declare void @__whacko_gc_store_field_ptr(i32, ptr, ptr, ptr)
 define void @_start() gc "shadow-stack" {
 entry:
   call void @__whacko_gc_initialize()
-  %"alloca~0" = alloca i64, align 8
-  %"64~inst" = load i64, ptr %"alloca~0", align 4
-  store i64 10, ptr %"alloca~0", align 4
+  %"variable-a-alloca~0" = alloca i64, align 8
+  %"64~inst" = load i64, ptr %"variable-a-alloca~0", align 4
+  store i64 10, ptr %"variable-a-alloca~0", align 4
   ret void
 }
 

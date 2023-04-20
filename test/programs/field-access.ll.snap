@@ -1,0 +1,72 @@
+; ModuleID = 'whacko'
+source_filename = "whacko"
+target triple = "wasm32-wasi"
+
+declare void @__whacko_gc_initialize()
+
+declare ptr @__whacko_gc_alloc(i32, i32)
+
+declare void @__whacko_gc_store_field_ptr(i32, ptr, ptr, ptr)
+
+define void @_start() gc "shadow-stack" {
+entry:
+  call void @__whacko_gc_initialize()
+  %"generated-alloca~0" = alloca ptr, align 8
+  call void @llvm.gcroot(ptr %"generated-alloca~0", ptr null)
+  %"variable-baz-alloca~1" = alloca ptr, align 8
+  call void @llvm.gcroot(ptr %"variable-baz-alloca~1", ptr null)
+  %"result~547" = call ptr @__whacko_gc_alloc(i32 1, i32 ptrtoint (ptr getelementptr ({ ptr, ptr, i32, i32, i32 }, ptr null, i32 1) to i32))
+  store ptr %"result~547", ptr %"generated-alloca~0", align 8
+  call void @"callable:[test/programs/field-access.wo]Foo.constructor;methodType:classType:[test/programs/field-access.wo]Foo<>#()=>voidType"(ptr %"result~547")
+  store ptr %"result~547", ptr %"variable-baz-alloca~1", align 8
+  %"521~inst" = load ptr, ptr %"variable-baz-alloca~1", align 8
+  %"gep~548" = getelementptr { ptr, ptr, i32, i32, i32 }, ptr %"521~inst", i32 0, i32 4
+  %"522~inst" = load i32, ptr %"gep~548", align 4
+  %"528~inst" = icmp eq i32 %"522~inst", 123
+  br i1 %"528~inst", label %"next~531", label %"falsy~530"
+
+"falsy~530":                                      ; preds = %entry
+  unreachable
+
+"next~531":                                       ; preds = %entry
+  ret void
+}
+
+define void @"callable:[test/programs/field-access.wo]Foo.constructor;methodType:classType:[test/programs/field-access.wo]Foo<>#()=>voidType"(ptr %0) gc "shadow-stack" {
+entry:
+  %"generated-alloca~0" = alloca ptr, align 8
+  call void @llvm.gcroot(ptr %"generated-alloca~0", ptr null)
+  store ptr %0, ptr %"generated-alloca~0", align 8
+  %"537~inst" = load ptr, ptr %"generated-alloca~0", align 8
+  %"gep~549" = getelementptr { ptr, ptr, i32, i32, i32 }, ptr %"537~inst", i32 0, i32 4
+  %"538~inst" = load i32, ptr %"gep~549", align 4
+  %"gep~550" = getelementptr { ptr, ptr, i32, i32, i32 }, ptr %"537~inst", i32 0, i32 4
+  store i32 123, ptr %"gep~550", align 4
+  ret void
+}
+
+; Function Attrs: nounwind
+declare void @llvm.gcroot(ptr, ptr) #0
+
+declare void @__whacko_gc_visit(ptr)
+
+define void @__visit_whacko_object(ptr %0) {
+"entry~551":
+  %"typeGEP~553" = getelementptr { ptr, ptr, i32, i32 }, ptr %0, i32 2
+  %1 = load i32, ptr %"typeGEP~553", align 4
+  switch i32 %1, label %"unreachable~552" [
+    i32 1, label %"classType:[test/programs/field-access.wo]Foo<>"
+    i32 2, label %"classType:[std/String.wo]String<>"
+  ]
+
+"unreachable~552":                                ; preds = %"entry~551"
+  unreachable
+
+"classType:[test/programs/field-access.wo]Foo<>": ; preds = %"entry~551"
+  ret void
+
+"classType:[std/String.wo]String<>":              ; preds = %"entry~551"
+  ret void
+}
+
+attributes #0 = { nounwind }
