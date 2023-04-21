@@ -146,14 +146,15 @@ export interface ConcreteField {
 export interface ClassType extends ConcreteType {
   classConstructor: WhackoFunctionContext | null;
   fields: Map<string, ConcreteField>;
+  gcVisitor: WhackoMethodContext | null;
   id: number;
   implements: Map<InterfaceType, NamedTypeExpression>;
   kind: ConcreteTypeKind.Class;
+  llvmStructType: LLVMTypeRef | null;
   methods: Map<string, WhackoFunctionContext>;
   node: ClassDeclaration;
   resolvedTypes: TypeMap;
   typeParameters: ConcreteType[];
-  llvmStructType: LLVMTypeRef | null;
 }
 
 export interface InterfaceType extends ConcreteType {
@@ -578,6 +579,7 @@ export function resolveClass(
 
   const fields = new Map<string, ConcreteField>();
 
+  // for each field
   for (const member of node.members) {
     if (!isFieldClassMember(member)) continue;
 
@@ -621,10 +623,16 @@ export function resolveClass(
     });
   }
 
+  const gcVisitNode =
+    (node.members.find(
+      (e) => isMethodClassMember(e) && e.name.name === "__whacko_gc_visit",
+    ) as MethodClassMember | void) ?? null;
+
   const interfaces = new Map();
   const result: ClassType = {
     classConstructor: null,
     fields,
+    gcVisitor: null,
     id: program.classId++,
     implements: interfaces,
     kind: ConcreteTypeKind.Class,
@@ -636,9 +644,57 @@ export function resolveClass(
     typeParameters,
   };
 
+  if (gcVisitNode) {
+    const scope = assert(
+      getScope(gcVisitNode),
+      "The scope for this method should exist.",
+    );
+    const returnType = resolveType(
+      program,
+      module,
+      gcVisitNode.returnType,
+      scope,
+      newTypeMap,
+    );
+    if (
+      gcVisitNode.parameters.length === 0 &&
+      gcVisitNode.typeParameters.length === 0 &&
+      returnType &&
+      returnType === program.voidType
+    ) {
+      const gcVisit = ensureCallableCompiled(
+        program,
+        module,
+        gcVisitNode as MethodClassMember,
+        result,
+        [],
+        newTypeMap,
+      ) as WhackoMethodContext | null;
+      if (gcVisit) {
+        result.gcVisitor = gcVisit;
+      } else {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          gcVisitNode.name,
+          `The gc visitor could not be compiled.`,
+        );
+      }
+    } else {
+      reportErrorDiagnostic(
+        program,
+        module,
+        "type",
+        gcVisitNode.name,
+        `__whacko_gc_visit has the wrong signature type.`,
+      );
+    }
+  }
+
   program.classes.set(name, result);
 
-  // 0. Type params, type maps, fields, basically everything above us.
+  // 0. Type params, type maps, fields, gc visitors.... basically everything above us.
   // 1. Ensure the interface is compiled
   // 2. Add the class to each interface's array of implementors
   // 3. Validate field existence/types and method existence/signatures

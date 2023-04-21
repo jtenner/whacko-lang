@@ -832,6 +832,7 @@ export function codegenGCVisitTrampoline(
   for (const classType of classes) {
     const className = getFullyQualifiedTypeName(classType);
     const blockName = LLVMUtil.lower(className);
+
     const block = LLVM._LLVMAppendBasicBlock(funcRef, blockName);
     LLVM._free(blockName);
 
@@ -862,7 +863,8 @@ export function codegenGCVisitTrampoline(
       }
 
       const indices = LLVMUtil.lowerPointerArray([
-        LLVM._LLVMConstInt(LLVM._LLVMInt32Type(), i, 0 as LLVMBool),
+        LLVM._LLVMConstInt(LLVM._LLVMInt32Type(), 0n, Number(false) as LLVMBool),
+        LLVM._LLVMConstInt(LLVM._LLVMInt32Type(), i + 4n, Number(false) as LLVMBool),
       ]);
       const gepName = LLVMUtil.lower(`gep~${idCounter.value++}`);
       const gep = LLVM._LLVMBuildGEP2(
@@ -897,6 +899,24 @@ export function codegenGCVisitTrampoline(
       );
       LLVM._free(loweredFieldName);
       LLVM._free(args);
+
+      // we need to call __whacko_gc_visit
+      if (classType.gcVisitor) {
+        const gcVisitor = classType.gcVisitor as WhackoMethodContext;
+
+        const args = LLVMUtil.lowerPointerArray([
+          LLVM._LLVMGetParam(funcRef, 0),
+        ]);
+        LLVM._LLVMBuildCall2(
+          llvmBuilder,
+          getLLVMFunctionType(LLVM, LLVMUtil, gcVisitor.type),
+          assert(gcVisitor.funcRef, "The function should already be compiled."),
+          args,
+          0,
+          Number(null) as LLVMStringRef,
+        );
+      }
+
     }
     LLVM._LLVMBuildRetVoid(llvmBuilder);
   }
