@@ -1,3 +1,29 @@
 export class Array<T> {
-  constructor() {}
+  buffer: ArrayBuffer;
+  length: usize;
+  constructor(capacity: usize) {
+    this.buffer = gc.alloc(
+      types.typeOf<ArrayBuffer>(),
+      capacity * (
+        types.isReference<T>()
+          ? types.sizeOf<usize>()
+          : types.sizeOf<T>()
+      )
+    );
+
+    this.length = usize(0);
+  }
+
+  __gc_visit(): void {
+    if (types.isReference<T>()) {
+      let i = usize(0);
+      let length = this.length;
+      let elements = types.asPtr(this.buffer);
+
+      while (i < length) {
+        gc.visit(elements + i * types.sizeOf<usize>());
+        i++;
+      }
+    }
+  }
 }
