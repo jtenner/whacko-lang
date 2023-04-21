@@ -625,7 +625,7 @@ export function resolveClass(
 
   const gcVisitNode =
     (node.members.find(
-      (e) => isMethodClassMember(e) && e.name.name === "__whacko_gc_visit",
+      (e) => isMethodClassMember(e) && e.name.name === "__gc_visit",
     ) as MethodClassMember | void) ?? null;
 
   const interfaces = new Map();
@@ -687,7 +687,7 @@ export function resolveClass(
         module,
         "type",
         gcVisitNode.name,
-        `__whacko_gc_visit has the wrong signature type.`,
+        `__gc_visit has the wrong signature type.`,
       );
     }
   }
