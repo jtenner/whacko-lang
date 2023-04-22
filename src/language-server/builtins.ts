@@ -65,6 +65,11 @@ import {
   isAssignable,
   getStringType,
   resolveNamedTypeScopeElement,
+  isReferenceType,
+  isNullableType,
+  isRawPointerType,
+  typesEqual,
+  NullableType,
 } from "./types";
 import { assert, getFullyQualifiedTypeName, idCounter } from "./util";
 import { isNumberObject } from "util/types";
@@ -253,18 +258,150 @@ export function registerDefaultBuiltins(program: WhackoProgram): void {
 
   addBuiltinToProgram(
     program,
+    "types.ref",
+    ({
+      program,
+      module,
+      typeParameters,
+      node,
+      args,
+      caller,
+      getCurrentBlock,
+    }) => {
+      const [inputType, outputType] = typeParameters;
+      const [theParameter] = args;
+
+      const inputIsUsize = typesEqual(
+        inputType,
+        getIntegerType(IntegerKind.USize),
+      );
+
+      if (!isReferenceType(outputType)) {
+        // TODO: Report error diagnostic
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          node,
+          `The output type of types.ref() should return a reference type.`,
+        );
+        return theInvalidValue;
+      }
+
+      if (!isRawPointerType(inputType) && !inputIsUsize) {
+        // TODO: Report error diagnostic
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          node,
+          `The input typeof types.ref() should be a RawPointer or a usize.`,
+        );
+        return theInvalidValue;
+      }
+
+      const currentBlock = getCurrentBlock();
+
+      if (inputIsUsize) {
+        const runtimeValue = ensureRuntime(caller, currentBlock, theParameter);
+        const intToPtrInstruction = buildIntToPtrInstruction(
+          caller,
+          currentBlock,
+          outputType as ClassType,
+          runtimeValue,
+        );
+        return createRuntimeValue(intToPtrInstruction, outputType);
+      } else if (isRawPointerType(inputType)) {
+        const value = ensureRuntime(caller, currentBlock, theParameter);
+        return {
+          instruction: value.instruction,
+          kind: ValueKind.Runtime,
+          type: outputType,
+          valueRef: value.valueRef,
+        } as RuntimeValue;
+      } else {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          node,
+          `The type parameter of 'types.ref' must be a reference type.`,
+        );
+        return theInvalidValue;
+      }
+    },
+  );
+
+  addBuiltinToProgram(program, "types.isReference", ({ typeParameters }) => {
+    return createIntegerValue(
+      isReferenceType(typeParameters[0]) ? 1n : 0n,
+      getIntegerType(IntegerKind.Bool),
+    );
+  });
+
+  addBuiltinToProgram(
+    program,
+    "types.typeOf",
+    ({ program, node, module, typeParameters }) => {
+      const theType = typeParameters[0];
+
+      if (
+        isClassType(theType) ||
+        (isNullableType(theType) && isClassType(theType.child))
+      ) {
+        const classType = isNullableType(theType)
+          ? theType.child
+          : (theType as ClassType);
+        return createIntegerValue(
+          BigInt(classType.id),
+          getIntegerType(IntegerKind.U32),
+        );
+      }
+
+      reportErrorDiagnostic(
+        program,
+        module,
+        "type",
+        node,
+        `'types.typeOf' must be called on a class or nullable type of class.`,
+      );
+      return theInvalidValue;
+    },
+  );
+
+  addBuiltinToProgram(
+    program,
     "types.ptr",
-    ({ args, caller, getCurrentBlock, setCurrentBlock }) => {
+    ({
+      program,
+      module,
+      args,
+      caller,
+      node,
+      getCurrentBlock,
+      setCurrentBlock,
+    }) => {
       const currentBlock = getCurrentBlock();
       const thePtr = ensureRuntime(caller, currentBlock, assert(args[0]));
-      const usizeType = getIntegerType(IntegerKind.USize);
-      const intToPtrInstruction = buildPtrToIntInstruction(
-        caller,
-        currentBlock,
-        usizeType,
-        thePtr,
-      );
-      return createRuntimeValue(intToPtrInstruction, usizeType);
+      if (isReferenceType(thePtr.type)) {
+        const usizeType = getIntegerType(IntegerKind.USize);
+        const ptrToIntInstruction = buildPtrToIntInstruction(
+          caller,
+          currentBlock,
+          usizeType,
+          thePtr,
+        );
+        return createRuntimeValue(ptrToIntInstruction, usizeType);
+      } else {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          node,
+          `'types.ptr' can only be used on references, nullables, or interfaces.`,
+        );
+        return theInvalidValue;
+      }
     },
   );
 

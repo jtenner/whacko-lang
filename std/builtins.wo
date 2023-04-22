@@ -35,12 +35,13 @@ export namespace types {
   @name("types.sizeOf") export builtin sizeOf<T>(): usize;
   @name("types.castTo") export builtin castTo<TFrom, TTo>(val: TFrom): TTo;
   @name("types.ptr") export builtin ptr<T>(ref: T): usize;
-  @name("types.ref") export builtin ref<T>(ptr: usize): T;
+  @name("types.ref") export builtin ref<TInput, TOutput>(ptr: TInput): TOutput;
   @name("types.isReference") export builtin isReference<T>(): bool;
   @name("types.isInteger") export builtin isInteger<T>(): bool;
   @name("types.forFieldsIn") export builtin forFieldsIn<T, U>(value: T, context: U, func: UnresolvedFunction): void;
   @name("types.RawPointer") export builtintype RawPointer;
   @name("types.asRawPointer") export builtin asRawPointer(ptr: usize): RawPointer;
+  @name("types.typeOf") export builtin typeOf<T>(): u32;
 }
 
 export namespace gc {

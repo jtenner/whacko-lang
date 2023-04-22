@@ -881,11 +881,8 @@ export class WIRGenPass extends WhackoVisitor {
     const derefLHS = ensureDereferenced(this.ctx, this.currentBlock, lhs);
 
     this.visit(node.rhs);
-    const derefRHS = ensureDereferenced(
-      this.ctx,
-      this.currentBlock,
-      this.assertValue,
-    );
+    const rhsValue = this.assertValue;
+    const derefRHS = ensureDereferenced(this.ctx, this.currentBlock, rhsValue);
 
     if (!derefLHS.type || !derefRHS.type) {
       this.value = theInvalidValue;
@@ -928,6 +925,8 @@ export class WIRGenPass extends WhackoVisitor {
           "LHS of assignment operator must be a field or variable reference",
         );
       } else if (!isAssignable(lhs.type, derefRHS.type)) {
+        const lhsType = getFullyQualifiedTypeName(lhs.type);
+        const rhsType = getFullyQualifiedTypeName(derefRHS.type);
         reportErrorDiagnostic(
           this.program,
           this.module,

@@ -969,6 +969,8 @@ export function resolveType(
 
       if (!typeExpression.typeParameters.length) {
         switch (node.name) {
+          case "bool":
+            return getIntegerType(IntegerKind.Bool);
           case "i8":
             return getIntegerType(IntegerKind.I8);
           case "u8":
@@ -1230,6 +1232,7 @@ export function getCallableType(
   );
 
   if (!maybeReturnType) {
+    logNode(node.returnType);
     reportErrorDiagnostic(
       program,
       module,
@@ -1508,13 +1511,15 @@ export function getOperatorOverloadMethod(
   }
 
   if (!methodAst) {
-    reportErrorDiagnostic(
-      program,
-      module,
-      "type",
-      operatorNode,
-      `Could not find valid operator ${op} overload.`,
-    );
+    if (op !== "=") {
+      reportErrorDiagnostic(
+        program,
+        module,
+        "type",
+        operatorNode,
+        `Could not find valid operator ${op} overload.`,
+      );
+    }
     return null;
   }
 
@@ -1604,6 +1609,10 @@ export function isNullableType(type: ConcreteType): type is NullableType {
 
 export function isReferenceType(
   type: ConcreteType,
-): type is ClassType | IntegerType | NullableType {
+): type is ClassType | InterfaceType | NullableType {
   return isClassType(type) || isInterfaceType(type) || isNullableType(type);
+}
+
+export function isRawPointerType(type: ConcreteType): type is RawPointerType {
+  return type.kind === ConcreteTypeKind.Pointer;
 }
