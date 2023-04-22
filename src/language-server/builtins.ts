@@ -251,6 +251,56 @@ export function registerDefaultBuiltins(program: WhackoProgram): void {
     },
   );
 
+  addBuiltinToProgram(
+    program,
+    "types.ptr",
+    ({ args, caller, getCurrentBlock, setCurrentBlock }) => {
+      const currentBlock = getCurrentBlock();
+      const thePtr = ensureRuntime(caller, currentBlock, assert(args[0]));
+      const usizeType = getIntegerType(IntegerKind.USize);
+      const intToPtrInstruction = buildPtrToIntInstruction(
+        caller,
+        currentBlock,
+        usizeType,
+        thePtr,
+      );
+      return createRuntimeValue(intToPtrInstruction, usizeType);
+    },
+  );
+
+  addBuiltinToProgram(
+    program,
+    "types.sizeOf",
+    ({
+      args,
+      caller,
+      funcType,
+      getCurrentBlock,
+      module,
+      node,
+      program,
+      setCurrentBlock,
+      typeParameters,
+    }) => {
+      const [theType] = typeParameters;
+      if (isNumeric(theType)) {
+        return createIntegerValue(
+          BigInt(getSize(theType)),
+          getIntegerType(IntegerKind.USize),
+        );
+      } else {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          node,
+          `The sizeOf intrinsic can only be called on integers.`,
+        );
+        return theInvalidValue;
+      }
+    },
+  );
+
   addBuiltinToProgram(program, "i8", integerCast(IntegerKind.I8));
   addBuiltinToProgram(program, "u8", integerCast(IntegerKind.U8));
   addBuiltinToProgram(program, "i16", integerCast(IntegerKind.I16));

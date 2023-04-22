@@ -18,7 +18,7 @@ export class Array<T> {
     if (types.isReference<T>()) {
       let i = usize(0);
       let length = this.length;
-      let elements = types.asPtr(this.buffer);
+      let elements = types.ptr(this.buffer);
 
       while (i < length) {
         gc.visit(elements + i * types.sizeOf<usize>());
