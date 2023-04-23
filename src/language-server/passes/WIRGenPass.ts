@@ -52,6 +52,8 @@ import {
   isInterfaceDeclaration,
   isClassDeclaration,
   isBinaryExpression,
+  isExpressionStatement,
+  isReturnStatement,
 } from "../generated/ast";
 import {
   BlockContext,
@@ -706,7 +708,6 @@ export function ensureGCRoot(
   currentBlock: BlockContext,
   value: Value,
   node: AstNode,
-  force: boolean,
 ) {
   const $container = node.$container;
 
@@ -714,7 +715,12 @@ export function ensureGCRoot(
     isVariableDeclarator($container) ||
     (isBinaryExpression($container) && isAssignmentOperator($container));
 
-  if (force || (value.type && isReferenceType(value.type) && !isAssignment)) {
+  const isReference = value.type && isReferenceType(value.type);
+
+  const isDropped = isExpressionStatement($container);
+  const isReturned = isReturnStatement($container);
+
+  if (isReference && !isAssignment && !isDropped && !isReturned) {
     const rootSite = {
       immutable: false,
       node,
@@ -907,7 +913,7 @@ export class WIRGenPass extends WhackoVisitor {
         ensureRuntime(this.ctx, this.currentBlock, derefLHS),
         ensureRuntime(this.ctx, this.currentBlock, derefRHS),
       ));
-      ensureGCRoot(this.ctx, this.currentBlock, value, node, false);
+      ensureGCRoot(this.ctx, this.currentBlock, value, node);
       return;
     }
 
@@ -1252,7 +1258,7 @@ export class WIRGenPass extends WhackoVisitor {
     }
 
     this.value = resultValue;
-    ensureGCRoot(this.ctx, this.currentBlock, resultValue, node, false);
+    ensureGCRoot(this.ctx, this.currentBlock, resultValue, node);
   }
 
   override visitStringLiteral(expression: StringLiteral): void {
@@ -1264,7 +1270,7 @@ export class WIRGenPass extends WhackoVisitor {
     );
 
     this.value = createRuntimeValue(newInst, theStrType);
-    ensureGCRoot(this.ctx, this.currentBlock, this.value, expression, false);
+    ensureGCRoot(this.ctx, this.currentBlock, this.value, expression);
     return;
   }
 
@@ -1411,7 +1417,7 @@ export class WIRGenPass extends WhackoVisitor {
       buildNewInstruction(this.ctx, this.currentBlock, concreteClass),
     );
 
-    ensureGCRoot(this.ctx, this.currentBlock, result, node, true);
+    ensureGCRoot(this.ctx, this.currentBlock, result, node);
 
     argumentValues.unshift(result);
     buildCallInstruction(
@@ -1537,13 +1543,7 @@ export class WIRGenPass extends WhackoVisitor {
                 });
               }
               this.value = createFieldReference(rootValue, field, node);
-              ensureGCRoot(
-                this.ctx,
-                this.currentBlock,
-                this.value,
-                node,
-                false,
-              );
+              ensureGCRoot(this.ctx, this.currentBlock, this.value, node);
               return;
             }
             const members = classType.node.members as AstNode[];
@@ -1653,7 +1653,7 @@ export class WIRGenPass extends WhackoVisitor {
           field,
           node,
         );
-        ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
+        ensureGCRoot(this.ctx, this.currentBlock, this.value, node);
         return;
       }
 
@@ -1734,7 +1734,7 @@ export class WIRGenPass extends WhackoVisitor {
         this.currentBlock,
         argumentValue,
       );
-      ensureGCRoot(this.ctx, this.currentBlock, parameterValue, node, false);
+      ensureGCRoot(this.ctx, this.currentBlock, parameterValue, node);
       argumentValues.push(parameterValue);
     }
 
@@ -1801,7 +1801,7 @@ export class WIRGenPass extends WhackoVisitor {
                 compiledArguments,
               ),
             );
-            ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
+            ensureGCRoot(this.ctx, this.currentBlock, this.value, node);
             return;
           }
           case ScopeElementType.Builtin: {
@@ -1878,7 +1878,7 @@ export class WIRGenPass extends WhackoVisitor {
                 this.currentBlock = block;
               },
             });
-            ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
+            ensureGCRoot(this.ctx, this.currentBlock, this.value, node);
             return;
           }
           case ScopeElementType.DeclareFunction: {
@@ -1940,7 +1940,7 @@ export class WIRGenPass extends WhackoVisitor {
                 compiledArgumentValues,
               ),
             );
-            ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
+            ensureGCRoot(this.ctx, this.currentBlock, this.value, node);
             return;
           }
           case ScopeElementType.Extern: {
@@ -2005,7 +2005,7 @@ export class WIRGenPass extends WhackoVisitor {
                 compiledArgumentValues,
               ),
             );
-            ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
+            ensureGCRoot(this.ctx, this.currentBlock, this.value, node);
             return;
           }
           default: {
@@ -2096,7 +2096,7 @@ export class WIRGenPass extends WhackoVisitor {
             compiledArguments,
           ),
         );
-        ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
+        ensureGCRoot(this.ctx, this.currentBlock, this.value, node);
         return;
       }
       case ValueKind.ConcreteFunction:
@@ -2195,7 +2195,7 @@ export class WIRGenPass extends WhackoVisitor {
         overload,
         ensureRuntime(this.ctx, this.currentBlock, operandDereferenced),
       );
-      ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
+      ensureGCRoot(this.ctx, this.currentBlock, this.value, node);
       return;
     }
 
@@ -2225,7 +2225,7 @@ export class WIRGenPass extends WhackoVisitor {
             this.currentBlock = block;
           },
         });
-        ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
+        ensureGCRoot(this.ctx, this.currentBlock, this.value, node);
         return;
       }
       // do we support prefix increment/decrement? it's fine either way
@@ -2344,7 +2344,7 @@ export class WIRGenPass extends WhackoVisitor {
         overload,
         ensureRuntime(this.ctx, this.currentBlock, operand),
       );
-      ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
+      ensureGCRoot(this.ctx, this.currentBlock, this.value, node);
       return;
     }
 
