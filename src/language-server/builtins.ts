@@ -277,7 +277,6 @@ export function registerDefaultBuiltins(program: WhackoProgram): void {
       );
 
       if (!isReferenceType(outputType)) {
-        // TODO: Report error diagnostic
         reportErrorDiagnostic(
           program,
           module,
@@ -289,13 +288,12 @@ export function registerDefaultBuiltins(program: WhackoProgram): void {
       }
 
       if (!isRawPointerType(inputType) && !inputIsUsize) {
-        // TODO: Report error diagnostic
         reportErrorDiagnostic(
           program,
           module,
           "type",
           node,
-          `The input typeof types.ref() should be a RawPointer or a usize.`,
+          `The input type of types.ref() should be a RawPointer or a usize.`,
         );
         return theInvalidValue;
       }
@@ -341,7 +339,7 @@ export function registerDefaultBuiltins(program: WhackoProgram): void {
 
   addBuiltinToProgram(
     program,
-    "types.typeOf",
+    "types.idOf",
     ({ program, node, module, typeParameters }) => {
       const theType = typeParameters[0];
 
@@ -363,7 +361,7 @@ export function registerDefaultBuiltins(program: WhackoProgram): void {
         module,
         "type",
         node,
-        `'types.typeOf' must be called on a class or nullable type of class.`,
+        `'types.idOf' must be called on a class or nullable type of class.`,
       );
       return theInvalidValue;
     },

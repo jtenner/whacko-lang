@@ -6,26 +6,25 @@ program:
   callable:[std/builtins.wo]gc.store_field_ptr;functionType:(i32Type,ptrType,ptrType,ptrType)=>voidType
 (extern function)
   callable:[test/programs/field-access.wo]_start;functionType:()=>voidType
-    block: entry~513
-      517~inst = new: classType:[test/programs/field-access.wo]Foo<>
-      518~inst = store: (variable compiler-generated) = (runtime classType:[test/programs/field-access.wo]Foo<> 517~inst)
-      519~inst = call: callable:[test/programs/field-access.wo]Foo.constructor;methodType:classType:[test/programs/field-access.wo]Foo<>#()=>voidType with (runtime classType:[test/programs/field-access.wo]Foo<> 517~inst)
-      520~inst = store: (variable baz) = (runtime classType:[test/programs/field-access.wo]Foo<> 517~inst)
-      521~inst = load: (variable baz)
-      522~inst = load: (field classType:[test/programs/field-access.wo]Foo<>#bar of (runtime classType:[test/programs/field-access.wo]Foo<> 521~inst))
-      527~inst = (i32 123)
-      528~inst = 522~inst == 527~inst
-      br to next~531 if (runtime i32Type 528~inst); else to falsy~530
-    block: falsy~530
-      534~inst = unreachable
-    block: next~531
+    block: entry~504
+      508~inst = new: classType:[test/programs/field-access.wo]Foo<>
+      509~inst = call: callable:[test/programs/field-access.wo]Foo.constructor;methodType:classType:[test/programs/field-access.wo]Foo<>#()=>voidType with (runtime classType:[test/programs/field-access.wo]Foo<> 508~inst)
+      510~inst = store: (variable baz) = (runtime classType:[test/programs/field-access.wo]Foo<> 508~inst)
+      511~inst = load: (variable baz)
+      512~inst = load: (field classType:[test/programs/field-access.wo]Foo<>#bar of (runtime classType:[test/programs/field-access.wo]Foo<> 511~inst))
+      517~inst = (i32 123)
+      518~inst = 512~inst == 517~inst
+      br to next~521 if (runtime i32Type 518~inst); else to falsy~520
+    block: falsy~520
+      524~inst = unreachable
+    block: next~521
       return (void)
 
   callable:[test/programs/field-access.wo]Foo.constructor;methodType:classType:[test/programs/field-access.wo]Foo<>#()=>voidType
-    block: entry~536
-      537~inst = load: (variable const compiler-generated)
-      538~inst = load: (field classType:[test/programs/field-access.wo]Foo<>#bar of (runtime classType:[test/programs/field-access.wo]Foo<> 537~inst))
-      543~inst = (i32 123)
-      544~inst = store: (field classType:[test/programs/field-access.wo]Foo<>#bar of (runtime classType:[test/programs/field-access.wo]Foo<> 537~inst)) = (runtime i32Type 543~inst)
+    block: entry~526
+      527~inst = load: (variable const compiler-generated)
+      528~inst = load: (field classType:[test/programs/field-access.wo]Foo<>#bar of (runtime classType:[test/programs/field-access.wo]Foo<> 527~inst))
+      533~inst = (i32 123)
+      534~inst = store: (field classType:[test/programs/field-access.wo]Foo<>#bar of (runtime classType:[test/programs/field-access.wo]Foo<> 527~inst)) = (runtime i32Type 533~inst)
       return (void)
 

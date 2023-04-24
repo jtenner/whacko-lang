@@ -9,7 +9,7 @@ export class Array<T> {
 
     this.buffer = types.ref<types.RawPointer, ArrayBuffer>(
       gc.alloc(
-        types.typeOf<ArrayBuffer>(),
+        types.idOf<ArrayBuffer>(),
         overhead + capacity * (
           types.isReference<T>()
             ? types.sizeOf<usize>()

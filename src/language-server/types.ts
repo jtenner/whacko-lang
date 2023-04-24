@@ -694,12 +694,6 @@ export function resolveClass(
 
   program.classes.set(name, result);
 
-  // 0. Type params, type maps, fields, gc visitors.... basically everything above us.
-  // 1. Ensure the interface is compiled
-  // 2. Add the class to each interface's array of implementors
-  // 3. Validate field existence/types and method existence/signatures
-  // 4. WHEN A METHOD IS ACCESSED FROM THE INTERFACE: ensure all the implementors' methods are compiled
-
   for (const implement of node.implements) {
     const type = resolveType(program, module, implement, nodeScope, newTypeMap);
     if (!type) {
@@ -1232,7 +1226,6 @@ export function getCallableType(
   );
 
   if (!maybeReturnType) {
-    logNode(node.returnType);
     reportErrorDiagnostic(
       program,
       module,

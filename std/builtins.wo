@@ -31,7 +31,6 @@ export namespace memory {
 export namespace types {
   @name("types.is") export builtin is<T, U>(): bool;
   @name("types.isAssignableTo") export builtin isAssignableTo<T, U>(): bool;
-  @name("types.idOf") export builtin idOf<T>(): u32;
   @name("types.sizeOf") export builtin sizeOf<T>(): usize;
   @name("types.castTo") export builtin castTo<TFrom, TTo>(val: TFrom): TTo;
   @name("types.ptr") export builtin ptr<T>(ref: T): usize;
@@ -41,7 +40,7 @@ export namespace types {
   @name("types.forFieldsIn") export builtin forFieldsIn<T, U>(value: T, context: U, func: UnresolvedFunction): void;
   @name("types.RawPointer") export builtintype RawPointer;
   @name("types.asRawPointer") export builtin asRawPointer(ptr: usize): RawPointer;
-  @name("types.typeOf") export builtin typeOf<T>(): u32;
+  @name("types.idOf") export builtin idOf<T>(): u32;
 }
 
 export namespace gc {

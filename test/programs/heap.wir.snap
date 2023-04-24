@@ -6,13 +6,13 @@ program:
   callable:[std/builtins.wo]gc.store_field_ptr;functionType:(i32Type,ptrType,ptrType,ptrType)=>voidType
 (extern function)
   callable:[test/programs/heap.wo]_start;functionType:()=>voidType
-    block: entry~479
-      488~inst = (u32 100)
-      490~inst = malloc: (runtime usizeType 488~inst)
-      491~inst = ptrtoint: (runtime ptrType 490~inst)
-      492~inst = store: (variable a) = (runtime usizeType 491~inst)
-      493~inst = load: (variable a)
-      495~inst = inttoptr: (runtime usizeType 493~inst) as ptrType
-      free: (runtime ptrType 495~inst)
+    block: entry~470
+      479~inst = (u32 100)
+      481~inst = malloc: (runtime usizeType 479~inst)
+      482~inst = ptrtoint: (runtime ptrType 481~inst)
+      483~inst = store: (variable a) = (runtime usizeType 482~inst)
+      484~inst = load: (variable a)
+      486~inst = inttoptr: (runtime usizeType 484~inst) as ptrType
+      free: (runtime ptrType 486~inst)
       return (void)
 
