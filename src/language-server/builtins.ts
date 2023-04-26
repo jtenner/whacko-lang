@@ -311,12 +311,11 @@ export function registerDefaultBuiltins(program: WhackoProgram): void {
         return createRuntimeValue(intToPtrInstruction, outputType);
       } else if (isRawPointerType(inputType)) {
         const value = ensureRuntime(caller, currentBlock, theParameter);
-        return {
-          instruction: value.instruction,
-          kind: ValueKind.Runtime,
-          type: outputType,
-          valueRef: value.valueRef,
-        } as RuntimeValue;
+
+        return createRuntimeValue(
+          caller.instructions.get(value.instruction)!,
+          outputType,
+        );
       } else {
         reportErrorDiagnostic(
           program,
