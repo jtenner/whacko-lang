@@ -426,7 +426,7 @@ export function registerDefaultBuiltins(program: WhackoProgram): void {
           module,
           "type",
           node,
-          `The sizeOf intrinsic can only be called on integers.`,
+          `'types.sizeOf' can only be called with integer types.`,
         );
         return theInvalidValue;
       }
