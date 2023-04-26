@@ -54,6 +54,7 @@ import {
   isBinaryExpression,
   isExpressionStatement,
   isReturnStatement,
+  ArrayLiteral,
 } from "../generated/ast";
 import {
   BlockContext,
@@ -162,6 +163,7 @@ import {
   isInterfaceType,
   isClassType,
   isReferenceType,
+  getArrayTypeOf,
 } from "../types";
 import {
   assert,
@@ -2768,5 +2770,125 @@ export class WIRGenPass extends WhackoVisitor {
         type: this.program.voidType,
       });
     }
+  }
+
+  override visitArrayLiteral(node: ArrayLiteral): void {
+    const scope = assert(
+      getScope(node),
+      "The scope for this node should exist",
+    );
+    const type = resolveType(
+      this.program,
+      this.module,
+      node.type,
+      scope,
+      this.ctx.typeMap,
+    );
+
+    if (!type) {
+      reportErrorDiagnostic(
+        this.program,
+        this.module,
+        "type",
+        node.type,
+        `Cannot resolve array type.`,
+      );
+      this.value = theInvalidValue;
+      return;
+    }
+
+    const arrayType = getArrayTypeOf(this.program, this.module, type);
+
+    // create the array
+    const newInstruction = buildNewInstruction(
+      this.ctx,
+      this.currentBlock,
+      arrayType,
+    );
+    const arrayValue = createRuntimeValue(newInstruction, arrayType);
+
+    // get the constructor type and
+    const constructorNode = assert(
+      arrayType.node.members.find((e) => isConstructorClassMember(e)),
+      "Constructor node for arrays must exist at this point.",
+    ) as ConstructorClassMember;
+    const constructorType = assert(
+      getConstructorType(this.program, this.module, arrayType, constructorNode),
+      "The constructor type for the constructor method must be resolvable.",
+    );
+    const constructorMethod = ensureConstructorCompiled(
+      this.program,
+      this.module,
+      arrayType,
+      constructorType,
+      constructorNode,
+    );
+
+    const usizeType = getIntegerType(IntegerKind.USize);
+    const arraySizeConst = createIntegerValue(
+      BigInt(node.values.length),
+      usizeType,
+    );
+
+    const runtimeArraySize = ensureRuntime(
+      this.ctx,
+      this.currentBlock,
+      arraySizeConst,
+    );
+    buildCallInstruction(this.ctx, this.currentBlock, constructorMethod, [
+      arrayValue,
+      runtimeArraySize,
+    ]);
+
+    const setMethod = assert(
+      getOperatorOverloadMethod(
+        this.program,
+        this.module,
+        arrayType,
+        type,
+        "[]=",
+        node,
+      ),
+      "The operator overload set for arrays method for arrays must exist",
+    );
+
+    assert(isAssignable(setMethod.type.parameterTypes[0], type));
+    assert(typesEqual(setMethod.type.parameterTypes[1], usizeType));
+
+    for (let i = 0; i < node.values.length; i++) {
+      this.visit(node.values[i]);
+      const arrayElementValue = ensureRuntime(
+        this.ctx,
+        this.currentBlock,
+        this.assertValue,
+      );
+
+      const arrayIndexValue = createIntegerValue(BigInt(i), usizeType);
+      // const arrayIndexConstInst = buildConstInstruction(this.ctx, this.currentBlock, arrayIndexValue);
+      const arrayIndexRuntimeValue = ensureRuntime(
+        this.ctx,
+        this.currentBlock,
+        arrayIndexValue,
+      );
+
+      if (isAssignable(type, arrayElementValue.type)) {
+        buildCallInstruction(this.ctx, this.currentBlock, setMethod, [
+          arrayValue,
+          arrayElementValue,
+          arrayIndexRuntimeValue,
+        ]);
+      } else {
+        reportErrorDiagnostic(
+          this.program,
+          this.module,
+          "type",
+          node.values[i],
+          `Array element is not assignable to array type.`,
+        );
+        continue;
+      }
+    }
+
+    this.value = arrayValue;
   }
 }

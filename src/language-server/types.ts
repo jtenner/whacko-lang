@@ -1609,3 +1609,25 @@ export function isReferenceType(
 export function isRawPointerType(type: ConcreteType): type is RawPointerType {
   return type.kind === ConcreteTypeKind.Pointer;
 }
+
+export function getArrayTypeOf(
+  program: WhackoProgram,
+  module: WhackoModule,
+  type: ConcreteType,
+): ClassType {
+  const arrayScopeElement = assert(
+    program.globalScope.elements.get("Array"),
+    "The scope element for array must exist.",
+  );
+  const arrayDeclaration = arrayScopeElement.node as ClassDeclaration;
+
+  assert(isClassDeclaration(arrayDeclaration));
+  assert(arrayDeclaration.typeParameters.length === 1);
+
+  const arrayClass = assert(
+    resolveClass(program, module, arrayScopeElement, [type]),
+    "The array class type must be resolvable.",
+  );
+
+  return arrayClass;
+}

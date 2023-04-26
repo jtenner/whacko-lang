@@ -72,6 +72,7 @@ import {
   InterfaceDeclaration,
   InterfaceFieldDeclaration,
   InterfaceMethodDeclaration,
+  ArrayLiteral,
 } from "./generated/ast";
 import { createWhackoServices, WhackoServices } from "./whacko-module";
 import { TypeID } from "./generated/ast";
@@ -233,6 +234,8 @@ export class WhackoVisitor {
         return this.visitInterfaceFieldDeclaration(node);
       case "InterfaceMethodDeclaration":
         return this.visitInterfaceMethodDeclaration(node);
+      case "ArrayLiteral":
+        return this.visitArrayLiteral(node);
       // case "TypeCastExpression":
       //   return this.visitTypeCastExpression(node);
       default:
@@ -564,6 +567,11 @@ export class WhackoVisitor {
     this.visitAll(node.typeParameters);
     this.visitAll(node.parameters);
     this.visit(node.returnType);
+  }
+
+  visitArrayLiteral(node: ArrayLiteral): void {
+    this.visit(node.type);
+    this.visitAll(node.values);
   }
 
   // visitTypeCastExpression(expression: TypeCastExpression) {
