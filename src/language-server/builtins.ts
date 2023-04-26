@@ -393,7 +393,7 @@ export function registerDefaultBuiltins(program: WhackoProgram): void {
           module,
           "type",
           node,
-          `'types.ptr' can only be used on references, nullables, or interfaces.`,
+          `'types.ptr' can only be used on references or nullable references.`,
         );
         return theInvalidValue;
       }
