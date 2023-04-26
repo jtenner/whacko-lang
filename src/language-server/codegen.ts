@@ -1167,7 +1167,6 @@ export function getLLVMValue(
           LLVM._LLVMConstInt(LLVM._LLVMInt32Type(), BigInt(index + 4), 0),
         ]);
 
-        assert(isRuntimeValue(thisValue), "temporary");
 
         const result = LLVM._LLVMBuildGEP2(
           builder,
