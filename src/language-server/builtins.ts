@@ -71,7 +71,12 @@ import {
   typesEqual,
   NullableType,
 } from "./types";
-import { assert, getFullyQualifiedTypeName, idCounter } from "./util";
+import {
+  UNREACHABLE,
+  assert,
+  getFullyQualifiedTypeName,
+  idCounter,
+} from "./util";
 import { isNumberObject } from "util/types";
 import { FunctionDeclaration, isFunctionDeclaration } from "./generated/ast";
 import { getElementInScope } from "./scope";
@@ -317,14 +322,7 @@ export function registerDefaultBuiltins(program: WhackoProgram): void {
           outputType,
         );
       } else {
-        reportErrorDiagnostic(
-          program,
-          module,
-          "type",
-          node,
-          `The type parameter of 'types.ref' must be a reference type.`,
-        );
-        return theInvalidValue;
+        UNREACHABLE("This is impossible. What happened?");
       }
     },
   );
