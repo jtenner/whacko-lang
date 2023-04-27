@@ -734,18 +734,7 @@ export function resolveClass(
         continue;
       }
 
-      // We check for equality because someone could cast the class to its parent
-      // interface and modify the field there. That would be inherently type
-      // type unsafe, because an object could be assignable to the parent's type
-      // but not the child's. Once a child's method implementation runs with that
-      // modified child, all bets are off.
       if (!typesEqual(field.type, concreteField.type)) {
-        // `implement` is intentionally used instead of `concreteField.node.type`.
-        // Otherwise, we would need to indicate which interface was the issue
-        // somehow. That means stringifying a ConcreteType, which isn't worth the
-        // effort. Just point at the referenced interface in "implements Foo"
-        // instead.
-
         reportErrorDiagnostic(
           program,
           module,
@@ -755,8 +744,6 @@ export function resolveClass(
         );
         continue;
       }
-
-      // Everything is fine and dandy, field-wise.
     }
   }
 

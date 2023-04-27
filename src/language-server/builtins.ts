@@ -83,149 +83,149 @@ import { getElementInScope } from "./scope";
 
 const simdInitialize =
   (type: V128Type) =>
-  ({
-    args,
-    caller,
-    funcType,
-    getCurrentBlock,
-    module,
-    node,
-    program,
-    setCurrentBlock,
-    typeParameters,
-  }: BuiltinFunctionParameters) => {
-    const laneCount = getLaneCount(type.v128Kind);
-    const currentBlock = getCurrentBlock();
+    ({
+      args,
+      caller,
+      funcType,
+      getCurrentBlock,
+      module,
+      node,
+      program,
+      setCurrentBlock,
+      typeParameters,
+    }: BuiltinFunctionParameters) => {
+      const laneCount = getLaneCount(type.v128Kind);
+      const currentBlock = getCurrentBlock();
 
-    let running = createRuntimeValue(
-      buildUndefinedInstruction(caller, currentBlock, type),
-      type,
-    );
-
-    for (let i = 0; i < laneCount; i++) {
-      running = createRuntimeValue(
-        buildInsertElementInstruction(
-          caller,
-          currentBlock,
-          running,
-          ensureRuntime(caller, currentBlock, args[i]),
-          i,
-        ),
+      let running = createRuntimeValue(
+        buildUndefinedInstruction(caller, currentBlock, type),
+        type,
       );
-    }
 
-    return running;
-  };
+      for (let i = 0; i < laneCount; i++) {
+        running = createRuntimeValue(
+          buildInsertElementInstruction(
+            caller,
+            currentBlock,
+            running,
+            ensureRuntime(caller, currentBlock, args[i]),
+            i,
+          ),
+        );
+      }
+
+      return running;
+    };
 
 const integerCast =
   (integerKind: IntegerKind) =>
-  ({
-    args,
-    caller,
-    program,
-    module,
-    node,
-    getCurrentBlock,
-  }: BuiltinFunctionParameters) => {
-    const [value] = args;
+    ({
+      args,
+      caller,
+      program,
+      module,
+      node,
+      getCurrentBlock,
+    }: BuiltinFunctionParameters) => {
+      const [value] = args;
 
-    if (value === theInvalidValue) {
-      return theInvalidValue;
-    }
+      if (value === theInvalidValue) {
+        return theInvalidValue;
+      }
 
-    const integerType = getIntegerType(integerKind);
+      const integerType = getIntegerType(integerKind);
 
-    if (value.kind === ValueKind.Float || value.kind === ValueKind.Integer) {
-      const compileTimeValue = value as ConstFloatValue | ConstIntegerValue;
-      const resultValue = isSignedIntegerKind(integerType.integerKind)
-        ? BigInt.asIntN(
+      if (value.kind === ValueKind.Float || value.kind === ValueKind.Integer) {
+        const compileTimeValue = value as ConstFloatValue | ConstIntegerValue;
+        const resultValue = isSignedIntegerKind(integerType.integerKind)
+          ? BigInt.asIntN(
             getIntegerBitCount(integerType.integerKind),
             BigInt(compileTimeValue.value),
           )
-        : BigInt.asUintN(
+          : BigInt.asUintN(
             getIntegerBitCount(integerType.integerKind),
             BigInt(compileTimeValue.value),
           );
 
-      // where do we have compile-time voids?
-      return createIntegerValue(resultValue, integerType);
-    } else if (
-      value.kind === ValueKind.Runtime &&
-      value.type &&
-      isNumeric(value.type)
-    ) {
-      // i'm smort that's why
-      // i copy-pastad
-      // actually, since it's not imported, it might be autocomplete for all we know
-      return createRuntimeValue(
-        buildIntegerCastInstruction(
-          caller,
-          getCurrentBlock(),
-          value as RuntimeValue,
-          integerType,
-        ),
-      );
-    } else {
-      reportErrorDiagnostic(
-        program,
-        module,
-        "type",
-        node,
-        "Invalid cast: value type is not numeric.",
-      );
-      return theInvalidValue;
-    }
-  };
+        // where do we have compile-time voids?
+        return createIntegerValue(resultValue, integerType);
+      } else if (
+        value.kind === ValueKind.Runtime &&
+        value.type &&
+        isNumeric(value.type)
+      ) {
+        // i'm smort that's why
+        // i copy-pastad
+        // actually, since it's not imported, it might be autocomplete for all we know
+        return createRuntimeValue(
+          buildIntegerCastInstruction(
+            caller,
+            getCurrentBlock(),
+            value as RuntimeValue,
+            integerType,
+          ),
+        );
+      } else {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          node,
+          "Invalid cast: value type is not numeric.",
+        );
+        return theInvalidValue;
+      }
+    };
 
 const floatCast =
   (floatKind: FloatKind) =>
-  ({
-    program,
-    module,
-    args,
-    caller,
-    node,
-    getCurrentBlock,
-  }: BuiltinFunctionParameters) => {
-    const [value] = args;
+    ({
+      program,
+      module,
+      args,
+      caller,
+      node,
+      getCurrentBlock,
+    }: BuiltinFunctionParameters) => {
+      const [value] = args;
 
-    if (value === theInvalidValue) {
-      return theInvalidValue;
-    }
+      if (value === theInvalidValue) {
+        return theInvalidValue;
+      }
 
-    const floatType = getFloatType(floatKind);
+      const floatType = getFloatType(floatKind);
 
-    if (value.kind === ValueKind.Float || value.kind === ValueKind.Integer) {
-      const compileTimeValue = value as ConstFloatValue | ConstIntegerValue;
-      const floatValue = Number(compileTimeValue.value);
-      return createFloatValue(floatValue, floatType);
+      if (value.kind === ValueKind.Float || value.kind === ValueKind.Integer) {
+        const compileTimeValue = value as ConstFloatValue | ConstIntegerValue;
+        const floatValue = Number(compileTimeValue.value);
+        return createFloatValue(floatValue, floatType);
 
-      // if value.type is null, we need to report a diagnostic, because it could be
-      // a function reference, scope element, etc.
-    } else if (
-      value.kind === ValueKind.Runtime &&
-      value.type &&
-      isNumeric(value.type)
-    ) {
-      return createRuntimeValue(
-        buildFloatCastInstruction(
-          caller,
-          getCurrentBlock(),
-          value as RuntimeValue,
-          floatType,
-        ),
-      );
-    } else {
-      reportErrorDiagnostic(
-        program,
-        module,
-        "type",
-        node,
-        "Invalid cast: value type is not numeric.",
-      );
-      return theInvalidValue;
-    }
-  };
+        // if value.type is null, we need to report a diagnostic, because it could be
+        // a function reference, scope element, etc.
+      } else if (
+        value.kind === ValueKind.Runtime &&
+        value.type &&
+        isNumeric(value.type)
+      ) {
+        return createRuntimeValue(
+          buildFloatCastInstruction(
+            caller,
+            getCurrentBlock(),
+            value as RuntimeValue,
+            floatType,
+          ),
+        );
+      } else {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          node,
+          "Invalid cast: value type is not numeric.",
+        );
+        return theInvalidValue;
+      }
+    };
 
 export function registerDefaultBuiltins(program: WhackoProgram): void {
   addBuiltinToProgram(
@@ -313,7 +313,7 @@ export function registerDefaultBuiltins(program: WhackoProgram): void {
           outputType as ClassType,
           runtimeValue,
         );
-        return createRuntimeValue(intToPtrInstruction, outputType);
+        return createRuntimeValue(intToPtrInstruction);
       } else if (isRawPointerType(inputType)) {
         const value = ensureRuntime(caller, currentBlock, theParameter);
 
