@@ -65,157 +65,167 @@ import {
   isAssignable,
   getStringType,
   resolveNamedTypeScopeElement,
+  isReferenceType,
+  isNullableType,
+  isRawPointerType,
+  typesEqual,
+  NullableType,
 } from "./types";
-import { assert, getFullyQualifiedTypeName, idCounter } from "./util";
+import {
+  UNREACHABLE,
+  assert,
+  getFullyQualifiedTypeName,
+  idCounter,
+} from "./util";
 import { isNumberObject } from "util/types";
 import { FunctionDeclaration, isFunctionDeclaration } from "./generated/ast";
 import { getElementInScope } from "./scope";
 
 const simdInitialize =
   (type: V128Type) =>
-  ({
-    args,
-    caller,
-    funcType,
-    getCurrentBlock,
-    module,
-    node,
-    program,
-    setCurrentBlock,
-    typeParameters,
-  }: BuiltinFunctionParameters) => {
-    const laneCount = getLaneCount(type.v128Kind);
-    const currentBlock = getCurrentBlock();
+    ({
+      args,
+      caller,
+      funcType,
+      getCurrentBlock,
+      module,
+      node,
+      program,
+      setCurrentBlock,
+      typeParameters,
+    }: BuiltinFunctionParameters) => {
+      const laneCount = getLaneCount(type.v128Kind);
+      const currentBlock = getCurrentBlock();
 
-    let running = createRuntimeValue(
-      buildUndefinedInstruction(caller, currentBlock, type),
-      type,
-    );
-
-    for (let i = 0; i < laneCount; i++) {
-      running = createRuntimeValue(
-        buildInsertElementInstruction(
-          caller,
-          currentBlock,
-          running,
-          ensureRuntime(caller, currentBlock, args[i]),
-          i,
-        ),
+      let running = createRuntimeValue(
+        buildUndefinedInstruction(caller, currentBlock, type),
+        type,
       );
-    }
 
-    return running;
-  };
+      for (let i = 0; i < laneCount; i++) {
+        running = createRuntimeValue(
+          buildInsertElementInstruction(
+            caller,
+            currentBlock,
+            running,
+            ensureRuntime(caller, currentBlock, args[i]),
+            i,
+          ),
+        );
+      }
+
+      return running;
+    };
 
 const integerCast =
   (integerKind: IntegerKind) =>
-  ({
-    args,
-    caller,
-    program,
-    module,
-    node,
-    getCurrentBlock,
-  }: BuiltinFunctionParameters) => {
-    const [value] = args;
+    ({
+      args,
+      caller,
+      program,
+      module,
+      node,
+      getCurrentBlock,
+    }: BuiltinFunctionParameters) => {
+      const [value] = args;
 
-    if (value === theInvalidValue) {
-      return theInvalidValue;
-    }
+      if (value === theInvalidValue) {
+        return theInvalidValue;
+      }
 
-    const integerType = getIntegerType(integerKind);
+      const integerType = getIntegerType(integerKind);
 
-    if (value.kind === ValueKind.Float || value.kind === ValueKind.Integer) {
-      const compileTimeValue = value as ConstFloatValue | ConstIntegerValue;
-      const resultValue = isSignedIntegerKind(integerType.integerKind)
-        ? BigInt.asIntN(
+      if (value.kind === ValueKind.Float || value.kind === ValueKind.Integer) {
+        const compileTimeValue = value as ConstFloatValue | ConstIntegerValue;
+        const resultValue = isSignedIntegerKind(integerType.integerKind)
+          ? BigInt.asIntN(
             getIntegerBitCount(integerType.integerKind),
             BigInt(compileTimeValue.value),
           )
-        : BigInt.asUintN(
+          : BigInt.asUintN(
             getIntegerBitCount(integerType.integerKind),
             BigInt(compileTimeValue.value),
           );
 
-      // where do we have compile-time voids?
-      return createIntegerValue(resultValue, integerType);
-    } else if (
-      value.kind === ValueKind.Runtime &&
-      value.type &&
-      isNumeric(value.type)
-    ) {
-      // i'm smort that's why
-      // i copy-pastad
-      // actually, since it's not imported, it might be autocomplete for all we know
-      return createRuntimeValue(
-        buildIntegerCastInstruction(
-          caller,
-          getCurrentBlock(),
-          value as RuntimeValue,
-          integerType,
-        ),
-      );
-    } else {
-      reportErrorDiagnostic(
-        program,
-        module,
-        "type",
-        node,
-        "Invalid cast: value type is not numeric.",
-      );
-      return theInvalidValue;
-    }
-  };
+        // where do we have compile-time voids?
+        return createIntegerValue(resultValue, integerType);
+      } else if (
+        value.kind === ValueKind.Runtime &&
+        value.type &&
+        isNumeric(value.type)
+      ) {
+        // i'm smort that's why
+        // i copy-pastad
+        // actually, since it's not imported, it might be autocomplete for all we know
+        return createRuntimeValue(
+          buildIntegerCastInstruction(
+            caller,
+            getCurrentBlock(),
+            value as RuntimeValue,
+            integerType,
+          ),
+        );
+      } else {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          node,
+          "Invalid cast: value type is not numeric.",
+        );
+        return theInvalidValue;
+      }
+    };
 
 const floatCast =
   (floatKind: FloatKind) =>
-  ({
-    program,
-    module,
-    args,
-    caller,
-    node,
-    getCurrentBlock,
-  }: BuiltinFunctionParameters) => {
-    const [value] = args;
+    ({
+      program,
+      module,
+      args,
+      caller,
+      node,
+      getCurrentBlock,
+    }: BuiltinFunctionParameters) => {
+      const [value] = args;
 
-    if (value === theInvalidValue) {
-      return theInvalidValue;
-    }
+      if (value === theInvalidValue) {
+        return theInvalidValue;
+      }
 
-    const floatType = getFloatType(floatKind);
+      const floatType = getFloatType(floatKind);
 
-    if (value.kind === ValueKind.Float || value.kind === ValueKind.Integer) {
-      const compileTimeValue = value as ConstFloatValue | ConstIntegerValue;
-      const floatValue = Number(compileTimeValue.value);
-      return createFloatValue(floatValue, floatType);
+      if (value.kind === ValueKind.Float || value.kind === ValueKind.Integer) {
+        const compileTimeValue = value as ConstFloatValue | ConstIntegerValue;
+        const floatValue = Number(compileTimeValue.value);
+        return createFloatValue(floatValue, floatType);
 
-      // if value.type is null, we need to report a diagnostic, because it could be
-      // a function reference, scope element, etc.
-    } else if (
-      value.kind === ValueKind.Runtime &&
-      value.type &&
-      isNumeric(value.type)
-    ) {
-      return createRuntimeValue(
-        buildFloatCastInstruction(
-          caller,
-          getCurrentBlock(),
-          value as RuntimeValue,
-          floatType,
-        ),
-      );
-    } else {
-      reportErrorDiagnostic(
-        program,
-        module,
-        "type",
-        node,
-        "Invalid cast: value type is not numeric.",
-      );
-      return theInvalidValue;
-    }
-  };
+        // if value.type is null, we need to report a diagnostic, because it could be
+        // a function reference, scope element, etc.
+      } else if (
+        value.kind === ValueKind.Runtime &&
+        value.type &&
+        isNumeric(value.type)
+      ) {
+        return createRuntimeValue(
+          buildFloatCastInstruction(
+            caller,
+            getCurrentBlock(),
+            value as RuntimeValue,
+            floatType,
+          ),
+        );
+      } else {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          node,
+          "Invalid cast: value type is not numeric.",
+        );
+        return theInvalidValue;
+      }
+    };
 
 export function registerDefaultBuiltins(program: WhackoProgram): void {
   addBuiltinToProgram(
@@ -248,6 +258,178 @@ export function registerDefaultBuiltins(program: WhackoProgram): void {
         ),
         "String must be resolvable.",
       );
+    },
+  );
+
+  addBuiltinToProgram(
+    program,
+    "types.ref",
+    ({
+      program,
+      module,
+      typeParameters,
+      node,
+      args,
+      caller,
+      getCurrentBlock,
+    }) => {
+      const [inputType, outputType] = typeParameters;
+      const [theParameter] = args;
+
+      const inputIsUsize = typesEqual(
+        inputType,
+        getIntegerType(IntegerKind.USize),
+      );
+
+      if (!isReferenceType(outputType)) {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          node,
+          `The output type of types.ref() should return a reference type.`,
+        );
+        return theInvalidValue;
+      }
+
+      if (!isRawPointerType(inputType) && !inputIsUsize) {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          node,
+          `The input type of types.ref() should be a RawPointer or a usize.`,
+        );
+        return theInvalidValue;
+      }
+
+      const currentBlock = getCurrentBlock();
+
+      if (inputIsUsize) {
+        const runtimeValue = ensureRuntime(caller, currentBlock, theParameter);
+        const intToPtrInstruction = buildIntToPtrInstruction(
+          caller,
+          currentBlock,
+          outputType as ClassType,
+          runtimeValue,
+        );
+        return createRuntimeValue(intToPtrInstruction);
+      } else if (isRawPointerType(inputType)) {
+        const value = ensureRuntime(caller, currentBlock, theParameter);
+
+        return createRuntimeValue(
+          caller.instructions.get(value.instruction)!,
+          outputType,
+        );
+      } else {
+        UNREACHABLE("This is impossible. What happened?");
+      }
+    },
+  );
+
+  addBuiltinToProgram(program, "types.isReference", ({ typeParameters }) => {
+    return createIntegerValue(
+      isReferenceType(typeParameters[0]) ? 1n : 0n,
+      getIntegerType(IntegerKind.Bool),
+    );
+  });
+
+  addBuiltinToProgram(
+    program,
+    "types.idOf",
+    ({ program, node, module, typeParameters }) => {
+      const theType = typeParameters[0];
+
+      if (
+        isClassType(theType) ||
+        (isNullableType(theType) && isClassType(theType.child))
+      ) {
+        const classType = isNullableType(theType)
+          ? theType.child
+          : (theType as ClassType);
+        return createIntegerValue(
+          BigInt(classType.id),
+          getIntegerType(IntegerKind.U32),
+        );
+      }
+
+      reportErrorDiagnostic(
+        program,
+        module,
+        "type",
+        node,
+        `'types.idOf' must be called on a class or nullable type of class.`,
+      );
+      return theInvalidValue;
+    },
+  );
+
+  addBuiltinToProgram(
+    program,
+    "types.ptr",
+    ({
+      program,
+      module,
+      args,
+      caller,
+      node,
+      getCurrentBlock,
+      setCurrentBlock,
+    }) => {
+      const currentBlock = getCurrentBlock();
+      const thePtr = ensureRuntime(caller, currentBlock, assert(args[0]));
+      if (isReferenceType(thePtr.type)) {
+        const usizeType = getIntegerType(IntegerKind.USize);
+        const ptrToIntInstruction = buildPtrToIntInstruction(
+          caller,
+          currentBlock,
+          usizeType,
+          thePtr,
+        );
+        return createRuntimeValue(ptrToIntInstruction, usizeType);
+      } else {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          node,
+          `'types.ptr' can only be used on references or nullable references.`,
+        );
+        return theInvalidValue;
+      }
+    },
+  );
+
+  addBuiltinToProgram(
+    program,
+    "types.sizeOf",
+    ({
+      args,
+      caller,
+      funcType,
+      getCurrentBlock,
+      module,
+      node,
+      program,
+      setCurrentBlock,
+      typeParameters,
+    }) => {
+      const [theType] = typeParameters;
+      if (isNumeric(theType)) {
+        return createIntegerValue(
+          BigInt(getSize(theType)),
+          getIntegerType(IntegerKind.USize),
+        );
+      } else {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          node,
+          `'types.sizeOf' can only be called with integer types.`,
+        );
+        return theInvalidValue;
+      }
     },
   );
 

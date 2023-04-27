@@ -6,12 +6,11 @@ program:
   callable:[std/builtins.wo]gc.store_field_ptr;functionType:(i32Type,ptrType,ptrType,ptrType)=>voidType
 (extern function)
   callable:[test/programs/String.wo]_start;functionType:()=>voidType
-    block: entry~567
-      568~inst = (str "Hello world")
-      569~inst = store: (variable a) = (runtime classType:[std/String.wo]String<> 568~inst)
-      570~inst = load: (variable a)
-      571~inst = store: (variable compiler-generated) = (runtime classType:[std/String.wo]String<> 570~inst)
-      574~inst = call: callable:[std/console.wo]console.log;functionType:(classType:[std/String.wo]String<>)=>voidType with (runtime classType:[std/String.wo]String<> 570~inst)
+    block: entry~658
+      659~inst = (str "Hello world")
+      660~inst = store: (variable a) = (runtime classType:[std/String.wo]String<> 659~inst)
+      661~inst = load: (variable a)
+      664~inst = call: callable:[std/console.wo]console.log;functionType:(classType:[std/String.wo]String<>)=>voidType with (runtime classType:[std/String.wo]String<> 661~inst)
       return (void)
 
   callable:[std/console.wo]console.log;functionType:(classType:[std/String.wo]String<>)=>voidType

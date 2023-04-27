@@ -52,6 +52,9 @@ import {
   isInterfaceDeclaration,
   isClassDeclaration,
   isBinaryExpression,
+  isExpressionStatement,
+  isReturnStatement,
+  ArrayLiteral,
 } from "../generated/ast";
 import {
   BlockContext,
@@ -160,6 +163,7 @@ import {
   isInterfaceType,
   isClassType,
   isReferenceType,
+  getArrayTypeOf,
 } from "../types";
 import {
   assert,
@@ -706,7 +710,6 @@ export function ensureGCRoot(
   currentBlock: BlockContext,
   value: Value,
   node: AstNode,
-  force: boolean,
 ) {
   const $container = node.$container;
 
@@ -714,7 +717,12 @@ export function ensureGCRoot(
     isVariableDeclarator($container) ||
     (isBinaryExpression($container) && isAssignmentOperator($container));
 
-  if (force || (value.type && isReferenceType(value.type) && !isAssignment)) {
+  const isReference = value.type && isReferenceType(value.type);
+
+  const isDropped = isExpressionStatement($container);
+  const isReturned = isReturnStatement($container);
+
+  if (isReference && !isAssignment && !isDropped && !isReturned) {
     const rootSite = {
       immutable: false,
       node,
@@ -881,11 +889,8 @@ export class WIRGenPass extends WhackoVisitor {
     const derefLHS = ensureDereferenced(this.ctx, this.currentBlock, lhs);
 
     this.visit(node.rhs);
-    const derefRHS = ensureDereferenced(
-      this.ctx,
-      this.currentBlock,
-      this.assertValue,
-    );
+    const rhsValue = this.assertValue;
+    const derefRHS = ensureDereferenced(this.ctx, this.currentBlock, rhsValue);
 
     if (!derefLHS.type || !derefRHS.type) {
       this.value = theInvalidValue;
@@ -910,7 +915,7 @@ export class WIRGenPass extends WhackoVisitor {
         ensureRuntime(this.ctx, this.currentBlock, derefLHS),
         ensureRuntime(this.ctx, this.currentBlock, derefRHS),
       ));
-      ensureGCRoot(this.ctx, this.currentBlock, value, node, false);
+      ensureGCRoot(this.ctx, this.currentBlock, value, node);
       return;
     }
 
@@ -928,6 +933,8 @@ export class WIRGenPass extends WhackoVisitor {
           "LHS of assignment operator must be a field or variable reference",
         );
       } else if (!isAssignable(lhs.type, derefRHS.type)) {
+        const lhsType = getFullyQualifiedTypeName(derefLHS.type);
+        const rhsType = getFullyQualifiedTypeName(derefRHS.type);
         reportErrorDiagnostic(
           this.program,
           this.module,
@@ -1253,7 +1260,7 @@ export class WIRGenPass extends WhackoVisitor {
     }
 
     this.value = resultValue;
-    ensureGCRoot(this.ctx, this.currentBlock, resultValue, node, false);
+    ensureGCRoot(this.ctx, this.currentBlock, resultValue, node);
   }
 
   override visitStringLiteral(expression: StringLiteral): void {
@@ -1265,7 +1272,7 @@ export class WIRGenPass extends WhackoVisitor {
     );
 
     this.value = createRuntimeValue(newInst, theStrType);
-    ensureGCRoot(this.ctx, this.currentBlock, this.value, expression, false);
+    ensureGCRoot(this.ctx, this.currentBlock, this.value, expression);
     return;
   }
 
@@ -1412,7 +1419,7 @@ export class WIRGenPass extends WhackoVisitor {
       buildNewInstruction(this.ctx, this.currentBlock, concreteClass),
     );
 
-    ensureGCRoot(this.ctx, this.currentBlock, result, node, true);
+    ensureGCRoot(this.ctx, this.currentBlock, result, node);
 
     argumentValues.unshift(result);
     buildCallInstruction(
@@ -1538,13 +1545,7 @@ export class WIRGenPass extends WhackoVisitor {
                 });
               }
               this.value = createFieldReference(rootValue, field, node);
-              ensureGCRoot(
-                this.ctx,
-                this.currentBlock,
-                this.value,
-                node,
-                false,
-              );
+              ensureGCRoot(this.ctx, this.currentBlock, this.value, node);
               return;
             }
             const members = classType.node.members as AstNode[];
@@ -1654,7 +1655,7 @@ export class WIRGenPass extends WhackoVisitor {
           field,
           node,
         );
-        ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
+        ensureGCRoot(this.ctx, this.currentBlock, this.value, node);
         return;
       }
 
@@ -1735,7 +1736,7 @@ export class WIRGenPass extends WhackoVisitor {
         this.currentBlock,
         argumentValue,
       );
-      ensureGCRoot(this.ctx, this.currentBlock, parameterValue, node, false);
+      ensureGCRoot(this.ctx, this.currentBlock, parameterValue, node);
       argumentValues.push(parameterValue);
     }
 
@@ -1802,7 +1803,7 @@ export class WIRGenPass extends WhackoVisitor {
                 compiledArguments,
               ),
             );
-            ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
+            ensureGCRoot(this.ctx, this.currentBlock, this.value, node);
             return;
           }
           case ScopeElementType.Builtin: {
@@ -1879,7 +1880,7 @@ export class WIRGenPass extends WhackoVisitor {
                 this.currentBlock = block;
               },
             });
-            ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
+            ensureGCRoot(this.ctx, this.currentBlock, this.value, node);
             return;
           }
           case ScopeElementType.DeclareFunction: {
@@ -1941,7 +1942,7 @@ export class WIRGenPass extends WhackoVisitor {
                 compiledArgumentValues,
               ),
             );
-            ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
+            ensureGCRoot(this.ctx, this.currentBlock, this.value, node);
             return;
           }
           case ScopeElementType.Extern: {
@@ -2006,7 +2007,7 @@ export class WIRGenPass extends WhackoVisitor {
                 compiledArgumentValues,
               ),
             );
-            ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
+            ensureGCRoot(this.ctx, this.currentBlock, this.value, node);
             return;
           }
           default: {
@@ -2097,7 +2098,7 @@ export class WIRGenPass extends WhackoVisitor {
             compiledArguments,
           ),
         );
-        ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
+        ensureGCRoot(this.ctx, this.currentBlock, this.value, node);
         return;
       }
       case ValueKind.ConcreteFunction:
@@ -2196,7 +2197,7 @@ export class WIRGenPass extends WhackoVisitor {
         overload,
         ensureRuntime(this.ctx, this.currentBlock, operandDereferenced),
       );
-      ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
+      ensureGCRoot(this.ctx, this.currentBlock, this.value, node);
       return;
     }
 
@@ -2226,7 +2227,7 @@ export class WIRGenPass extends WhackoVisitor {
             this.currentBlock = block;
           },
         });
-        ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
+        ensureGCRoot(this.ctx, this.currentBlock, this.value, node);
         return;
       }
       // do we support prefix increment/decrement? it's fine either way
@@ -2345,7 +2346,7 @@ export class WIRGenPass extends WhackoVisitor {
         overload,
         ensureRuntime(this.ctx, this.currentBlock, operand),
       );
-      ensureGCRoot(this.ctx, this.currentBlock, this.value, node, false);
+      ensureGCRoot(this.ctx, this.currentBlock, this.value, node);
       return;
     }
 
@@ -2769,5 +2770,125 @@ export class WIRGenPass extends WhackoVisitor {
         type: this.program.voidType,
       });
     }
+  }
+
+  override visitArrayLiteral(node: ArrayLiteral): void {
+    const scope = assert(
+      getScope(node),
+      "The scope for this node should exist",
+    );
+    const type = resolveType(
+      this.program,
+      this.module,
+      node.type,
+      scope,
+      this.ctx.typeMap,
+    );
+
+    if (!type) {
+      reportErrorDiagnostic(
+        this.program,
+        this.module,
+        "type",
+        node.type,
+        `Cannot resolve array type.`,
+      );
+      this.value = theInvalidValue;
+      return;
+    }
+
+    const arrayType = getArrayTypeOf(this.program, this.module, type);
+
+    // create the array
+    const newInstruction = buildNewInstruction(
+      this.ctx,
+      this.currentBlock,
+      arrayType,
+    );
+    const arrayValue = createRuntimeValue(newInstruction, arrayType);
+
+    // get the constructor type and
+    const constructorNode = assert(
+      arrayType.node.members.find((e) => isConstructorClassMember(e)),
+      "Constructor node for arrays must exist at this point.",
+    ) as ConstructorClassMember;
+    const constructorType = assert(
+      getConstructorType(this.program, this.module, arrayType, constructorNode),
+      "The constructor type for the constructor method must be resolvable.",
+    );
+    const constructorMethod = ensureConstructorCompiled(
+      this.program,
+      this.module,
+      arrayType,
+      constructorType,
+      constructorNode,
+    );
+
+    const usizeType = getIntegerType(IntegerKind.USize);
+    const arraySizeConst = createIntegerValue(
+      BigInt(node.values.length),
+      usizeType,
+    );
+
+    const runtimeArraySize = ensureRuntime(
+      this.ctx,
+      this.currentBlock,
+      arraySizeConst,
+    );
+    buildCallInstruction(this.ctx, this.currentBlock, constructorMethod, [
+      arrayValue,
+      runtimeArraySize,
+    ]);
+
+    const setMethod = assert(
+      getOperatorOverloadMethod(
+        this.program,
+        this.module,
+        arrayType,
+        type,
+        "[]=",
+        node,
+      ),
+      "The operator overload set for arrays method for arrays must exist",
+    );
+
+    assert(isAssignable(setMethod.type.parameterTypes[0], type));
+    assert(typesEqual(setMethod.type.parameterTypes[1], usizeType));
+
+    for (let i = 0; i < node.values.length; i++) {
+      this.visit(node.values[i]);
+      const arrayElementValue = ensureRuntime(
+        this.ctx,
+        this.currentBlock,
+        this.assertValue,
+      );
+
+      const arrayIndexValue = createIntegerValue(BigInt(i), usizeType);
+      // const arrayIndexConstInst = buildConstInstruction(this.ctx, this.currentBlock, arrayIndexValue);
+      const arrayIndexRuntimeValue = ensureRuntime(
+        this.ctx,
+        this.currentBlock,
+        arrayIndexValue,
+      );
+
+      if (isAssignable(type, arrayElementValue.type)) {
+        buildCallInstruction(this.ctx, this.currentBlock, setMethod, [
+          arrayValue,
+          arrayElementValue,
+          arrayIndexRuntimeValue,
+        ]);
+      } else {
+        reportErrorDiagnostic(
+          this.program,
+          this.module,
+          "type",
+          node.values[i],
+          `Array element is not assignable to array type.`,
+        );
+        continue;
+      }
+    }
+
+    this.value = arrayValue;
   }
 }

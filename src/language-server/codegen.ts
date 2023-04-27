@@ -832,6 +832,7 @@ export function codegenGCVisitTrampoline(
   for (const classType of classes) {
     const className = getFullyQualifiedTypeName(classType);
     const blockName = LLVMUtil.lower(className);
+
     const block = LLVM._LLVMAppendBasicBlock(funcRef, blockName);
     LLVM._free(blockName);
 
@@ -862,7 +863,16 @@ export function codegenGCVisitTrampoline(
       }
 
       const indices = LLVMUtil.lowerPointerArray([
-        LLVM._LLVMConstInt(LLVM._LLVMInt32Type(), i, 0 as LLVMBool),
+        LLVM._LLVMConstInt(
+          LLVM._LLVMInt32Type(),
+          0n,
+          Number(false) as LLVMBool,
+        ),
+        LLVM._LLVMConstInt(
+          LLVM._LLVMInt32Type(),
+          i + 4n,
+          Number(false) as LLVMBool,
+        ),
       ]);
       const gepName = LLVMUtil.lower(`gep~${idCounter.value++}`);
       const gep = LLVM._LLVMBuildGEP2(
@@ -886,17 +896,32 @@ export function codegenGCVisitTrampoline(
       LLVM._free(loadName);
 
       const args = LLVMUtil.lowerPointerArray([load]);
-      const loweredFieldName = LLVMUtil.lower(`${className}#${name}`);
       LLVM._LLVMBuildCall2(
         llvmBuilder,
         typeRef,
         gcVisitFuncRef,
         args,
         1,
-        loweredFieldName,
+        Number(null) as LLVMStringRef,
       );
-      LLVM._free(loweredFieldName);
       LLVM._free(args);
+
+      // we need to call __whacko_gc_visit
+      if (classType.gcVisitor) {
+        const gcVisitor = classType.gcVisitor as WhackoMethodContext;
+
+        const args = LLVMUtil.lowerPointerArray([
+          LLVM._LLVMGetParam(funcRef, 0),
+        ]);
+        LLVM._LLVMBuildCall2(
+          llvmBuilder,
+          getLLVMFunctionType(LLVM, LLVMUtil, gcVisitor.type),
+          assert(gcVisitor.funcRef, "The function should already be compiled."),
+          args,
+          1,
+          Number(null) as LLVMStringRef,
+        );
+      }
     }
     LLVM._LLVMBuildRetVoid(llvmBuilder);
   }
@@ -1142,15 +1167,7 @@ export function getLLVMValue(
           LLVM._LLVMConstInt(LLVM._LLVMInt32Type(), BigInt(index + 4), 0),
         ]);
 
-        // What could possible be wrong if everything's runtime
-        // and it's just returning the ref?
-        // how about we try something else...
-        assert(isRuntimeValue(thisValue), "temporary");
-        console.log(
-          printInstructionToString(
-            func.instructions.get(thisValue.instruction)!,
-          ),
-        );
+
         const result = LLVM._LLVMBuildGEP2(
           builder,
           structType,
@@ -1896,17 +1913,16 @@ function appendLLVMInstruction(
           getLLVMValue(program, func, builder, LLVM, LLVMUtil, casted.value),
           getLLVMValue(program, func, builder, LLVM, LLVMUtil, casted.target),
         ]);
-        const callName = LLVMUtil.lower(`callName~${idCounter.value++}`);
+
         const result = LLVM._LLVMBuildCall2(
           builder,
           getLLVMType(LLVM, LLVMUtil, storeFieldPtrFunc.type),
           funcRef,
           loweredArgs,
-          3,
-          callName,
+          4,
+          Number(null) as LLVMStringRef,
         );
         LLVM._free(loweredArgs);
-        LLVM._free(callName);
 
         return result;
       }

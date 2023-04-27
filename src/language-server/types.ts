@@ -146,14 +146,15 @@ export interface ConcreteField {
 export interface ClassType extends ConcreteType {
   classConstructor: WhackoFunctionContext | null;
   fields: Map<string, ConcreteField>;
+  gcVisitor: WhackoMethodContext | null;
   id: number;
   implements: Map<InterfaceType, NamedTypeExpression>;
   kind: ConcreteTypeKind.Class;
+  llvmStructType: LLVMTypeRef | null;
   methods: Map<string, WhackoFunctionContext>;
   node: ClassDeclaration;
   resolvedTypes: TypeMap;
   typeParameters: ConcreteType[];
-  llvmStructType: LLVMTypeRef | null;
 }
 
 export interface InterfaceType extends ConcreteType {
@@ -578,6 +579,7 @@ export function resolveClass(
 
   const fields = new Map<string, ConcreteField>();
 
+  // for each field
   for (const member of node.members) {
     if (!isFieldClassMember(member)) continue;
 
@@ -621,10 +623,16 @@ export function resolveClass(
     });
   }
 
+  const gcVisitNode =
+    (node.members.find(
+      (e) => isMethodClassMember(e) && e.name.name === "__gc_visit",
+    ) as MethodClassMember | void) ?? null;
+
   const interfaces = new Map();
   const result: ClassType = {
     classConstructor: null,
     fields,
+    gcVisitor: null,
     id: program.classId++,
     implements: interfaces,
     kind: ConcreteTypeKind.Class,
@@ -636,13 +644,55 @@ export function resolveClass(
     typeParameters,
   };
 
-  program.classes.set(name, result);
+  if (gcVisitNode) {
+    const scope = assert(
+      getScope(gcVisitNode),
+      "The scope for this method should exist.",
+    );
+    const returnType = resolveType(
+      program,
+      module,
+      gcVisitNode.returnType,
+      scope,
+      newTypeMap,
+    );
+    if (
+      gcVisitNode.parameters.length === 0 &&
+      gcVisitNode.typeParameters.length === 0 &&
+      returnType &&
+      returnType === program.voidType
+    ) {
+      const gcVisit = ensureCallableCompiled(
+        program,
+        module,
+        gcVisitNode as MethodClassMember,
+        result,
+        [],
+        newTypeMap,
+      ) as WhackoMethodContext | null;
+      if (gcVisit) {
+        result.gcVisitor = gcVisit;
+      } else {
+        reportErrorDiagnostic(
+          program,
+          module,
+          "type",
+          gcVisitNode.name,
+          `The gc visitor could not be compiled.`,
+        );
+      }
+    } else {
+      reportErrorDiagnostic(
+        program,
+        module,
+        "type",
+        gcVisitNode.name,
+        `__gc_visit has the wrong signature type.`,
+      );
+    }
+  }
 
-  // 0. Type params, type maps, fields, basically everything above us.
-  // 1. Ensure the interface is compiled
-  // 2. Add the class to each interface's array of implementors
-  // 3. Validate field existence/types and method existence/signatures
-  // 4. WHEN A METHOD IS ACCESSED FROM THE INTERFACE: ensure all the implementors' methods are compiled
+  program.classes.set(name, result);
 
   for (const implement of node.implements) {
     const type = resolveType(program, module, implement, nodeScope, newTypeMap);
@@ -684,18 +734,7 @@ export function resolveClass(
         continue;
       }
 
-      // We check for equality because someone could cast the class to its parent
-      // interface and modify the field there. That would be inherently type
-      // type unsafe, because an object could be assignable to the parent's type
-      // but not the child's. Once a child's method implementation runs with that
-      // modified child, all bets are off.
       if (!typesEqual(field.type, concreteField.type)) {
-        // `implement` is intentionally used instead of `concreteField.node.type`.
-        // Otherwise, we would need to indicate which interface was the issue
-        // somehow. That means stringifying a ConcreteType, which isn't worth the
-        // effort. Just point at the referenced interface in "implements Foo"
-        // instead.
-
         reportErrorDiagnostic(
           program,
           module,
@@ -705,8 +744,6 @@ export function resolveClass(
         );
         continue;
       }
-
-      // Everything is fine and dandy, field-wise.
     }
   }
 
@@ -913,6 +950,8 @@ export function resolveType(
 
       if (!typeExpression.typeParameters.length) {
         switch (node.name) {
+          case "bool":
+            return getIntegerType(IntegerKind.Bool);
           case "i8":
             return getIntegerType(IntegerKind.I8);
           case "u8":
@@ -1452,13 +1491,15 @@ export function getOperatorOverloadMethod(
   }
 
   if (!methodAst) {
-    reportErrorDiagnostic(
-      program,
-      module,
-      "type",
-      operatorNode,
-      `Could not find valid operator ${op} overload.`,
-    );
+    if (op !== "=") {
+      reportErrorDiagnostic(
+        program,
+        module,
+        "type",
+        operatorNode,
+        `Could not find valid operator ${op} overload.`,
+      );
+    }
     return null;
   }
 
@@ -1548,6 +1589,32 @@ export function isNullableType(type: ConcreteType): type is NullableType {
 
 export function isReferenceType(
   type: ConcreteType,
-): type is ClassType | IntegerType | NullableType {
+): type is ClassType | InterfaceType | NullableType {
   return isClassType(type) || isInterfaceType(type) || isNullableType(type);
+}
+
+export function isRawPointerType(type: ConcreteType): type is RawPointerType {
+  return type.kind === ConcreteTypeKind.Pointer;
+}
+
+export function getArrayTypeOf(
+  program: WhackoProgram,
+  module: WhackoModule,
+  type: ConcreteType,
+): ClassType {
+  const arrayScopeElement = assert(
+    program.globalScope.elements.get("Array"),
+    "The scope element for array must exist.",
+  );
+  const arrayDeclaration = arrayScopeElement.node as ClassDeclaration;
+
+  assert(isClassDeclaration(arrayDeclaration));
+  assert(arrayDeclaration.typeParameters.length === 1);
+
+  const arrayClass = assert(
+    resolveClass(program, module, arrayScopeElement, [type]),
+    "The array class type must be resolvable.",
+  );
+
+  return arrayClass;
 }

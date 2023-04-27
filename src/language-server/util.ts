@@ -95,8 +95,6 @@ export function getNodeName(node: Nameable | ConstructorClassMember): string {
   }
 
   const result = `[${module.relativePath}]${accumulatedName}`;
-  if (scope.module?.relativePath === "std/Box.wo")
-    console.log(scope.id, result);
   return result;
 }
 

@@ -233,7 +233,10 @@ PathExpression:
     )*;
 
 PrimaryExpression infers Expression:
-    FunctionLiteral | GroupLiteral | FloatLiteral | IntegerLiteral | HexLiteral | BinaryLiteral | OctalLiteral | StringLiteral | FalseLiteral | TrueLiteral | NullLiteral | AsyncBlockLiteral;
+    ArrayLiteral | FunctionLiteral | GroupLiteral | FloatLiteral | IntegerLiteral | HexLiteral | BinaryLiteral | OctalLiteral | StringLiteral | FalseLiteral | TrueLiteral | NullLiteral | AsyncBlockLiteral;
+
+ArrayLiteral:
+    "[" type=TypeExpression ";" (values+=Expression ("," values+=Expression)*)? "]";
 
 GroupLiteral infers Expression:
     "(" Expression ")";

@@ -1,3 +1,36 @@
 export class Array<T> {
-  constructor() {}
+  buffer: ArrayBuffer;
+  length: usize;
+
+  constructor(capacity: usize) {
+    // overhead of a whacko object
+    const overhead = types.sizeOf<usize>() * usize(2) + types.sizeOf<u32>() * usize(2);
+
+
+    this.buffer = types.ref<types.RawPointer, ArrayBuffer>(
+      gc.alloc(
+        types.idOf<ArrayBuffer>(),
+        overhead + capacity * (
+          types.isReference<T>()
+            ? types.sizeOf<usize>()
+            : types.sizeOf<T>()
+        )
+      )
+    );
+
+    this.length = usize(0);
+  }
+
+  __gc_visit(): void {
+    if (types.isReference<T>()) {
+      let i = usize(0);
+      let length = this.length;
+      let elements = types.ptr(this.buffer);
+
+      while (i < length) {
+        gc.visit(elements + i * types.sizeOf<usize>());
+        i++;
+      }
+    }
+  }
 }

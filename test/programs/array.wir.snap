@@ -1,0 +1,37 @@
+program:
+  callable:[std/builtins.wo]gc.initialize;functionType:()=>voidType
+(extern function)
+  callable:[std/builtins.wo]gc.alloc;functionType:(u32Type,usizeType)=>ptrType
+(extern function)
+  callable:[std/builtins.wo]gc.store_field_ptr;functionType:(i32Type,ptrType,ptrType,ptrType)=>voidType
+(extern function)
+  callable:[test/programs/array.wo]_start;functionType:()=>voidType
+    block: entry~557
+      562~inst = (u32 100)
+      570~inst = new: classType:[std/array.wo]Array<i32Type>
+      571~inst = call: callable:[std/array.wo]Array.constructor;methodType:classType:[std/array.wo]Array<i32Type>#(usizeType)=>voidType with (runtime classType:[std/array.wo]Array<i32Type> 570~inst), (runtime usizeType 562~inst)
+      572~inst = store: (variable a) = (runtime classType:[std/array.wo]Array<i32Type> 570~inst)
+      return (void)
+
+  callable:[std/array.wo]Array.__gc_visit;methodType:classType:[std/array.wo]Array<i32Type>#()=>voidType
+    block: entry~629
+      return (void)
+
+  callable:[std/array.wo]Array.constructor;methodType:classType:[std/array.wo]Array<i32Type>#(usizeType)=>voidType
+    block: entry~574
+      592~inst = load: (variable const compiler-generated)
+      593~inst = load: (field classType:[std/array.wo]Array<i32Type>#buffer of (runtime classType:[std/array.wo]Array<i32Type> 592~inst))
+      597~inst = load: (variable const overhead)
+      598~inst = load: (variable capacity)
+      609~inst = (u32 32)
+      610~inst = 598~inst * 609~inst
+      611~inst = 597~inst + 610~inst
+      615~inst = (u32 1)
+      616~inst = call: callable:[std/builtins.wo]gc.alloc;functionType:(u32Type,usizeType)=>ptrType with (runtime u32Type 615~inst), (runtime usizeType 611~inst)
+      619~inst = store: (field classType:[std/array.wo]Array<i32Type>#buffer of (runtime classType:[std/array.wo]Array<i32Type> 592~inst)) = (runtime classType:[std/buffer.wo]ArrayBuffer<> 616~inst)
+      620~inst = load: (variable const compiler-generated)
+      621~inst = load: (field classType:[std/array.wo]Array<i32Type>#length of (runtime classType:[std/array.wo]Array<i32Type> 620~inst))
+      626~inst = (u32 0)
+      627~inst = store: (field classType:[std/array.wo]Array<i32Type>#length of (runtime classType:[std/array.wo]Array<i32Type> 620~inst)) = (runtime usizeType 626~inst)
+      return (void)
+
